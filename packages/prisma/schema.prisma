@@ -1,0 +1,388 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── AUTH ────────────────────────────────────────────────
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  TECHNICIAN
+  RECEPTIONIST
+}
+
+model Users {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique @db.VarChar(255)
+  password_hash String    @db.VarChar(255)
+  full_name     String    @db.VarChar(100)
+  phone         String?   @db.VarChar(20)
+  role          UserRole
+  is_active     Boolean   @default(true)
+  last_login_at DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+
+  // Relations
+  created_contracts   Contracts[]              @relation("ContractCreator")
+  status_logs         ApartmentStatusLogs[]
+  utility_recordings  UtilityReadings[]
+  invoice_creations   Invoices[]
+  payment_records     Payments[]
+  service_assignments ServiceRequests[]        @relation("AssignedTo")
+  service_requests_by ServiceRequests[]        @relation("RequestedBy")
+  contract_renewals   ContractRenewals[]
+  temp_registrations  TemporaryRegistrations[]
+}
+
+// ─── BUILDING & APARTMENT ────────────────────────────────
+
+model Buildings {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.VarChar(20)
+  name         String   @db.VarChar(100)
+  address      String   @db.Text
+  total_floors Int
+  description  String?  @db.Text
+  created_at   DateTime @default(now())
+
+  floors Floors[]
+}
+
+model Floors {
+  id           Int     @id @default(autoincrement())
+  building_id  Int
+  floor_number Int
+  description  String? @db.VarChar(255)
+
+  building   Buildings    @relation(fields: [building_id], references: [id])
+  apartments Apartments[]
+
+  @@index([building_id])
+}
+
+enum ApartmentStatus {
+  AVAILABLE
+  OCCUPIED
+  MAINTENANCE
+  RESERVED
+}
+
+enum RoomType {
+  STUDIO
+  ONE_BR
+  TWO_BR
+  THREE_BR
+}
+
+model Apartments {
+  id             Int             @id @default(autoincrement())
+  floor_id       Int
+  apartment_code String          @unique @db.VarChar(20)
+  room_type      RoomType
+  area_sqm       Decimal         @db.Decimal(6, 2)
+  max_occupants  Int
+  base_price     Decimal         @db.Decimal(15, 2)
+  deposit_amount Decimal         @db.Decimal(15, 2)
+  status         ApartmentStatus @default(AVAILABLE)
+  description    String?         @db.Text
+  created_at     DateTime        @default(now())
+  updated_at     DateTime        @updatedAt
+
+  floor              Floors                   @relation(fields: [floor_id], references: [id])
+  furniture          ApartmentFurniture[]
+  status_logs        ApartmentStatusLogs[]
+  contracts          Contracts[]
+  utility_readings   UtilityReadings[]
+  invoices           Invoices[]
+  temp_registrations TemporaryRegistrations[]
+
+  @@index([floor_id])
+  @@index([status])
+}
+
+enum FurnitureCondition {
+  NEW
+  GOOD
+  WORN
+}
+
+model ApartmentFurniture {
+  id           Int                @id @default(autoincrement())
+  apartment_id Int
+  item_name    String             @db.VarChar(100)
+  quantity     Int
+  condition    FurnitureCondition
+  note         String?            @db.Text
+  created_at   DateTime           @default(now())
+
+  apartment Apartments @relation(fields: [apartment_id], references: [id])
+
+  @@index([apartment_id])
+}
+
+model ApartmentStatusLogs {
+  id           Int             @id @default(autoincrement())
+  apartment_id Int
+  old_status   ApartmentStatus
+  new_status   ApartmentStatus
+  changed_by   Int
+  reason       String?         @db.Text
+  changed_at   DateTime        @default(now())
+
+  apartment Apartments @relation(fields: [apartment_id], references: [id])
+  user      Users      @relation(fields: [changed_by], references: [id])
+
+  @@index([apartment_id])
+}
+
+// ─── TENANT & CONTRACT ───────────────────────────────────
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+model Tenants {
+  id                       Int      @id @default(autoincrement())
+  full_name                String   @db.VarChar(100)
+  national_id              String   @unique @db.VarChar(20)
+  national_id_issued_date  DateTime @db.Date
+  national_id_issued_place String   @db.VarChar(255)
+  date_of_birth            DateTime @db.Date
+  gender                   Gender
+  phone                    String   @db.VarChar(20)
+  email                    String?  @db.VarChar(255)
+  permanent_address        String   @db.Text
+  nationality              String   @default("Việt Nam") @db.VarChar(100)
+  occupation               String?  @db.VarChar(100)
+  avatar_url               String?  @db.VarChar(512)
+  created_at               DateTime @default(now())
+  updated_at               DateTime @updatedAt
+
+  contracts               Contracts[]
+  temporary_registrations TemporaryRegistrations[]
+
+  @@index([national_id])
+  @@index([phone])
+}
+
+enum ContractStatus {
+  ACTIVE
+  EXPIRING_SOON
+  EXPIRED
+  TERMINATED
+}
+
+model Contracts {
+  id                 Int            @id @default(autoincrement())
+  contract_code      String         @unique @db.VarChar(30)
+  tenant_id          Int
+  apartment_id       Int
+  start_date         DateTime       @db.Date
+  end_date           DateTime       @db.Date
+  monthly_rent       Decimal        @db.Decimal(15, 2)
+  deposit_amount     Decimal        @db.Decimal(15, 2)
+  payment_due_day    Int
+  status             ContractStatus @default(ACTIVE)
+  termination_reason String?        @db.Text
+  notes              String?        @db.Text
+  created_by         Int
+  created_at         DateTime       @default(now())
+  updated_at         DateTime       @updatedAt
+
+  tenant    Tenants    @relation(fields: [tenant_id], references: [id])
+  apartment Apartments @relation(fields: [apartment_id], references: [id])
+  creator   Users      @relation("ContractCreator", fields: [created_by], references: [id])
+
+  renewals              ContractRenewals[]
+  service_subscriptions ServiceSubscriptions[]
+  invoices              Invoices[]
+
+  @@index([tenant_id])
+  @@index([apartment_id])
+  @@index([status])
+  @@index([end_date])
+}
+
+model ContractRenewals {
+  id               Int      @id @default(autoincrement())
+  contract_id      Int
+  old_end_date     DateTime @db.Date
+  new_end_date     DateTime @db.Date
+  new_monthly_rent Decimal  @db.Decimal(15, 2)
+  notes            String?  @db.Text
+  renewed_by       Int
+  created_at       DateTime @default(now())
+
+  contract Contracts @relation(fields: [contract_id], references: [id])
+  user     Users     @relation(fields: [renewed_by], references: [id])
+
+  @@index([contract_id])
+}
+
+enum RegistrationType {
+  TEMPORARY_RESIDENCE
+  TEMPORARY_ABSENCE
+}
+
+model TemporaryRegistrations {
+  id           Int              @id @default(autoincrement())
+  tenant_id    Int
+  apartment_id Int
+  type         RegistrationType
+  start_date   DateTime         @db.Date
+  end_date     DateTime         @db.Date
+  destination  String?          @db.VarChar(255)
+  reason       String?          @db.Text
+  submitted_by Int
+  created_at   DateTime         @default(now())
+
+  tenant    Tenants    @relation(fields: [tenant_id], references: [id])
+  apartment Apartments @relation(fields: [apartment_id], references: [id])
+  submitter Users      @relation(fields: [submitted_by], references: [id])
+
+  @@index([tenant_id])
+  @@index([apartment_id])
+}
+
+// ─── SERVICE & FINANCE ───────────────────────────────────
+
+enum ServiceType {
+  CLEANING
+  LAUNDRY
+  INTERNET
+  CABLE_TV
+  OTHER
+}
+
+model Services {
+  id          Int         @id @default(autoincrement())
+  name        String      @db.VarChar(100)
+  type        ServiceType
+  unit_price  Decimal     @db.Decimal(15, 2)
+  unit        String      @db.VarChar(30)
+  description String?     @db.Text
+  is_active   Boolean     @default(true)
+
+  subscriptions ServiceSubscriptions[]
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELLED
+}
+
+model ServiceSubscriptions {
+  id            Int                @id @default(autoincrement())
+  contract_id   Int
+  service_id    Int
+  status        SubscriptionStatus @default(ACTIVE)
+  quantity      Int                @default(1)
+  note          String?            @db.Text
+  subscribed_at DateTime           @default(now())
+
+  contract Contracts @relation(fields: [contract_id], references: [id])
+  service  Services  @relation(fields: [service_id], references: [id])
+
+  @@index([contract_id])
+}
+
+model UtilityReadings {
+  id                     Int      @id @default(autoincrement())
+  apartment_id           Int
+  billing_month          String   @db.VarChar(7) // YYYY-MM
+  electricity_prev       Decimal  @db.Decimal(10, 2)
+  electricity_curr       Decimal  @db.Decimal(10, 2)
+  water_prev             Decimal  @db.Decimal(10, 2)
+  water_curr             Decimal  @db.Decimal(10, 2)
+  electricity_unit_price Decimal  @db.Decimal(10, 2)
+  water_unit_price       Decimal  @db.Decimal(10, 2)
+  recorded_by            Int
+  recorded_at            DateTime @default(now())
+
+  apartment Apartments @relation(fields: [apartment_id], references: [id])
+  recorder  Users      @relation(fields: [recorded_by], references: [id])
+
+  @@unique([apartment_id, billing_month])
+  @@index([apartment_id])
+}
+
+enum InvoiceStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+}
+
+model Invoices {
+  id                 Int           @id @default(autoincrement())
+  invoice_code       String        @unique @db.VarChar(30)
+  contract_id        Int
+  apartment_id       Int
+  billing_month      String        @db.VarChar(7)
+  rent_amount        Decimal       @db.Decimal(15, 2)
+  electricity_amount Decimal       @db.Decimal(15, 2)
+  water_amount       Decimal       @db.Decimal(15, 2)
+  service_amount     Decimal       @db.Decimal(15, 2)
+  other_amount       Decimal       @default(0) @db.Decimal(15, 2)
+  total_amount       Decimal       @db.Decimal(15, 2)
+  status             InvoiceStatus @default(UNPAID)
+  due_date           DateTime      @db.Date
+  created_by         Int
+  created_at         DateTime      @default(now())
+
+  contract  Contracts  @relation(fields: [contract_id], references: [id])
+  apartment Apartments @relation(fields: [apartment_id], references: [id])
+  creator   Users      @relation(fields: [created_by], references: [id])
+  payments  Payments[]
+
+  @@unique([contract_id, billing_month])
+  @@index([status])
+  @@index([due_date])
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+}
+
+model Payments {
+  id               Int           @id @default(autoincrement())
+  invoice_id       Int
+  amount           Decimal       @db.Decimal(15, 2)
+  payment_method   PaymentMethod
+  payment_date     DateTime      @db.Date
+  reference_number String?       @db.VarChar(100)
+  note             String?       @db.Text
+  recorded_by      Int
+  created_at       DateTime      @default(now())
+
+  invoice  Invoices @relation(fields: [invoice_id], references: [id])
+  recorder Users    @relation(fields: [recorded_by], references: [id])
+
+  @@index([invoice_id])
+}
+
+// Missing ServiceRequests model to satisfy Users relation
+model ServiceRequests {
+  id           Int      @id @default(autoincrement())
+  requested_by Int
+  assigned_to  Int?
+  description  String   @db.Text
+  status       String   @db.VarChar(50) // Ví dụ: PENDING, IN_PROGRESS, RESOLVED
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  requester Users  @relation("RequestedBy", fields: [requested_by], references: [id])
+  assignee  Users? @relation("AssignedTo", fields: [assigned_to], references: [id])
+
+  @@index([requested_by])
+  @@index([assigned_to])
+}
