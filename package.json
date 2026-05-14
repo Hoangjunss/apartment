@@ -10,5 +10,12 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "packageManager": "pnpm@10.33.0"
+  "packageManager": "pnpm@10.33.0",
+  "prisma": {
+    "schema": "packages/prisma/schema.prisma",
+    "seed": "node packages/prisma/seed.js"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0"
+  }
 }
