@@ -1,0 +1,19 @@
+{
+  "name": "@my/prisma",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.14.0",
+    "bcrypt": "^6.0.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.14.0"
+  },
+  "prisma": {
+    "seed": "node seed.js"
+  }
+}
