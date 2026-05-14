@@ -1,0 +1,14 @@
+{
+  "name": "@my/tenant-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "@my/auth-backend": "workspace:*",
+    "@my/prisma": "workspace:*"
+  }
+}
