@@ -1,11 +1,24 @@
 import express from 'express';
+import cors from 'cors';
+import authRouter from '@my/auth-backend';
+import buildingRouter from '@my/building-backend';
+import tenantRouter from '@my/tenant-backend';
+import contractRouter from '@my/contract-backend';
 
 const app = express();
 const port = process.env.PORT || 3001;
 
+app.use(cors());
+app.use(express.json());
+
 app.get('/', (req, res) => {
   res.send('Backend is running!');
 });
+
+app.use('/api/auth', authRouter);
+app.use('/api/building', buildingRouter);
+app.use('/api/tenant', tenantRouter);
+app.use('/api/contract', contractRouter);
 
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);
