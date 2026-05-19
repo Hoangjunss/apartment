@@ -2,10 +2,13 @@
   "name": "backend-main",
   "type": "module",
   "dependencies": {
-    "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.2",
     "@my/auth-backend": "workspace:*",
-    "@my/building-backend": "workspace:*"
+    "@my/building-backend": "workspace:*",
+    "@my/contract-backend": "workspace:*",
+    "@my/tenant-backend": "workspace:*",
+    "cors": "^2.8.6",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2"
   },
   "scripts": {
     "start": "node server.js",

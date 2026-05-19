@@ -17,5 +17,14 @@
   },
   "devDependencies": {
     "prisma": "^5.22.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "bcrypt",
+      "@prisma/engines",
+      "prisma",
+      "@prisma/client",
+      "esbuild"
+    ]
   }
 }
