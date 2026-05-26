@@ -4,6 +4,7 @@ import authRouter from '@my/auth-backend';
 import buildingRouter from '@my/building-backend';
 import tenantRouter from '@my/tenant-backend';
 import contractRouter from '@my/contract-backend';
+import '@my/contract-backend/cron.js';
 
 const app = express();
 const port = process.env.PORT || 3001;

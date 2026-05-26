@@ -2,16 +2,32 @@
   "name": "frontend-main",
   "type": "module",
   "scripts": {
-    "dev": "vite"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-router-dom": "^6.22.0",
+    "axios": "^1.6.0",
+    "@tanstack/react-query": "^5.17.0",
+    "react-hook-form": "^7.49.0",
+    "@hookform/resolvers": "^3.3.0",
+    "zod": "^3.22.0",
+    "lucide-react": "^0.309.0",
+    "react-hot-toast": "^2.4.1",
+    "date-fns": "^3.3.0",
     "@my/auth-frontend": "workspace:*",
-    "@my/building-frontend": "workspace:*"
+    "@my/building-frontend": "workspace:*",
+    "@my/tenant-frontend": "workspace:*",
+    "@my/contract-frontend": "workspace:*"
   },
   "devDependencies": {
     "vite": "^5.0.0",
-    "@vitejs/plugin-react": "^4.0.0"
+    "@vitejs/plugin-react": "^4.0.0",
+    "tailwindcss": "^3.4.0",
+    "postcss": "^8.4.0",
+    "autoprefixer": "^10.4.0"
   }
 }
