@@ -5,6 +5,7 @@
     "@my/auth-backend": "workspace:*",
     "@my/building-backend": "workspace:*",
     "@my/contract-backend": "workspace:*",
+    "@my/finance-backend": "workspace:*",
     "@my/tenant-backend": "workspace:*",
     "cors": "^2.8.6",
     "express": "^4.18.2",

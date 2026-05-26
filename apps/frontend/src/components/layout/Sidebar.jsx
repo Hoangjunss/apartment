@@ -7,6 +7,8 @@ import {
   Users,
   FileText,
   UserCog,
+  Zap,
+  Receipt,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import {
@@ -47,6 +49,18 @@ const NAV_ITEMS = [
     label: 'Hợp đồng',
     icon: FileText,
     roles: CONTRACT_VIEW_ROLES,
+  },
+  {
+    to: '/utilities',
+    label: 'Điện nước',
+    icon: Zap,
+    roles: ALL_ROLES,
+  },
+  {
+    to: '/invoices',
+    label: 'Hóa đơn',
+    icon: Receipt,
+    roles: ALL_ROLES,
   },
   {
     to: '/users',

@@ -163,7 +163,7 @@ function StatusLogsTab({ apartmentId }) {
               <p className="text-xs text-gray-500 mt-1">Lý do: {log.reason}</p>
             )}
             <p className="text-xs text-gray-400 mt-0.5">
-              {log.changed_by?.full_name ?? 'Hệ thống'} •{' '}
+              {log.user?.full_name ?? 'Hệ thống'} •{' '}
               {log.created_at ? format(parseISO(log.created_at), 'dd/MM/yyyy HH:mm') : ''}
             </p>
           </div>

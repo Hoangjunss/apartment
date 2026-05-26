@@ -21,7 +21,8 @@
     "@my/auth-frontend": "workspace:*",
     "@my/building-frontend": "workspace:*",
     "@my/tenant-frontend": "workspace:*",
-    "@my/contract-frontend": "workspace:*"
+    "@my/contract-frontend": "workspace:*",
+    "@my/finance-frontend": "workspace:*"
   },
   "devDependencies": {
     "vite": "^5.0.0",

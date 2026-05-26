@@ -99,8 +99,13 @@ export const getTenantHistory = async (id) => {
   });
 
   return history.map((h) => ({
+    id: h.id,
     contract_code: h.contract_code,
     apartment_code: h.apartment.apartment_code,
+    apartment: {
+      id: h.apartment_id,
+      apartment_code: h.apartment.apartment_code,
+    },
     building_name: h.apartment.floor.building.name,
     start_date: h.start_date,
     end_date: h.end_date,

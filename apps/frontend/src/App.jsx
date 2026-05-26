@@ -34,6 +34,11 @@ import ContractsPage from 'modules/contract/frontend/pages/ContractsPage.jsx';
 import ContractFormPage from 'modules/contract/frontend/pages/ContractFormPage.jsx';
 import ContractDetailPage from 'modules/contract/frontend/pages/ContractDetailPage.jsx';
 
+// ── Finance Module Pages ────────────────────────────────────────────────────────
+import UtilityReadingsPage from 'modules/finance/frontend/pages/UtilityReadingsPage.jsx';
+import InvoicesPage from 'modules/finance/frontend/pages/InvoicesPage.jsx';
+import InvoiceDetailPage from 'modules/finance/frontend/pages/InvoiceDetailPage.jsx';
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -109,6 +114,32 @@ export default function App() {
                 element={
                   <ProtectedRoute roles={CONTRACT_VIEW_ROLES}>
                     <ContractDetailPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Finance */}
+              <Route
+                path="/utilities"
+                element={
+                  <ProtectedRoute>
+                    <UtilityReadingsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/invoices"
+                element={
+                  <ProtectedRoute>
+                    <InvoicesPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/invoices/:id"
+                element={
+                  <ProtectedRoute>
+                    <InvoiceDetailPage />
                   </ProtectedRoute>
                 }
               />

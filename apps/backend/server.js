@@ -4,6 +4,7 @@ import authRouter from '@my/auth-backend';
 import buildingRouter from '@my/building-backend';
 import tenantRouter from '@my/tenant-backend';
 import contractRouter from '@my/contract-backend';
+import financeRouter from '@my/finance-backend';
 import '@my/contract-backend/cron.js';
 
 const app = express();
@@ -20,6 +21,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/building', buildingRouter);
 app.use('/api/tenant', tenantRouter);
 app.use('/api/contract', contractRouter);
+app.use('/api/finance', financeRouter);
 
 app.listen(port, () => {
   console.log(`Server listening on port ${port}`);

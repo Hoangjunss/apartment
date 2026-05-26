@@ -43,7 +43,7 @@ function RenewalsTab({ contractId }) {
               <td className="px-4 py-3 text-gray-600">{r.old_end_date ? format(parseISO(r.old_end_date), 'dd/MM/yyyy') : '—'}</td>
               <td className="px-4 py-3 font-medium text-gray-800">{r.new_end_date ? format(parseISO(r.new_end_date), 'dd/MM/yyyy') : '—'}</td>
               <td className="px-4 py-3">{r.new_monthly_rent ? formatCurrency(r.new_monthly_rent) : 'Giữ nguyên'}</td>
-              <td className="px-4 py-3 text-gray-600">{r.renewed_by?.full_name ?? '—'}</td>
+              <td className="px-4 py-3 text-gray-600">{r.user?.full_name ?? '—'}</td>
               <td className="px-4 py-3 text-xs text-gray-400">
                 {r.created_at ? format(parseISO(r.created_at), 'dd/MM/yyyy HH:mm') : '—'}
               </td>

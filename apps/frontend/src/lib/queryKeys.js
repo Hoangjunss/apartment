@@ -28,4 +28,9 @@ export const QUERY_KEYS = {
   contract: (id) => ['contracts', id],
   expiringSoon: ['contracts', 'expiring-soon'],
   renewals: (contractId) => ['contracts', contractId, 'renewals'],
+
+  // ── Finance ───────────────────────────────────────────
+  utilities: (params) => ['utilities', params],
+  invoices: (params) => ['invoices', params],
+  invoice: (id) => ['invoices', id],
 };

@@ -38,6 +38,13 @@ export const REGISTRATION_TYPE_LABELS = {
   TEMPORARY_ABSENCE:   'Tạm vắng',
 };
 
+export const INVOICE_STATUS_CONFIG = {
+  UNPAID:         { label: 'Chưa thanh toán', className: 'bg-rose-100 text-rose-800' },
+  PARTIALLY_PAID: { label: 'Trả một phần',    className: 'bg-amber-100 text-amber-800' },
+  PAID:           { label: 'Đã thanh toán',   className: 'bg-emerald-100 text-emerald-800' },
+  OVERDUE:        { label: 'Quá hạn',         className: 'bg-red-100 text-red-800' },
+};
+
 // State machine: trạng thái tiếp theo hợp lệ
 export const VALID_APARTMENT_TRANSITIONS = {
   AVAILABLE:   ['OCCUPIED', 'RESERVED', 'MAINTENANCE'],
