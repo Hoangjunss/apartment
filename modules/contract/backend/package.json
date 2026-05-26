@@ -1,14 +1,16 @@
 {
-  "name": "@my/building-backend",
+  "name": "@my/contract-backend",
   "type": "module",
   "version": "1.0.0",
   "main": "index.js",
   "exports": {
-    ".": "./index.js"
+    ".": "./index.js",
+    "./cron.js": "./cron.js"
   },
   "dependencies": {
     "@my/prisma": "workspace:*",
     "@my/auth-backend": "workspace:*",
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "node-cron": "^4.2.1"
   }
 }

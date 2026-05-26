@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Typography ──────────────────────────────────────── */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    font-family: 'Inter', sans-serif;
+    @apply text-gray-900 bg-gray-50;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+/* ── Reusable Components ─────────────────────────────── */
+@layer components {
+  /* Form inputs */
+  .input {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
+           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+           placeholder:text-gray-400 transition bg-white disabled:bg-gray-50 disabled:text-gray-500;
+  }
+
+  .input-error {
+    @apply border-red-400 focus:ring-red-400;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    @apply inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white
+           bg-blue-600 rounded-lg hover:bg-blue-700 active:bg-blue-800
+           disabled:opacity-60 disabled:cursor-not-allowed transition;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium
+           text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50
+           active:bg-gray-100 disabled:opacity-60 transition;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white
+           bg-red-600 rounded-lg hover:bg-red-700 active:bg-red-800
+           disabled:opacity-60 disabled:cursor-not-allowed transition;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium
+           text-gray-600 rounded-lg hover:bg-gray-100 transition;
+  }
+
+  .btn-icon {
+    @apply p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition;
+  }
+
+  /* Cards */
+  .card {
+    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+  }
+
+  /* Badge utilities */
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  /* Tab button */
+  .tab-btn {
+    @apply px-4 py-2.5 text-sm font-medium border-b-2 transition;
+  }
+
+  .tab-btn-active {
+    @apply border-blue-600 text-blue-600;
+  }
+
+  .tab-btn-inactive {
+    @apply border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300;
+  }
+
+  /* Info grid */
+  .info-label {
+    @apply text-xs font-medium text-gray-500 uppercase tracking-wider;
+  }
+
+  .info-value {
+    @apply text-sm text-gray-900 mt-0.5;
+  }
+}
