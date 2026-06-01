@@ -36,7 +36,7 @@ export function Modal({ title, onClose, children, size = 'md' }) {
       />
       {/* Modal box */}
       <div
-        className={`relative bg-white rounded-xl shadow-xl w-full ${SIZE_CLASS[size]} max-h-[90vh] flex flex-col`}
+        className={`relative bg-white rounded-xl shadow-xl w-full ${SIZE_CLASS[size]} max-h-[90vh] flex flex-col overflow-hidden`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 shrink-0">

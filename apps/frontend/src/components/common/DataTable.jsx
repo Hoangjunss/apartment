@@ -52,7 +52,7 @@ export function DataTable({
               {columns.map((col) => (
                 <th
                   key={col.key}
-                  className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap"
+                  className="px-4 py-3 text-left table-header-cell whitespace-nowrap"
                   style={col.width ? { width: col.width } : {}}
                 >
                   {col.label}
