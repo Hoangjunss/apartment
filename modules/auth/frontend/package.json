@@ -11,6 +11,7 @@
     "zod": "^3.22.0",
     "lucide-react": "^0.309.0",
     "react-hot-toast": "^2.4.1",
-    "date-fns": "^3.3.0"
+    "date-fns": "^3.3.0",
+    "recharts": "^3.8.1"
   }
 }
