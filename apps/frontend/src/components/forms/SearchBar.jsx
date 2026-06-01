@@ -1,13 +1,13 @@
 // src/components/forms/SearchBar.jsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, forwardRef } from 'react';
 import { Search, X } from 'lucide-react';
 
-export function SearchBar({
+export const SearchBar = forwardRef(function SearchBar({
   placeholder = 'Tìm kiếm...',
   value,
   onChange,
   debounceMs = 300,
-}) {
+}, ref) {
   const [localValue, setLocalValue] = useState(value ?? '');
 
   // Sync external value
@@ -35,6 +35,7 @@ export function SearchBar({
         className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
       />
       <input
+        ref={ref}
         type="text"
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
@@ -52,4 +53,4 @@ export function SearchBar({
       )}
     </div>
   );
-}
+});

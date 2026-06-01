@@ -1,7 +1,7 @@
 // modules/contract/frontend/pages/ContractsPage.jsx
-import { useState, useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Eye, AlertTriangle } from 'lucide-react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, Eye, AlertTriangle, Search, RotateCcw } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader.jsx';
 import { DataTable } from '@/components/common/DataTable.jsx';
 import { SearchBar } from '@/components/forms/SearchBar.jsx';
@@ -10,6 +10,8 @@ import { RoleGuard } from '@/components/common/RoleGuard.jsx';
 import { MANAGEMENT_ROLES } from '@/constants/roles.js';
 import { CONTRACT_STATUS_CONFIG } from '@/constants/status.js';
 import { useContracts, useExpiringSoon } from '../hooks/useContract.js';
+import { useBuildings } from 'modules/building/frontend/hooks/useBuilding.js';
+import { useFilterState } from '@/hooks/useFilterState.js';
 import { format, parseISO, differenceInDays } from 'date-fns';
 
 const formatCurrency = (v) =>
@@ -17,60 +19,77 @@ const formatCurrency = (v) =>
 
 export default function ContractsPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState(searchParams.get('status') ?? '');
+
+  const searchInputRef = useRef(null);
+  const defaultFilters = {
+    search: '',
+    status: '',
+    building_id: '',
+    month: '',
+  };
+
+  const { filters, hasActiveFilters, setFilter, clearAll } = useFilterState(defaultFilters, searchInputRef);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [filters.search, filters.status, filters.building_id, filters.month]);
 
   const { data, isLoading } = useContracts({
-    search: search || undefined,
-    status: status || undefined,
+    search: filters.search || undefined,
+    status: filters.status || undefined,
+    building_id: filters.building_id || undefined,
+    month: filters.month || undefined,
     page,
     limit: 20,
   });
+
   const { data: expiring } = useExpiringSoon();
+  const { data: buildingsData } = useBuildings({ limit: 100 });
 
   const contracts = data?.items ?? [];
   const total = data?.total ?? 0;
   const expiringSoonList = Array.isArray(expiring) ? expiring : (expiring?.items ?? []);
+  const buildings = buildingsData?.items ?? [];
 
   const handlePageChange = useCallback((p) => setPage(p), []);
-  const handleSearch = useCallback((v) => { setSearch(v); setPage(1); }, []);
+  const handleSearch = useCallback((v) => setFilter('search', v), [setFilter]);
 
   const columns = [
     {
-      key: 'id',
+      key: 'contract_code',
       label: 'Mã HĐ',
-      render: (row) => <span className="font-mono text-sm text-gray-500">#{row.id}</span>,
+      render: (row) => <span className="font-mono table-cell-primary">{row.contract_code || `#${row.id}`}</span>,
     },
     {
       key: 'tenant',
       label: 'Khách thuê',
       render: (row) => (
-        <p className="font-medium text-gray-800 text-sm">{row.tenant?.full_name ?? '—'}</p>
+        <p className="table-cell-primary">{row.tenant?.full_name ?? '—'}</p>
       ),
     },
     {
       key: 'apartment',
       label: 'Phòng',
       render: (row) => (
-        <span className="font-mono text-sm">{row.apartment?.apartment_code ?? '—'}</span>
+        <span className="font-mono table-cell-primary">{row.apartment?.apartment_code ?? '—'}</span>
       ),
     },
     {
       key: 'start_date',
       label: 'Bắt đầu',
-      render: (row) => row.start_date ? format(parseISO(row.start_date), 'dd/MM/yyyy') : '—',
+      render: (row) => row.start_date ? <span className="table-cell-secondary">{format(parseISO(row.start_date), 'dd/MM/yyyy')}</span> : '—',
     },
     {
       key: 'end_date',
       label: 'Kết thúc',
-      render: (row) => row.end_date ? format(parseISO(row.end_date), 'dd/MM/yyyy') : '—',
+      render: (row) => row.end_date ? <span className="table-cell-secondary">{format(parseISO(row.end_date), 'dd/MM/yyyy')}</span> : '—',
     },
     {
       key: 'monthly_rent',
       label: 'Giá thuê',
-      render: (row) => <span className="text-sm">{formatCurrency(row.monthly_rent)}</span>,
+      render: (row) => <span className="table-cell-primary font-semibold">{formatCurrency(row.monthly_rent)}</span>,
     },
     {
       key: 'status',
@@ -120,29 +139,32 @@ export default function ContractsPage() {
       {/* Banner cảnh báo */}
       {expiringSoonList.length > 0 && (
         <div
-          className="flex items-center gap-3 p-4 bg-orange-50 border border-orange-200 rounded-xl mb-4 cursor-pointer hover:bg-orange-100 transition"
-          onClick={() => setStatus('EXPIRING_SOON')}
+          className="flex items-center gap-3 p-4 bg-orange-50 border border-orange-200 dark:bg-orange-950/20 dark:border-orange-900/30 rounded-xl mb-4 cursor-pointer hover:bg-orange-100/50 transition animate-pulse"
+          onClick={() => setFilter('status', 'EXPIRING_SOON')}
           id="expiring-banner"
         >
           <AlertTriangle size={18} className="text-orange-500 shrink-0" />
-          <p className="text-sm text-orange-700">
+          <p className="text-sm text-orange-700 dark:text-orange-300">
             <strong>{expiringSoonList.length} hợp đồng</strong> sắp hết hạn trong 30 ngày tới.{' '}
-            <span className="underline">Xem danh sách →</span>
+            <span className="underline font-semibold">Xem danh sách →</span>
           </p>
         </div>
       )}
 
-      <div className="flex gap-3 mb-4">
-        <div className="flex-1">
+      {/* Filter Bar */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="flex-1 min-w-48">
           <SearchBar
+            ref={searchInputRef}
             placeholder="Tìm theo khách thuê, mã phòng..."
-            value={search}
+            value={filters.search}
             onChange={handleSearch}
           />
         </div>
+
         <select
-          value={status}
-          onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+          value={filters.status}
+          onChange={(e) => setFilter('status', e.target.value)}
           className="input w-48"
           id="filter-contract-status"
         >
@@ -151,17 +173,75 @@ export default function ContractsPage() {
             <option key={v} value={v}>{label}</option>
           ))}
         </select>
+
+        <select
+          value={filters.building_id}
+          onChange={(e) => setFilter('building_id', e.target.value)}
+          className="input w-44"
+          id="filter-building"
+        >
+          <option value="">Tất cả tòa nhà</option>
+          {buildings.map((b) => (
+            <option key={b.id} value={b.id}>{b.name}</option>
+          ))}
+        </select>
+
+        <input
+          type="month"
+          value={filters.month}
+          onChange={(e) => setFilter('month', e.target.value)}
+          className="input w-44"
+          id="filter-month"
+        />
+
+        {hasActiveFilters && (
+          <button
+            onClick={() => {
+              clearAll();
+              setPage(1);
+            }}
+            className="btn-ghost text-red-500 hover:text-red-600 hover:bg-red-500/10 transition px-3 py-2 text-sm rounded-lg flex items-center gap-1.5"
+            id="clear-filters-btn"
+          >
+            <RotateCcw size={14} />
+            Xóa bộ lọc
+          </button>
+        )}
       </div>
 
-      <DataTable
-        columns={columns}
-        data={contracts}
-        total={total}
-        page={page}
-        onPageChange={handlePageChange}
-        isLoading={isLoading}
-        emptyMessage="Không tìm thấy hợp đồng nào"
-      />
+      {total === 0 && !isLoading ? (
+        <div className="flex flex-col items-center justify-center py-12 px-4 border border-dashed rounded-xl bg-gray-50/50 dark:bg-gray-900/10 border-gray-200 dark:border-gray-800 text-center my-6">
+          <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-400 mb-4 animate-bounce">
+            <Search size={32} />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
+            Không tìm thấy hợp đồng nào
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-6">
+            Không có hợp đồng nào khớp với các tiêu chí tìm kiếm hoặc bộ lọc hiện tại. Thử xóa hoặc đặt lại bộ lọc của bạn.
+          </p>
+          <button
+            onClick={() => {
+              clearAll();
+              setPage(1);
+            }}
+            className="btn-primary flex items-center gap-2 px-5 py-2.5 shadow-sm rounded-lg"
+          >
+            <RotateCcw size={16} />
+            Đặt lại bộ lọc
+          </button>
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={contracts}
+          total={total}
+          page={page}
+          onPageChange={handlePageChange}
+          isLoading={isLoading}
+          emptyMessage="Không tìm thấy hợp đồng nào"
+        />
+      )}
     </div>
   );
 }

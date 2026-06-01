@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Eye, Receipt, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Eye, Receipt, CheckCircle, AlertTriangle, Search, RotateCcw } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader.jsx';
 import { DataTable } from '@/components/common/DataTable.jsx';
 import { RoleGuard } from '@/components/common/RoleGuard.jsx';
@@ -8,6 +8,8 @@ import { InvoiceStatusBadge } from '@/components/common/StatusBadge.jsx';
 import { MANAGEMENT_ROLES } from '@/constants/roles.js';
 import { useInvoices, useGenerateInvoice } from '../hooks/useFinance.js';
 import { useContracts } from 'modules/contract/frontend/hooks/useContract.js';
+import { useApartments } from 'modules/building/frontend/hooks/useBuilding.js';
+import { useFilterState } from '@/hooks/useFilterState.js';
 import { Modal } from '@/components/common/Modal.jsx';
 import { ModalFooter } from '@/components/forms/ModalFooter.jsx';
 
@@ -24,8 +26,6 @@ const getCurrentMonthStr = () => {
 export default function InvoicesPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState('');
-  const [billingMonth, setBillingMonth] = useState('');
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
 
   // Batch Generation States
@@ -33,16 +33,32 @@ export default function InvoicesPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationResults, setGenerationResults] = useState([]); // Array of { contract, success, error }
 
+  const defaultFilters = {
+    status: '',
+    billing_month: '',
+    apartment_id: '',
+  };
+
+  const { filters, hasActiveFilters, setFilter, clearAll } = useFilterState(defaultFilters, null);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [filters.status, filters.billing_month, filters.apartment_id]);
+
   const params = {
     page,
     limit: 20,
-    status: status || undefined,
-    billing_month: billingMonth || undefined,
+    status: filters.status || undefined,
+    billing_month: filters.billing_month || undefined,
+    apartment_id: filters.apartment_id || undefined,
   };
 
   const { data, isLoading, refetch } = useInvoices(params);
   const { data: activeContractsData } = useContracts({ status: 'ACTIVE', limit: 100 });
+  const { data: apartmentsData } = useApartments({ limit: 100 });
   const activeContracts = activeContractsData?.items ?? [];
+  const apartments = apartmentsData?.items ?? [];
 
   const invoices = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -97,7 +113,7 @@ export default function InvoicesPage() {
       key: 'apartment_code',
       label: 'Căn hộ',
       render: (row) => (
-        <span className="font-mono font-semibold text-slate-800">
+        <span className="font-mono table-cell-primary">
           {row.apartment?.apartment_code ?? '—'}
         </span>
       ),
@@ -105,24 +121,24 @@ export default function InvoicesPage() {
     {
       key: 'tenant_name',
       label: 'Khách thuê',
-      render: (row) => row.contract?.tenant?.full_name ?? '—',
+      render: (row) => <span className="table-cell-secondary">{row.contract?.tenant?.full_name ?? '—'}</span>,
     },
     {
       key: 'billing_month',
       label: 'Kỳ thanh toán',
-      render: (row) => <span className="font-medium text-slate-700">{row.billing_month}</span>,
+      render: (row) => <span className="table-cell-secondary font-medium">{row.billing_month}</span>,
     },
     {
       key: 'total_amount',
       label: 'Tổng tiền',
-      render: (row) => <span className="font-semibold text-slate-900">{formatCurrency(row.total_amount)}</span>,
+      render: (row) => <span className="table-cell-primary font-semibold">{formatCurrency(row.total_amount)}</span>,
     },
     {
       key: 'due_date',
       label: 'Hạn thanh toán',
       render: (row) => {
         if (!row.due_date) return '—';
-        return new Date(row.due_date).toLocaleDateString('vi-VN');
+        return <span className="table-cell-muted">{new Date(row.due_date).toLocaleDateString('vi-VN')}</span>;
       },
     },
     {
@@ -169,17 +185,14 @@ export default function InvoicesPage() {
       />
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-center bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
+      <div className="flex flex-wrap gap-4 items-center bg-white dark:bg-gray-800 p-4 rounded-xl border border-slate-100 dark:border-gray-700 shadow-sm">
         <div className="w-full sm:w-48">
-          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
             Trạng thái đóng tiền
           </label>
           <select
-            value={status}
-            onChange={(e) => {
-              setStatus(e.target.value);
-              setPage(1);
-            }}
+            value={filters.status}
+            onChange={(e) => setFilter('status', e.target.value)}
             className="input w-full"
             id="filter-status-select"
           >
@@ -192,44 +205,83 @@ export default function InvoicesPage() {
         </div>
 
         <div className="w-full sm:w-48">
-          <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+            Căn hộ
+          </label>
+          <select
+            value={filters.apartment_id}
+            onChange={(e) => setFilter('apartment_id', e.target.value)}
+            className="input w-full"
+            id="filter-apartment-select"
+          >
+            <option value="">Tất cả căn hộ</option>
+            {apartments.map((a) => (
+              <option key={a.id} value={a.id}>{a.apartment_code}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="w-full sm:w-48">
+          <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
             Kỳ thanh toán (Tháng)
           </label>
           <input
             type="month"
-            value={billingMonth}
-            onChange={(e) => {
-              setBillingMonth(e.target.value);
-              setPage(1);
-            }}
+            value={filters.billing_month}
+            onChange={(e) => setFilter('billing_month', e.target.value)}
             className="input w-full"
             id="filter-month-input"
           />
         </div>
 
-        {(status || billingMonth) && (
+        {hasActiveFilters && (
           <button
             onClick={() => {
-              setStatus('');
-              setBillingMonth('');
+              clearAll();
               setPage(1);
             }}
-            className="mt-6 text-sm text-slate-500 hover:text-slate-800 transition"
+            className="btn-ghost text-red-500 hover:text-red-600 hover:bg-red-500/10 transition px-4 py-2 mt-5 text-sm rounded-lg flex items-center gap-1.5"
+            id="clear-filters-btn"
           >
+            <RotateCcw size={14} />
             Xóa bộ lọc
           </button>
         )}
       </div>
 
-      <DataTable
-        columns={columns}
-        data={invoices}
-        total={total}
-        page={page}
-        onPageChange={handlePageChange}
-        isLoading={isLoading}
-        emptyMessage="Không tìm thấy hóa đơn nào."
-      />
+      {total === 0 && !isLoading ? (
+        <div className="flex flex-col items-center justify-center py-12 px-4 border border-dashed rounded-xl bg-gray-50/50 dark:bg-gray-900/10 border-gray-200 dark:border-gray-800 text-center my-6">
+          <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-400 mb-4 animate-bounce">
+            <Search size={32} />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
+            Không tìm thấy hóa đơn nào
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-6">
+            Không có hóa đơn nào phù hợp với các tiêu chí lọc được chọn. Thử xóa hoặc đặt lại bộ lọc.
+          </p>
+          <button
+            onClick={() => {
+              clearAll();
+              setPage(1);
+            }}
+            className="btn-primary flex items-center gap-2 px-5 py-2.5 shadow-sm rounded-lg"
+          >
+            <RotateCcw size={16} />
+            Đặt lại bộ lọc
+          </button>
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={invoices}
+          total={total}
+          page={page}
+          onPageChange={handlePageChange}
+          isLoading={isLoading}
+          emptyMessage="Không tìm thấy hóa đơn nào."
+        />
+      )}
 
       {/* Generation Modal */}
       {isGenerateModalOpen && (
@@ -238,7 +290,13 @@ export default function InvoicesPage() {
           onClose={() => !isGenerating && setIsGenerateModalOpen(false)}
           size="md"
         >
-          <div className="space-y-4">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleBatchGenerate();
+            }}
+            className="space-y-4"
+          >
             <p className="text-sm text-gray-500">
               Hệ thống sẽ tạo hóa đơn hàng tháng cho tất cả hợp đồng có hiệu lực dựa trên số điện nước đã ghi nhận và danh sách dịch vụ đăng ký.
             </p>
@@ -297,12 +355,11 @@ export default function InvoicesPage() {
 
             <ModalFooter
               onCancel={() => setIsGenerateModalOpen(false)}
-              onSubmit={handleBatchGenerate}
               submitLabel={isGenerating ? "Đang tạo hóa đơn..." : "Bắt đầu lập hóa đơn"}
               isLoading={isGenerating}
               submitDisabled={!batchMonth || isGenerating || activeContracts.length === 0}
             />
-          </div>
+          </form>
         </Modal>
       )}
     </div>

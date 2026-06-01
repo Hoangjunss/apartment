@@ -185,3 +185,24 @@ export const deleteFurniture = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+export const getDistinctRoomTypes = async (req, res) => {
+  try {
+    const data = await service.getDistinctRoomTypes();
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const checkApartmentCode = async (req, res) => {
+  try {
+    const { code, excludeId } = req.query;
+    if (!code) return res.json({ success: true, exists: false });
+    const exists = await service.checkApartmentCode(code, excludeId ? +excludeId : undefined);
+    res.json({ success: true, exists });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+

@@ -36,8 +36,8 @@ export const getUtilities = async (req, res) => {
 
 export const recordUtility = async (req, res) => {
   try {
-    const { apartment_id, billing_month, electricity_curr, water_curr } = req.body;
-    if (!apartment_id || !billing_month || electricity_curr === undefined || water_curr === undefined) {
+    const { apartment_id, billing_month, electricity_curr, water_curr, soNguoiO } = req.body;
+    if (!apartment_id || !billing_month || electricity_curr === undefined) {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đủ các thông tin bắt buộc' });
     }
 
@@ -45,7 +45,8 @@ export const recordUtility = async (req, res) => {
       ...req.body,
       apartment_id: +apartment_id,
       electricity_curr: +electricity_curr,
-      water_curr: +water_curr,
+      water_curr: water_curr !== undefined && water_curr !== '' ? +water_curr : undefined,
+      soNguoiO: soNguoiO !== undefined && soNguoiO !== '' ? +soNguoiO : undefined,
       electricity_unit_price: req.body.electricity_unit_price !== undefined ? +req.body.electricity_unit_price : undefined,
       water_unit_price: req.body.water_unit_price !== undefined ? +req.body.water_unit_price : undefined
     }, req.user.userId);
@@ -59,13 +60,14 @@ export const recordUtility = async (req, res) => {
 // Invoices (Hóa Đơn)
 export const getInvoices = async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, contract_id, billing_month } = req.query;
+    const { page = 1, limit = 20, status, contract_id, billing_month, apartment_id } = req.query;
     const data = await service.getInvoices({
       page: +page,
       limit: +limit,
       status,
       contract_id: contract_id ? +contract_id : undefined,
-      billing_month
+      billing_month,
+      apartment_id: apartment_id ? +apartment_id : undefined
     });
     res.json({ success: true, data });
   } catch (err) {

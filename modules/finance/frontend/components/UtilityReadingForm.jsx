@@ -2,19 +2,22 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
+import { useEffect } from 'react';
 import { Modal } from '@/components/common/Modal.jsx';
 import { FormField } from '@/components/forms/FormField.jsx';
 import { ModalFooter } from '@/components/forms/ModalFooter.jsx';
 import { useRecordUtility } from '../hooks/useFinance.js';
 import { useApartments } from 'modules/building/frontend/hooks/useBuilding.js';
+import { useContracts } from 'modules/contract/frontend/hooks/useContract.js';
+import { WATER_PRICE_PER_PERSON } from '@/constants/finance.js';
 
 const schema = z.object({
   apartment_id: z.coerce.number().min(1, 'Vui lòng chọn căn hộ'),
   billing_month: z.string().regex(/^\d{4}-\d{2}$/, 'Tháng không hợp lệ (định dạng YYYY-MM)'),
   electricity_curr: z.coerce.number().min(0, 'Chỉ số điện hiện tại không được nhỏ hơn 0'),
-  water_curr: z.coerce.number().min(0, 'Chỉ số nước hiện tại không được nhỏ hơn 0'),
+  soNguoiO: z.coerce.number().min(1, 'Số người ở tối thiểu là 1'),
   electricity_unit_price: z.coerce.number().min(0, 'Đơn giá điện không được nhỏ hơn 0'),
-  water_unit_price: z.coerce.number().min(0, 'Đơn giá nước không được nhỏ hơn 0'),
+  water_unit_price: z.coerce.number().optional(),
 });
 
 const getCurrentMonthStr = () => {
@@ -28,17 +31,33 @@ export function UtilityReadingForm({ onClose, preselectedApartmentId }) {
   const { data: apartmentsData } = useApartments({ limit: 100 });
   const apartments = apartmentsData?.items ?? [];
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const { data: contractsData } = useContracts({ status: 'ACTIVE', limit: 100 });
+  const activeContracts = contractsData?.items ?? [];
+
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       apartment_id: preselectedApartmentId ?? '',
       billing_month: getCurrentMonthStr(),
       electricity_curr: '',
-      water_curr: '',
+      soNguoiO: 1,
       electricity_unit_price: 3500,
-      water_unit_price: 15000,
+      water_unit_price: WATER_PRICE_PER_PERSON,
     },
   });
+
+  const selectedAptId = watch('apartment_id');
+  const soNguoiO = watch('soNguoiO') ?? 1;
+
+  // Prefill soNguoiO when an apartment is selected based on its active contract
+  useEffect(() => {
+    if (selectedAptId && activeContracts.length > 0) {
+      const matched = activeContracts.find(c => Number(c.apartment_id) === Number(selectedAptId));
+      if (matched) {
+        setValue('soNguoiO', matched.soNguoiO || matched.occupants_count || 1);
+      }
+    }
+  }, [selectedAptId, activeContracts, setValue]);
 
   const { mutate, isPending } = useRecordUtility({
     onSuccess: () => {
@@ -106,14 +125,14 @@ export function UtilityReadingForm({ onClose, preselectedApartmentId }) {
             />
           </FormField>
 
-          <FormField label="Chỉ số nước mới" required error={errors.water_curr?.message}>
+          <FormField label="Số người ở" required error={errors.soNguoiO?.message}>
             <input
               type="number"
-              step="0.01"
-              placeholder="Chỉ số nước mới"
-              {...register('water_curr')}
+              min="1"
+              placeholder="Số người ở"
+              {...register('soNguoiO', { valueAsNumber: true })}
               className="input"
-              id="water-curr-input"
+              id="so-nguoi-o-input"
             />
           </FormField>
         </div>
@@ -128,15 +147,32 @@ export function UtilityReadingForm({ onClose, preselectedApartmentId }) {
             />
           </FormField>
 
-          <FormField label="Đơn giá nước (VND/m³)" required error={errors.water_unit_price?.message}>
+          <FormField label="Đơn giá nước (Cố định)">
             <input
-              type="number"
-              {...register('water_unit_price')}
-              className="input"
-              id="water-price-input"
+              type="text"
+              value={`${new Intl.NumberFormat('vi-VN').format(WATER_PRICE_PER_PERSON)} đ/người/tháng`}
+              className="input bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200"
+              disabled
+              id="water-price-static"
             />
           </FormField>
         </div>
+
+        {/* Live Preview section */}
+        {selectedAptId && (
+          <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-xl space-y-1.5 mt-2">
+            <h4 className="text-xs font-bold text-indigo-800 uppercase tracking-wider">Xem trước chi phí</h4>
+            <div className="flex justify-between text-sm text-indigo-950 font-medium">
+              <span>Tiền nước ước tính ({soNguoiO} người):</span>
+              <span className="font-semibold text-indigo-700">
+                {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(soNguoiO * WATER_PRICE_PER_PERSON)}
+              </span>
+            </div>
+            <p className="text-[11px] text-indigo-500/80 mt-1">
+              * Tiền nước được tính khoán theo 100.000đ/người/tháng. Chỉ số m³ nước không cần ghi nhận từ tháng này.
+            </p>
+          </div>
+        )}
 
         <ModalFooter
           onCancel={onClose}

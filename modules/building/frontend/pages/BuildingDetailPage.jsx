@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
-import { Edit2, Plus, Home } from 'lucide-react';
+import { Edit2, Plus, Home, ChevronDown, ChevronUp } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader.jsx';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner.jsx';
 import { EmptyState } from '@/components/common/EmptyState.jsx';
@@ -14,6 +14,7 @@ import { FormField } from '@/components/forms/FormField.jsx';
 import { MANAGEMENT_ROLES, ROLES } from '@/constants/roles.js';
 import { useBuildingById, useFloors, useBulkCreateFloors } from '../hooks/useBuilding.js';
 import { BuildingForm } from '../components/BuildingForm.jsx';
+import { ApartmentStatusBadge } from '@/components/common/StatusBadge.jsx';
 
 const floorSchema = z.object({
   from_floor: z.number({ invalid_type_error: 'Phải là số' }).int().min(1, 'Tầng tối thiểu là 1'),
@@ -69,6 +70,14 @@ export default function BuildingDetailPage() {
   const buildingId = Number(id);
   const [activeTab, setActiveTab] = useState('floors');
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [expandedFloors, setExpandedFloors] = useState({});
+
+  const toggleFloor = useCallback((floorId) => {
+    setExpandedFloors((prev) => ({
+      ...prev,
+      [floorId]: !prev[floorId],
+    }));
+  }, []);
 
   const { data: building, isLoading } = useBuildingById(buildingId);
   const { data: floorsData, isLoading: loadingFloors } = useFloors(buildingId);
@@ -150,29 +159,55 @@ export default function BuildingDetailPage() {
           ) : floors.length === 0 ? (
             <EmptyState message="Chưa có tầng nào. Dùng tab 'Tạo tầng hàng loạt' để thêm." />
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div className="space-y-6">
               {floors.map((floor) => (
-                <button
-                  key={floor.id}
-                  onClick={() => navigate(`/apartments?floor_id=${floor.id}&building_id=${buildingId}`)}
-                  className="card p-4 text-left hover:shadow-md hover:border-blue-200 transition group"
-                  id={`floor-${floor.id}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        Tầng {floor.floor_number}
-                      </p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        {floor._count?.apartments ?? 0} căn hộ
-                      </p>
+                <div key={floor.id} className="card p-5 border border-gray-100 shadow-sm bg-white rounded-xl">
+                  {/* Floor header */}
+                  <div 
+                    onClick={() => toggleFloor(floor.id)}
+                    className="flex items-center justify-between cursor-pointer group/header select-none"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover/header:bg-blue-100 transition">
+                        <Home size={18} />
+                      </div>
+                      <div>
+                        <h4 className="text-base font-bold text-gray-800 group-hover/header:text-blue-600 transition">Tầng {floor.floor_number}</h4>
+                        <p className="text-xs text-gray-400">
+                          {floor.apartments?.length ?? 0} căn hộ
+                        </p>
+                      </div>
                     </div>
-                    <Home
-                      size={18}
-                      className="text-gray-300 group-hover:text-blue-400 transition"
-                    />
+                    <div className="text-gray-400 group-hover/header:text-blue-500 transition">
+                      {expandedFloors[floor.id] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    </div>
                   </div>
-                </button>
+                  
+                  {/* Apartments list */}
+                  <div className={`overflow-hidden transition-all duration-300 ease-in-out ${expandedFloors[floor.id] ? 'max-h-[1000px] opacity-100 mt-4 pt-4 border-t border-gray-100' : 'max-h-0 opacity-0 pointer-events-none'}`}>
+                    {!floor.apartments || floor.apartments.length === 0 ? (
+                      <p className="text-sm text-gray-400 italic">Chưa có căn hộ nào ở tầng này.</p>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+                        {floor.apartments.map((apartment) => (
+                          <button
+                            key={apartment.id}
+                            onClick={(e) => { e.stopPropagation(); navigate(`/apartments/${apartment.id}`); }}
+                            className="flex flex-col items-center justify-between p-3 rounded-lg border border-gray-100 hover:border-blue-400 hover:shadow-sm transition bg-gray-50 hover:bg-white text-center group/apt"
+                            id={`apartment-${apartment.id}`}
+                          >
+                            <span className="text-sm font-bold text-gray-800 group-hover/apt:text-blue-600 font-mono">
+                              {apartment.apartment_code}
+                            </span>
+                            <span className="mt-1.5">
+                              <ApartmentStatusBadge status={apartment.status} />
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           )}

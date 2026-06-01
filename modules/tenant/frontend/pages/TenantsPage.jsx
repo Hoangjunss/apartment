@@ -1,25 +1,43 @@
 // modules/tenant/frontend/pages/TenantsPage.jsx
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Eye } from 'lucide-react';
+import { Plus, Eye, Search, RotateCcw } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader.jsx';
 import { DataTable } from '@/components/common/DataTable.jsx';
 import { SearchBar } from '@/components/forms/SearchBar.jsx';
 import { ContractStatusBadge } from '@/components/common/StatusBadge.jsx';
 import { useTenants } from '../hooks/useTenant.js';
+import { useFilterState } from '@/hooks/useFilterState.js';
 
 export default function TenantsPage() {
   const navigate = useNavigate();
-  const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState('');
 
-  const { data, isLoading } = useTenants({ search: search || undefined, status: status || undefined, page, limit: 20 });
+  const searchInputRef = useRef(null);
+  const defaultFilters = {
+    search: '',
+    status: '',
+  };
+
+  const { filters, hasActiveFilters, setFilter, clearAll } = useFilterState(defaultFilters, searchInputRef);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [filters.search, filters.status]);
+
+  const { data, isLoading } = useTenants({
+    search: filters.search || undefined,
+    status: filters.status || undefined,
+    page,
+    limit: 20
+  });
+
   const tenants = data?.items ?? [];
   const total = data?.total ?? 0;
 
   const handlePageChange = useCallback((p) => setPage(p), []);
-  const handleSearch = useCallback((v) => { setSearch(v); setPage(1); }, []);
+  const handleSearch = useCallback((v) => setFilter('search', v), [setFilter]);
 
   const columns = [
     {
@@ -27,36 +45,30 @@ export default function TenantsPage() {
       label: 'Họ tên',
       render: (row) => (
         <div>
-          <p className="font-medium text-gray-800">{row.full_name}</p>
-          <p className="text-xs text-gray-400">{row.email || ''}</p>
+          <p className="table-cell-primary">{row.full_name}</p>
+          <p className="table-cell-secondary">{row.email || ''}</p>
         </div>
       ),
     },
-    { key: 'national_id', label: 'Số CCCD', render: (row) => <span className="font-mono text-sm">{row.national_id}</span> },
-    { key: 'phone', label: 'SĐT' },
+    { key: 'national_id', label: 'Số CCCD', render: (row) => <span className="font-mono table-cell-secondary">{row.national_id}</span> },
+    { key: 'phone', label: 'SĐT', render: (row) => <span className="table-cell-primary">{row.phone}</span> },
     {
       key: 'current_room',
       label: 'Phòng hiện tại',
-      render: (row) => {
-        const activeContract = row.contracts?.find(
-          (c) => c.status === 'ACTIVE' || c.status === 'EXPIRING_SOON',
-        );
-        return activeContract?.apartment?.apartment_code ?? '—';
-      },
+      render: (row) => (
+        <span className="font-mono table-cell-primary">
+          {row.current_room ?? '—'}
+        </span>
+      ),
     },
     {
       key: 'contract_status',
       label: 'Trạng thái HĐ',
-      render: (row) => {
-        const activeContract = row.contracts?.find(
-          (c) => c.status === 'ACTIVE' || c.status === 'EXPIRING_SOON',
-        );
-        return activeContract ? (
-          <ContractStatusBadge status={activeContract.status} />
-        ) : (
-          <span className="text-gray-400 text-xs">—</span>
-        );
-      },
+      render: (row) => row.contract_status ? (
+        <ContractStatusBadge status={row.contract_status} />
+      ) : (
+        <span className="table-cell-muted">—</span>
+      ),
     },
     {
       key: 'actions',
@@ -91,17 +103,18 @@ export default function TenantsPage() {
         }
       />
 
-      <div className="flex gap-3 mb-4">
-        <div className="flex-1">
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="flex-1 min-w-48">
           <SearchBar
+            ref={searchInputRef}
             placeholder="Tìm theo tên, CCCD, SĐT..."
-            value={search}
+            value={filters.search}
             onChange={handleSearch}
           />
         </div>
         <select
-          value={status}
-          onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+          value={filters.status}
+          onChange={(e) => setFilter('status', e.target.value)}
           className="input w-44"
           id="filter-tenant-status"
         >
@@ -109,17 +122,55 @@ export default function TenantsPage() {
           <option value="ACTIVE">Đang thuê</option>
           <option value="INACTIVE">Không hoạt động</option>
         </select>
+
+        {hasActiveFilters && (
+          <button
+            onClick={() => {
+              clearAll();
+              setPage(1);
+            }}
+            className="btn-ghost text-red-500 hover:text-red-600 hover:bg-red-500/10 transition px-3 py-2 text-sm rounded-lg flex items-center gap-1.5"
+            id="clear-filters-btn"
+          >
+            <RotateCcw size={14} />
+            Xóa bộ lọc
+          </button>
+        )}
       </div>
 
-      <DataTable
-        columns={columns}
-        data={tenants}
-        total={total}
-        page={page}
-        onPageChange={handlePageChange}
-        isLoading={isLoading}
-        emptyMessage="Không tìm thấy khách thuê"
-      />
+      {total === 0 && !isLoading ? (
+        <div className="flex flex-col items-center justify-center py-12 px-4 border border-dashed rounded-xl bg-gray-50/50 dark:bg-gray-900/10 border-gray-200 dark:border-gray-800 text-center my-6">
+          <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full text-gray-400 mb-4 animate-bounce">
+            <Search size={32} />
+          </div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-1">
+            Không tìm thấy khách thuê nào
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm mb-6">
+            Không có khách thuê nào phù hợp với các tiêu chí tìm kiếm hoặc bộ lọc được chọn. Thử xóa hoặc đặt lại bộ lọc.
+          </p>
+          <button
+            onClick={() => {
+              clearAll();
+              setPage(1);
+            }}
+            className="btn-primary flex items-center gap-2 px-5 py-2.5 shadow-sm rounded-lg"
+          >
+            <RotateCcw size={16} />
+            Đặt lại bộ lọc
+          </button>
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={tenants}
+          total={total}
+          page={page}
+          onPageChange={handlePageChange}
+          isLoading={isLoading}
+          emptyMessage="Không tìm thấy khách thuê"
+        />
+      )}
     </div>
   );
 }

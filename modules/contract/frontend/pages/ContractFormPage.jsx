@@ -1,5 +1,5 @@
 // modules/contract/frontend/pages/ContractFormPage.jsx
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -20,17 +20,30 @@ const schema = z
     start_date: z.string().min(1, 'Chọn ngày bắt đầu'),
     end_date: z.string().min(1, 'Chọn ngày kết thúc'),
     monthly_rent: z.number({ required_error: 'Nhập giá thuê', invalid_type_error: 'Phải là số' }).positive('Giá thuê phải > 0'),
-    deposit_amount: z.number({ invalid_type_error: 'Phải là số' }).positive(),
+    deposit_amount: z.number({ invalid_type_error: 'Phải là số' }).positive('Đặt cọc phải > 0'),
     payment_due_day: z
       .number({ invalid_type_error: 'Phải là số' })
       .int()
       .min(1, 'Tối thiểu ngày 1')
       .max(28, 'Tối đa ngày 28'),
     notes: z.string().optional(),
+    
+    // New fields
+    occupants_count: z.number({ required_error: 'Nhập số người ở', invalid_type_error: 'Phải là số' }).int().min(1, 'Tối thiểu 1 người'),
+    water_price_per_month: z.number().optional(),
+    initial_electricity: z.number({ invalid_type_error: 'Phải là số' }).nonnegative('Không được âm'),
+    electricity_price: z.number({ invalid_type_error: 'Phải là số' }).nonnegative('Không được âm'),
+    initial_water: z.number({ invalid_type_error: 'Phải là số' }).nonnegative('Không được âm').nullable().optional(),
+    furniture_handover: z.string().optional(),
+    termination_notice_days: z.number({ invalid_type_error: 'Phải là số' }).int().nonnegative('Không được âm'),
   })
   .refine((d) => new Date(d.end_date) > new Date(d.start_date), {
     message: 'Ngày kết thúc phải sau ngày bắt đầu',
     path: ['end_date'],
+  })
+  .refine((d) => d.deposit_amount <= d.monthly_rent, {
+    message: 'Tiền đặt cọc không được cao hơn giá thuê',
+    path: ['deposit_amount'],
   });
 
 // ── Tenant Search Select ───────────────────────────────────────────────────────
@@ -125,11 +138,26 @@ export default function ContractFormPage() {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(schema),
-    defaultValues: { payment_due_day: 5 },
+    defaultValues: { 
+      payment_due_day: 5,
+      occupants_count: 1,
+      water_price_per_month: 100000,
+      initial_electricity: 0,
+      electricity_price: 3500,
+      initial_water: null,
+      termination_notice_days: 30,
+      furniture_handover: '',
+    },
   });
+
+  const occupants = watch('occupants_count') ?? 1;
+  useEffect(() => {
+    setValue('water_price_per_month', occupants * 100000);
+  }, [occupants, setValue]);
 
   const { mutate: create, isPending } = useCreateContract({
     onSuccess: (data) => {
@@ -149,13 +177,36 @@ export default function ContractFormPage() {
     setValue('apartment_id', id);
   }, [setValue]);
 
+  // Furniture list state
+  const furnitureItems = ['Giường', 'Tủ', 'Bàn', 'Ghế', 'Máy lạnh', 'Nóng lạnh', 'Tủ lạnh', 'Máy giặt', 'Bếp', 'TV'];
+  const [selectedFurniture, setSelectedFurniture] = useState([]);
+  const [customFurnitureText, setCustomFurnitureText] = useState('');
+
+  const handleFurnitureToggle = (item) => {
+    setSelectedFurniture((prev) =>
+      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
+    );
+  };
+
+  const onSubmit = (formData) => {
+    const checklistStr = selectedFurniture.join(', ');
+    const finalHandover = [
+      checklistStr ? `Nội thất bàn giao: ${checklistStr}` : '',
+      customFurnitureText ? `Mô tả thêm: ${customFurnitureText}` : ''
+    ].filter(Boolean).join('\n');
+    
+    formData.furniture_handover = finalHandover;
+    create(formData);
+  };
+
   return (
     <div>
       <PageHeader title="Tạo hợp đồng mới" backUrl="/contracts" />
 
-      <form onSubmit={handleSubmit((d) => create(d))}>
-        <div className="card p-6 mb-4">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Thông tin hợp đồng</h2>
+      <form onSubmit={handleSubmit(onSubmit)}>
+        {/* Section 1 – Thông tin hợp đồng */}
+        <div className="card p-6 mb-5 border border-gray-150 shadow-sm rounded-xl">
+          <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-2 mb-4">Section 1 – Thông tin hợp đồng</h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Khách thuê" required error={errors.tenant_id?.message}>
@@ -181,7 +232,14 @@ export default function ContractFormPage() {
             <FormField label="Ngày kết thúc" required error={errors.end_date?.message}>
               <input {...register('end_date')} type="date" id="end-date" className="input" />
             </FormField>
+          </div>
+        </div>
 
+        {/* Section 2 – Chi phí & Đặt cọc */}
+        <div className="card p-6 mb-5 border border-gray-150 shadow-sm rounded-xl">
+          <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-2 mb-4">Section 2 – Chi phí & Đặt cọc</h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <FormField label="Giá thuê/tháng (VND)" required error={errors.monthly_rent?.message}>
               <input
                 {...register('monthly_rent', { valueAsNumber: true })}
@@ -214,16 +272,119 @@ export default function ContractFormPage() {
                 className="input"
               />
             </FormField>
-          </div>
 
-          <div className="mt-4">
-            <FormField label="Ghi chú" error={errors.notes?.message}>
-              <textarea {...register('notes')} id="contract-notes" className="input" rows={2} placeholder="Điều khoản bổ sung..." />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField label="Số người ở" required error={errors.occupants_count?.message}>
+                <input
+                  {...register('occupants_count', { valueAsNumber: true })}
+                  type="number"
+                  id="occupants-count"
+                  min={1}
+                  className="input"
+                />
+              </FormField>
+              
+              <FormField label="Tiền nước hàng tháng (VND)">
+                <input
+                  type="text"
+                  readOnly
+                  disabled
+                  value={new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(occupants * 100000)}
+                  className="input bg-gray-50 border-gray-200 text-gray-500 font-semibold"
+                />
+              </FormField>
+            </div>
+          </div>
+        </div>
+
+        {/* Section 3 – Chỉ số ban đầu */}
+        <div className="card p-6 mb-5 border border-gray-150 shadow-sm rounded-xl">
+          <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-2 mb-4">Section 3 – Chỉ số ban đầu</h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <FormField label="Chỉ số điện ban đầu (kWh)" required error={errors.initial_electricity?.message}>
+              <input
+                {...register('initial_electricity', { valueAsNumber: true })}
+                type="number"
+                step="0.1"
+                className="input"
+              />
+            </FormField>
+
+            <FormField label="Giá điện/kWh (VND)" required error={errors.electricity_price?.message}>
+              <input
+                {...register('electricity_price', { valueAsNumber: true })}
+                type="number"
+                step="100"
+                className="input"
+              />
+            </FormField>
+
+            <FormField label="Chỉ số nước ban đầu (m³)" error={errors.initial_water?.message}>
+              <input
+                {...register('initial_water', { valueAsNumber: true })}
+                type="number"
+                step="0.1"
+                placeholder="Ghi nhận nếu có đồng hồ riêng"
+                className="input"
+              />
             </FormField>
           </div>
         </div>
 
-        <div className="flex justify-end gap-3">
+        {/* Section 4 – Nội thất bàn giao */}
+        <div className="card p-6 mb-5 border border-gray-150 shadow-sm rounded-xl">
+          <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-2 mb-4">Section 4 – Nội thất bàn giao</h2>
+
+          <div className="mb-4">
+            <p className="text-xs text-gray-500 mb-3 font-semibold">Chọn các danh mục nội thất có sẵn bàn giao:</p>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              {furnitureItems.map((item) => (
+                <label key={item} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none border border-gray-100 p-2 rounded-lg bg-gray-50 hover:bg-white hover:border-blue-200 transition">
+                  <input
+                    type="checkbox"
+                    checked={selectedFurniture.includes(item)}
+                    onChange={() => handleFurnitureToggle(item)}
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                  />
+                  <span>{item}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <FormField label="Mô tả chi tiết hoặc ghi chú bàn giao nội thất">
+            <textarea
+              value={customFurnitureText}
+              onChange={(e) => setCustomFurnitureText(e.target.value)}
+              className="input"
+              rows={3}
+              placeholder="Ví dụ: Giường gỗ sồi mới 100%, Tủ quần áo 3 cánh có vết xước nhỏ ở góc trái..."
+            />
+          </FormField>
+        </div>
+
+        {/* Section 5 – Điều khoản */}
+        <div className="card p-6 mb-6 border border-gray-150 shadow-sm rounded-xl">
+          <h2 className="text-sm font-bold text-gray-800 border-b border-gray-100 pb-2 mb-4">Section 5 – Điều khoản</h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <FormField label="Thời hạn báo trước khi hủy HĐ (Ngày)" required error={errors.termination_notice_days?.message}>
+              <input
+                {...register('termination_notice_days', { valueAsNumber: true })}
+                type="number"
+                min={0}
+                className="input"
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Ghi chú / Điều khoản bổ sung" error={errors.notes?.message}>
+            <textarea {...register('notes')} id="contract-notes" className="input" rows={3} placeholder="Ví dụ: Không nuôi thú cưng, giữ gìn vệ sinh chung, thanh toán trễ phạt 50k/ngày..." />
+          </FormField>
+        </div>
+
+        <div className="flex justify-end gap-3 mb-6">
           <button type="button" onClick={() => navigate('/contracts')} className="btn-secondary">
             Hủy
           </button>

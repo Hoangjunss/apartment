@@ -1,0 +1,1 @@
+export const WATER_PRICE_PER_PERSON = 100000;

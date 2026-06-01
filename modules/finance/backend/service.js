@@ -1,4 +1,6 @@
 import { prisma } from '@my/prisma';
+import { WATER_PRICE_PER_PERSON } from './constants.js';
+import { calculateWaterCost } from './utils.js';
 
 // ==========================================
 // UTILITY READINGS (ĐIỆN NƯỚC)
@@ -19,7 +21,14 @@ export const getUtilityReadings = async ({ page = 1, limit = 20, apartment_id, b
         { recorded_at: 'desc' }
       ],
       include: {
-        apartment: { select: { id: true, apartment_code: true } },
+        apartment: {
+          include: {
+            contracts: {
+              where: { status: 'ACTIVE' },
+              select: { soNguoiO: true }
+            }
+          }
+        },
         recorder: { select: { id: true, full_name: true } }
       }
     }),
@@ -30,10 +39,10 @@ export const getUtilityReadings = async ({ page = 1, limit = 20, apartment_id, b
 };
 
 export const recordUtilityReading = async (data, userId) => {
-  const { apartment_id, billing_month, electricity_curr, water_curr, electricity_unit_price, water_unit_price } = data;
+  const { apartment_id, billing_month, electricity_curr, water_curr, soNguoiO, electricity_unit_price, water_unit_price } = data;
 
-  if (!apartment_id || !billing_month || electricity_curr === undefined || water_curr === undefined) {
-    throw new Error('Thiếu thông tin ghi nhận số điện nước bắt buộc');
+  if (!apartment_id || !billing_month || electricity_curr === undefined) {
+    throw new Error('Thiếu thông tin ghi nhận số điện bắt buộc');
   }
 
   // Validate format YYYY-MM
@@ -65,14 +74,25 @@ export const recordUtilityReading = async (data, userId) => {
   });
 
   const electricity_prev = prevReading ? Number(prevReading.electricity_curr) : 0;
-  const water_prev = prevReading ? Number(prevReading.water_curr) : 0;
+  const water_prev = prevReading && prevReading.water_curr !== null ? Number(prevReading.water_curr) : null;
 
   if (Number(electricity_curr) < electricity_prev) {
     throw new Error(`Chỉ số điện mới (${electricity_curr}) không được nhỏ hơn chỉ số điện cũ (${electricity_prev})`);
   }
 
-  if (Number(water_curr) < water_prev) {
-    throw new Error(`Chỉ số nước mới (${water_curr}) không được nhỏ hơn chỉ số nước cũ (${water_prev})`);
+  if (water_curr !== undefined && water_curr !== null && water_prev !== null) {
+    if (Number(water_curr) < water_prev) {
+      throw new Error(`Chỉ số nước mới (${water_curr}) không được nhỏ hơn chỉ số nước cũ (${water_prev})`);
+    }
+  }
+
+  // Fallback for soNguoiO: find from active contract if not provided
+  let final_soNguoiO = soNguoiO !== undefined && soNguoiO !== null ? Number(soNguoiO) : null;
+  if (!final_soNguoiO) {
+    const activeContract = await prisma.contracts.findFirst({
+      where: { apartment_id, status: 'ACTIVE' }
+    });
+    final_soNguoiO = activeContract ? activeContract.soNguoiO : 1;
   }
 
   return prisma.utilityReadings.create({
@@ -81,10 +101,11 @@ export const recordUtilityReading = async (data, userId) => {
       billing_month,
       electricity_prev,
       electricity_curr: Number(electricity_curr),
-      water_prev,
-      water_curr: Number(water_curr),
+      water_prev: water_curr !== undefined && water_curr !== null ? water_prev : null,
+      water_curr: water_curr !== undefined && water_curr !== null ? Number(water_curr) : null,
       electricity_unit_price: electricity_unit_price !== undefined ? Number(electricity_unit_price) : 3500,
-      water_unit_price: water_unit_price !== undefined ? Number(water_unit_price) : 15000,
+      water_unit_price: water_unit_price !== undefined ? Number(water_unit_price) : WATER_PRICE_PER_PERSON,
+      soNguoiO: final_soNguoiO,
       recorded_by: userId
     }
   });
@@ -94,11 +115,12 @@ export const recordUtilityReading = async (data, userId) => {
 // INVOICES (HÓA ĐƠN)
 // ==========================================
 
-export const getInvoices = async ({ page = 1, limit = 20, status, contract_id, billing_month }) => {
+export const getInvoices = async ({ page = 1, limit = 20, status, contract_id, billing_month, apartment_id }) => {
   const where = {};
   if (status) where.status = status;
   if (contract_id) where.contract_id = contract_id;
   if (billing_month) where.billing_month = billing_month;
+  if (apartment_id) where.apartment_id = apartment_id;
 
   const [items, total] = await Promise.all([
     prisma.invoices.findMany({
@@ -225,8 +247,11 @@ export const generateInvoice = async (data, userId) => {
   const electricity_usage = Number(utilityReading.electricity_curr) - Number(utilityReading.electricity_prev);
   const electricity_amount = electricity_usage * Number(utilityReading.electricity_unit_price);
 
-  const water_usage = Number(utilityReading.water_curr) - Number(utilityReading.water_prev);
-  const water_amount = water_usage * Number(utilityReading.water_unit_price);
+  if (!contract.soNguoiO || contract.soNguoiO <= 0) {
+    throw new Error(`Hợp đồng ${contract.contract_code} chưa cấu hình Số người ở hoặc bằng 0. Không thể tạo hóa đơn.`);
+  }
+
+  const water_amount = calculateWaterCost(contract.soNguoiO);
 
   let service_amount = 0;
   for (const sub of contract.service_subscriptions) {

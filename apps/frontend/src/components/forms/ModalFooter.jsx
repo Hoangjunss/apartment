@@ -1,7 +1,7 @@
 // src/components/forms/ModalFooter.jsx
-export function ModalFooter({ onCancel, isLoading, submitLabel = 'Lưu', submitVariant = 'primary' }) {
+export function ModalFooter({ onCancel, isLoading, submitLabel = 'Lưu', submitVariant = 'primary', submitDisabled = false }) {
   return (
-    <div className="flex justify-end gap-2 pt-4 mt-2 border-t border-gray-100">
+    <div className="sticky bottom-0 bg-white dark:bg-gray-800 flex justify-end gap-2 pt-4 mt-4 border-t border-gray-100 dark:border-gray-700 shrink-0 z-10">
       <button
         type="button"
         onClick={onCancel}
@@ -12,7 +12,7 @@ export function ModalFooter({ onCancel, isLoading, submitLabel = 'Lưu', submitV
       </button>
       <button
         type="submit"
-        disabled={isLoading}
+        disabled={isLoading || submitDisabled}
         className={submitVariant === 'danger' ? 'btn-danger' : 'btn-primary'}
       >
         {isLoading ? (

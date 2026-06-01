@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, CreditCard, Receipt, Calendar, User, Home, Plus } from 'lucide-react';
+import { ArrowLeft, CreditCard, Receipt, Calendar, User, Home, Plus, Printer } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader.jsx';
 import { RoleGuard } from '@/components/common/RoleGuard.jsx';
 import { InvoiceStatusBadge } from '@/components/common/StatusBadge.jsx';
@@ -57,18 +57,28 @@ export default function InvoiceDetailPage() {
         title={`Chi tiết hóa đơn ${invoice.invoice_code}`}
         subtitle={`Lập vào ngày ${new Date(invoice.created_at).toLocaleDateString('vi-VN')}`}
         action={
-          invoice.status !== 'PAID' && (
-            <RoleGuard roles={TENANT_ACCESS_ROLES}>
-              <button
-                onClick={() => setIsPaymentModalOpen(true)}
-                className="btn-primary flex items-center gap-2"
-                id="add-payment-btn"
-              >
-                <Plus size={16} />
-                Ghi nhận thanh toán
-              </button>
-            </RoleGuard>
-          )
+          <div className="flex gap-2">
+            <button
+              onClick={() => window.print()}
+              className="btn-secondary flex items-center gap-1.5 no-print"
+              id="print-invoice-btn"
+            >
+              <Printer size={14} />
+              In PDF
+            </button>
+            {invoice.status !== 'PAID' && (
+              <RoleGuard roles={TENANT_ACCESS_ROLES}>
+                <button
+                  onClick={() => setIsPaymentModalOpen(true)}
+                  className="btn-primary flex items-center gap-2 no-print"
+                  id="add-payment-btn"
+                >
+                  <Plus size={16} />
+                  Ghi nhận thanh toán
+                </button>
+              </RoleGuard>
+            )}
+          </div>
         }
       />
 
@@ -172,17 +182,10 @@ export default function InvoiceDetailPage() {
                       <tr>
                         <td className="py-3 px-3 font-medium text-slate-800">Tiền Nước</td>
                         <td className="py-3 px-3 text-slate-500 text-xs">
-                          {utilityReading ? (
-                            <>
-                              Chỉ số: {Number(utilityReading.water_prev)} → {Number(utilityReading.water_curr)}
-                              <span className="ml-1 font-semibold">({(Number(utilityReading.water_curr) - Number(utilityReading.water_prev)).toFixed(1)} m³)</span>
-                            </>
-                          ) : (
-                            'Ghi nhận theo chỉ số đồng hồ'
-                          )}
+                          {invoice.contract?.soNguoiO || invoice.contract?.occupants_count || utilityReading?.soNguoiO || 1} người
                         </td>
                         <td className="py-3 px-3 text-right text-xs">
-                          {utilityReading ? `${new Intl.NumberFormat('vi-VN').format(Number(utilityReading.water_unit_price))} đ/m³` : '—'}
+                          100.000 đ/người/tháng
                         </td>
                         <td className="py-3 px-3 text-right font-medium text-slate-800">
                           {formatCurrency(invoice.water_amount)}
@@ -244,8 +247,9 @@ export default function InvoiceDetailPage() {
                 </div>
               </div>
 
-              <div className="text-xs text-gray-400 border-t pt-4">
-                Người lập hóa đơn: {invoice.creator?.full_name ?? 'Hệ thống'}
+              <div className="text-xs text-slate-400 border-t pt-4 flex flex-col sm:flex-row justify-between gap-2">
+                <div>Người lập hóa đơn: {invoice.creator?.full_name ?? 'Hệ thống'}</div>
+                <div className="italic text-slate-500">* Tiền nước từ kỳ mới được tính khoán theo 100.000đ/người/tháng.</div>
               </div>
             </div>
           </div>
