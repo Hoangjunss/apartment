@@ -197,6 +197,16 @@ model Contracts {
   created_at         DateTime       @default(now())
   updated_at         DateTime       @updatedAt
 
+  // Real-world fields
+  occupants_count          Int            @default(1)
+  soNguoiO                 Int            @default(1)
+  water_price_per_month    Decimal        @default(100000) @db.Decimal(15, 2)
+  initial_electricity      Decimal        @default(0) @db.Decimal(10, 2)
+  electricity_price        Decimal        @default(3500) @db.Decimal(10, 2)
+  initial_water            Decimal?       @db.Decimal(10, 2)
+  furniture_handover       String?        @db.Text
+  termination_notice_days  Int            @default(30)
+
   tenant    Tenants    @relation(fields: [tenant_id], references: [id])
   apartment Apartments @relation(fields: [apartment_id], references: [id])
   creator   Users      @relation("ContractCreator", fields: [created_by], references: [id])
@@ -300,10 +310,11 @@ model UtilityReadings {
   billing_month          String   @db.VarChar(7) // YYYY-MM
   electricity_prev       Decimal  @db.Decimal(10, 2)
   electricity_curr       Decimal  @db.Decimal(10, 2)
-  water_prev             Decimal  @db.Decimal(10, 2)
-  water_curr             Decimal  @db.Decimal(10, 2)
+  water_prev             Decimal? @db.Decimal(10, 2)
+  water_curr             Decimal? @db.Decimal(10, 2)
   electricity_unit_price Decimal  @db.Decimal(10, 2)
-  water_unit_price       Decimal  @db.Decimal(10, 2)
+  water_unit_price       Decimal? @db.Decimal(10, 2)
+  soNguoiO               Int      @default(1)
   recorded_by            Int
   recorded_at            DateTime @default(now())
 
