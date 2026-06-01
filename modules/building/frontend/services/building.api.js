@@ -84,3 +84,15 @@ export async function deleteFurniture(furnitureId) {
   const res = await api.delete(`/building/furniture/${furnitureId}`);
   return res.data;
 }
+
+export async function getDistinctRoomTypes() {
+  const res = await api.get('/building/apartments/room-types');
+  return res.data.data;
+}
+
+export async function checkApartmentCode(code, excludeId) {
+  const res = await api.get('/building/apartments/check-code', {
+    params: { code, excludeId }
+  });
+  return res.data.data;
+}

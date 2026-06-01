@@ -180,3 +180,20 @@ export function useDeleteFurniture(apartmentId, options = {}) {
     onError: options.onError,
   });
 }
+
+export function useDistinctRoomTypes() {
+  return useQuery({
+    queryKey: ['room-types'],
+    queryFn: () => buildingApi.getDistinctRoomTypes(),
+  });
+}
+
+export function useCheckApartmentCode(code, excludeId, enabled = true) {
+  return useQuery({
+    queryKey: ['check-apartment-code', code, excludeId],
+    queryFn: () => buildingApi.checkApartmentCode(code, excludeId),
+    enabled: enabled && !!code,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+}
