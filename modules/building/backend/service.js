@@ -65,6 +65,11 @@ export const getFloorsByBuildingId = async (buildingId) => {
   return prisma.floors.findMany({
     where: { building_id: buildingId },
     orderBy: { floor_number: 'asc' },
+    include: {
+      apartments: {
+        orderBy: { apartment_code: 'asc' },
+      },
+    },
   });
 };
 
@@ -134,30 +139,59 @@ export const getApartmentById = async (id) => {
       furniture: true,
       floor: {
         include: { building: true }
+      },
+      contracts: {
+        include: {
+          tenant: true
+        }
       }
     },
   });
 };
 
 export const createApartment = async (data) => {
-  const existing = await prisma.apartments.findUnique({ where: { apartment_code: data.apartment_code } });
-  if (existing) throw new Error(`Mã căn hộ '${data.apartment_code}' đã tồn tại`);
+  const { building_id, floor_id, ...rest } = data;
+  const existing = await prisma.apartments.findUnique({ where: { apartment_code: rest.apartment_code } });
+  if (existing) throw new Error(`Mã căn hộ '${rest.apartment_code}' đã tồn tại`);
 
-  return prisma.apartments.create({ data });
+  return prisma.apartments.create({
+    data: {
+      apartment_code: rest.apartment_code,
+      room_type: rest.room_type,
+      area_sqm: Number(rest.area_sqm),
+      max_occupants: Number(rest.max_occupants),
+      base_price: Number(rest.base_price),
+      deposit_amount: Number(rest.deposit_amount),
+      description: rest.description || null,
+      floor: { connect: { id: Number(floor_id) } }
+    }
+  });
 };
 
 export const updateApartment = async (id, data) => {
-  // Ngăn chặn update status qua hàm này
-  const { status, ...updateData } = data;
+  const { status, building_id, floor_id, ...updateData } = data;
 
   if (updateData.apartment_code) {
     const existing = await prisma.apartments.findUnique({ where: { apartment_code: updateData.apartment_code } });
     if (existing && existing.id !== id) throw new Error(`Mã căn hộ '${updateData.apartment_code}' đã tồn tại`);
   }
 
+  const payload = {};
+  if (updateData.apartment_code !== undefined) payload.apartment_code = updateData.apartment_code;
+  if (updateData.room_type !== undefined) payload.room_type = updateData.room_type;
+  if (updateData.area_sqm !== undefined) payload.area_sqm = Number(updateData.area_sqm);
+  if (updateData.max_occupants !== undefined) payload.max_occupants = Number(updateData.max_occupants);
+  if (updateData.base_price !== undefined) payload.base_price = Number(updateData.base_price);
+  if (updateData.deposit_amount !== undefined) payload.deposit_amount = Number(updateData.deposit_amount);
+  if (updateData.description !== undefined) payload.description = updateData.description || null;
+  
+  if (floor_id !== undefined && floor_id !== null) {
+    payload.floor = { connect: { id: Number(floor_id) } };
+  }
+
   return prisma.apartments.update({
     where: { id },
-    data: updateData,
+    data: payload,
   });
 };
 
@@ -246,3 +280,20 @@ export const deleteFurniture = async (id) => {
     where: { id },
   });
 };
+
+export const getDistinctRoomTypes = async () => {
+  const groups = await prisma.apartments.groupBy({
+    by: ['room_type'],
+  });
+  return groups.map((g) => g.room_type);
+};
+
+export const checkApartmentCode = async (code, excludeId) => {
+  const apartment = await prisma.apartments.findUnique({
+    where: { apartment_code: code },
+  });
+  if (!apartment) return false;
+  if (excludeId && apartment.id === excludeId) return false;
+  return true;
+};
+

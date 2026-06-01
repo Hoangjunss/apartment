@@ -20,6 +20,8 @@ router.post('/buildings/:buildingId/floors', authenticate, requireRole(['ADMIN',
 // APARTMENTS
 // ==========================================
 router.get('/apartments', authenticate, ctrl.getApartments);
+router.get('/apartments/room-types', authenticate, ctrl.getDistinctRoomTypes);
+router.get('/apartments/check-code', authenticate, ctrl.checkApartmentCode);
 router.get('/apartments/:id', authenticate, ctrl.getApartmentById);
 router.post('/apartments', authenticate, requireRole(['ADMIN', 'MANAGER']), ctrl.createApartment);
 router.put('/apartments/:id', authenticate, requireRole(['ADMIN', 'MANAGER']), ctrl.updateApartment);

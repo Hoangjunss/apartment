@@ -16,13 +16,15 @@ const getErrorStatus = (message) => {
 
 export const getContracts = async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, apartment_id, tenant_id } = req.query;
+    const { page = 1, limit = 20, status, apartment_id, tenant_id, building_id, month } = req.query;
     const data = await service.getContracts({
       page: +page,
       limit: +limit,
       status,
       apartment_id: apartment_id ? +apartment_id : undefined,
       tenant_id: tenant_id ? +tenant_id : undefined,
+      building_id: building_id ? +building_id : undefined,
+      month,
     });
     res.json({ success: true, data });
   } catch (err) {

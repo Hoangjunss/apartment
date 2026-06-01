@@ -15,11 +15,30 @@ const generateContractCode = async () => {
   return `HD${year}-${String(seq).padStart(4, '0')}`;
 };
 
-export const getContracts = async ({ page = 1, limit = 20, status, apartment_id, tenant_id }) => {
+export const getContracts = async ({ page = 1, limit = 20, status, apartment_id, tenant_id, building_id, month }) => {
   const where = {};
   if (status) where.status = status;
   if (apartment_id) where.apartment_id = apartment_id;
   if (tenant_id) where.tenant_id = tenant_id;
+
+  if (building_id) {
+    where.apartment = {
+      floor: {
+        building_id: building_id
+      }
+    };
+  }
+
+  if (month) {
+    const [yStr, mStr] = month.split('-');
+    const year = Number(yStr);
+    const m = Number(mStr);
+    const startOfMonth = new Date(year, m - 1, 1);
+    const endOfMonth = new Date(year, m, 0, 23, 59, 59, 999);
+    
+    where.start_date = { lte: endOfMonth };
+    where.end_date = { gte: startOfMonth };
+  }
 
   const [items, total] = await Promise.all([
     prisma.contracts.findMany({
@@ -79,18 +98,40 @@ export const createContract = async (data, userId) => {
     throw new Error('Căn hộ này đang có hợp đồng hiệu lực khác');
   }
 
+  const occupants_count = data.occupants_count ? Number(data.occupants_count) : 1;
+  const water_price_per_month = data.water_price_per_month ? Number(data.water_price_per_month) : 100000;
+  const initial_electricity = data.initial_electricity ? Number(data.initial_electricity) : 0;
+  const electricity_price = data.electricity_price ? Number(data.electricity_price) : 3500;
+  const initial_water = data.initial_water != null && data.initial_water !== '' ? Number(data.initial_water) : null;
+  const termination_notice_days = data.termination_notice_days ? Number(data.termination_notice_days) : 30;
+  const furniture_handover = data.furniture_handover || null;
+
   // 3. Thực hiện Transaction
   const contractCode = await generateContractCode();
 
   const [newContract] = await prisma.$transaction([
     prisma.contracts.create({
       data: {
-        ...data,
+        tenant_id: Number(data.tenant_id),
+        apartment_id: Number(data.apartment_id),
         start_date: startDate,
         end_date: endDate,
+        monthly_rent: Number(data.monthly_rent),
+        deposit_amount: Number(data.deposit_amount),
+        payment_due_day: Number(data.payment_due_day),
+        notes: data.notes || null,
         contract_code: contractCode,
         created_by: userId,
         status: 'ACTIVE',
+        
+        occupants_count,
+        soNguoiO: occupants_count,
+        water_price_per_month,
+        initial_electricity,
+        electricity_price,
+        initial_water,
+        furniture_handover,
+        termination_notice_days,
       },
     }),
     prisma.apartments.update({
@@ -117,6 +158,10 @@ export const updateContract = async (id, data) => {
   
   if (updateData.start_date) updateData.start_date = new Date(updateData.start_date);
   if (updateData.end_date) updateData.end_date = new Date(updateData.end_date);
+
+  if (updateData.occupants_count !== undefined && updateData.occupants_count !== null) {
+    updateData.soNguoiO = Number(updateData.occupants_count);
+  }
 
   return prisma.contracts.update({
     where: { id },
