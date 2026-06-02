@@ -376,44 +376,103 @@ cd apps/frontend && pnpm dev
 
 ---
 
-## 📽️ Tài liệu phục vụ Slide PPTX (Presentation Design & Prompts)
+## 📽️ Tài liệu phục vụ Slide PPTX (Presentation Outline - 15 Slides)
 
-Dưới đây là cấu trúc nội dung và các điểm nhấn (Key Takeaways) được biên soạn sẵn để làm Prompt cho AI tạo file thuyết trình PowerPoint (PPTX) về dự án **Hệ thống Quản lý Căn hộ Dịch vụ (QLCHDC)**.
+Dưới đây là dàn bài chi tiết **15 Slide** và các điểm nhấn (Key Takeaways) được biên soạn chuyên sâu, giúp làm Prompt cho AI tạo file thuyết trình PowerPoint (PPTX) ấn tượng về hệ thống **QLCHDC**.
 
-### 💡 Gợi ý Prompt để sinh PPTX nhanh (Dùng cho Gamma.app, Tome, hoặc ChatGPT Marp):
-> *"Tạo một slide thuyết trình chuyên nghiệp có cấu trúc dựa trên nội dung sau: Giới thiệu hệ thống QLCHDC, quy trình chuyển đổi trạng thái hóa đơn tự động bằng Cron Job + kiểm tra động trên giao diện UI, tính toán tiền nước theo đầu người thay vì m³, tối ưu trải nghiệm người dùng với việc đồng bộ hóa điều hướng bộ lọc quá hạn từ Dashboard, và hệ thống báo hỏng QR Code không cần đăng nhập cho khách thuê. Thiết kế theo tông màu chuyên nghiệp (xanh dương đậm và xám nhạt). Cụ thể như sau..."*
+### 💡 Gợi ý Prompt để sinh 15 Slide nhanh (Dùng cho Gamma.app, Tome, hoặc ChatGPT Marp):
+> *"Tạo một slide thuyết trình chi tiết gồm đúng 15 slide về dự án Hệ thống Quản lý Căn hộ Dịch vụ (QLCHDC). Cấu trúc slide phải đi từ bối cảnh, công nghệ, thiết kế cơ sở dữ liệu, cho đến chi tiết từng module (Tòa nhà, Khách thuê, Hợp đồng, Hóa đơn điện nước, Cơ chế xử lý quá hạn, Hỗ trợ qua QR Code không cần đăng nhập, Dashboard thống kê và kết luận). Thiết kế theo phong cách tối giản, hiện đại, màu sắc chủ đạo xanh dương phối xám cao cấp. Nội dung cụ thể như sau..."*
 
 ---
 
-### 🗂️ Phác thảo cấu trúc Slide (Slide Outline & Content):
+### 🗂️ Phác thảo cấu trúc chi tiết 15 Slide:
 
-#### Slide 1: Trang tiêu đề & Giới thiệu
+#### Slide 1: Tiêu đề & Giới thiệu chung
 * **Tiêu đề:** Hệ thống Quản lý Nội bộ Căn hộ Dịch vụ (QLCHDC)
-* **Phụ đề:** Giải pháp tối ưu hóa vận hành, tài chính và kỹ thuật dành cho Ban quản lý tòa nhà
-* **Điểm nhấn:** Kiến trúc Monorepo (pnpm workspaces), kết hợp Express.js + React.js + Prisma ORM.
+* **Phụ đề:** Giải pháp Chuyển đổi số toàn diện trong Vận hành, Tài chính và Dịch vụ hỗ trợ
+* **Nội dung:** Giới thiệu ngắn gọn về hệ thống quản lý nội bộ dành riêng cho Ban quản lý tòa nhà, giúp tối ưu hóa công việc của Admin, Manager, Receptionist và Technician.
 
-#### Slide 2: Vòng đời Hóa đơn & Quản lý Tài chính (Invoice Lifecycle)
-* **Nội dung trọng tâm:** Quy trình chuyển dịch trạng thái khép kín:
-  1. **Khởi tạo:** Hệ thống chốt chỉ số điện nước + phí dịch vụ cố định theo số lượng người ở (`soNguoiO`) để tự động tạo hóa đơn `UNPAID` với hạn nộp (`due_date`) vào tháng tiếp theo.
-  2. **Thanh toán:** Cập nhật trạng thái tự động thành `PARTIALLY_PAID` (đóng một phần) hoặc `PAID` (đã thu đủ).
-  3. **Quá hạn:** Chạy Cron Job tự động lúc 00:00 hàng ngày quét trạng thái hóa đơn trễ hạn chuyển thành `OVERDUE` dựa trên múi giờ Việt Nam (`TZ=Asia/Ho_Chi_Minh`).
-* **Logic tối ưu UI mới:** Cột "Hạn thanh toán" được thiết kế tối giản, loại bỏ chữ cảnh báo rác; toàn bộ cảnh báo quá hạn được gom sang cột **"Trạng thái"** với badge đỏ đậm (`bg-red-200 text-red-800 font-semibold`) hiển thị trực quan và đồng bộ.
+#### Slide 2: Bối cảnh & Thách thức trong Quản lý Truyền thống
+* **Khó khăn thực tế:** 
+  * Sai sót khi ghi chép chỉ số điện nước thủ công bằng giấy/excel.
+  * Thất thoát doanh thu do quên hạn nợ hóa đơn hoặc không theo dõi sát sao tiến độ trả tiền của khách.
+  * Quy trình tiếp nhận báo hỏng cồng kềnh, kéo dài thời gian chờ đợi của khách thuê.
+  * Khó tổng hợp báo cáo tài chính và hiệu suất lấp đầy phòng theo thời gian thực.
 
-#### Slide 3: Hệ thống Báo hỏng & Yêu cầu Kỹ thuật qua QR Code (QR Support)
-* **Nội dung trọng tâm:** Trải nghiệm "Zero-Login" cho khách thuê phòng:
-  * Mỗi phòng có một mã QR động riêng biệt (chứa token bảo mật thời hạn 90 ngày).
-  * Khách quét mã để truy cập giao diện báo sự cố di động, điền form báo hỏng (điện, nước, khóa cửa...).
-  * Hệ thống tự động phân loại, ghi nhận nguồn gửi ("Khách thuê" qua QR vs "Nội bộ" do nhân viên tạo), và thông báo cho kỹ thuật viên xử lý thông qua Dashboard của Ban quản lý.
+#### Slide 3: Mục tiêu Dự án & Giải pháp Tổng quan
+* **Mục tiêu chính:** Số hóa 100% hồ sơ, tự động hóa tính toán tài chính và đơn giản hóa tương tác kỹ thuật.
+* **Giải pháp:** Xây dựng hệ thống web nội bộ đa nhiệm, kết hợp các tiến trình tự động hóa (Cron job), báo cáo trực quan qua biểu đồ và cổng tiếp nhận báo hỏng qua QR Code công khai không cần tài khoản.
 
-#### Slide 4: Bảng điều khiển (Dashboard) thông minh hỗ trợ Quyết định
-* **Nội dung trọng tâm:**
-  * **8 chỉ số KPI thời gian thực:** Phân làm 2 nhóm Bất động sản (Lấp đầy, HĐ hoạt động, Sắp hết hạn) và Tài chính (Doanh thu tháng, Còn phải thu, Số HĐ chưa TT).
-  * **Đồng bộ hóa điều hướng:** Click vào các chỉ số như "Còn cần thu" hay "Hóa đơn quá hạn" sẽ điều hướng chính xác đến trang danh sách hóa đơn được áp bộ lọc tương ứng (`?status=OVERDUE`), khắc phục triệt để lỗi mất dữ liệu khi lọc.
-  * **Biểu đồ trực quan:** Thống kê doanh thu 6 tháng gần nhất (đã thu vs chưa thu) và phân bố cơ cấu loại phòng.
+#### Slide 4: Kiến trúc Hệ thống & Công nghệ Cốt lõi
+* **Mô hình Monorepo:** Tổ chức với `pnpm workspaces` giúp tách biệt các module nhưng chia sẻ tài nguyên linh hoạt.
+* **Tech Stack lựa chọn:**
+  * **Backend:** Node.js + Express.js (ES Modules) đảm bảo hiệu năng cao.
+  * **Frontend:** React.js + Vite + TailwindCSS tối ưu tốc độ tải trang và UX.
+  * **Database:** MySQL + Prisma ORM quản lý giao dịch an toàn và đồng bộ schema nhanh chóng.
+  * **Deploy:** Đóng gói Docker & Docker-Compose chạy độc lập, nhất quán múi giờ.
 
-#### Slide 5: Tổng kết hiệu quả vận hành & Công nghệ
-* **Lợi ích:**
-  * Tránh thất thoát tài chính nhờ tự động hóa toàn bộ hóa đơn từ hợp đồng gốc.
-  * Giảm 80% thời gian xử lý sự cố thông qua quy trình QR Code không cần đăng nhập.
-  * Hệ thống hoạt động độc lập, gọn nhẹ trên nền Docker, cấu hình múi giờ chuẩn xác giúp báo cáo tài chính luôn nhất quán.
+#### Slide 5: Thiết kế Cơ sở Dữ liệu (Database Schema)
+* **Quy mô DB:** 14 bảng quan hệ chặt chẽ.
+* **Quy ước chuẩn hóa:**
+  * Tất cả các trường tiền tệ dùng kiểu `Decimal` để tránh sai lệch số nổi (Float).
+  * Mọi bảng có dấu vết thời gian (`created_at`, `updated_at`) và soft delete.
+  * Quản lý phân quyền chặt chẽ thông qua 4 vai trò chính: ADMIN, MANAGER, RECEPTIONIST, TECHNICIAN.
 
+#### Slide 6: Module Quản lý Tòa nhà & Căn hộ
+* **Tính năng cốt lõi:**
+  * Quản lý phân cấp: Tòa nhà -> Tầng -> Căn hộ.
+  * Thiết lập thuộc tính chi tiết cho từng căn hộ (Loại phòng: Studio, 1PN, 2PN, 3PN; Danh mục nội thất đi kèm).
+  * Quy trình chuyển trạng thái căn hộ tự động hoặc thủ công dựa trên vòng đời hợp đồng (`AVAILABLE`, `OCCUPIED`, `MAINTENANCE`, `RESERVED`).
+
+#### Slide 7: Quản lý Khách thuê & Thủ tục Hành chính
+* **Hồ sơ số hóa:** Lưu trữ đầy đủ lý lịch khách thuê đại diện (CCCD, SĐT, Thông tin liên lạc).
+* **Quản lý cư trú:**
+  * Tích hợp tính năng Khai báo Tạm trú / Tạm vắng trực tiếp trên hồ sơ khách.
+  * Lưu trữ lịch sử tất cả các hợp đồng khách đã ký trong quá khứ để phân tích hành vi tiêu dùng.
+
+#### Slide 8: Thiết lập & Vòng đời Hợp đồng thuê
+* **Quy trình ký hợp đồng:** Chọn khách đại diện, áp phòng trống, cấu hình đơn giá điện nước, cấu hình ngày đến hạn thanh toán (`payment_due_day`), và đính kèm dịch vụ.
+* **Vòng đời hợp đồng tự động:**
+  * **ACTIVE** (Đang hoạt động).
+  * **EXPIRING_SOON** (Tự động chuyển qua Cron khi còn ≤ 30 ngày).
+  * **EXPIRED** (Hết hạn và tự giải phóng trạng thái phòng về trống).
+  * **TERMINATED** (Chấm dứt trước hạn kèm lý do cụ thể).
+
+#### Slide 9: Ghi nhận Chỉ số Điện nước & Dịch vụ đi kèm
+* **Chốt số thông minh:** Giao diện chốt số điện nước hàng tháng tự động gợi ý chỉ số cũ (lấy từ số điện nước tháng trước hoặc chỉ số ban đầu của hợp đồng), giảm thiểu lỗi nhập liệu của nhân viên.
+* **Quản lý dịch vụ đăng ký:** Đăng ký dịch vụ (vệ sinh, xe cộ, internet...) theo số lượng và đơn giá quy định trên từng hợp đồng, tự động cộng dồn vào hóa đơn cuối tháng.
+
+#### Slide 10: Quy trình Tính toán & Lập Hóa đơn hàng loạt
+* **Tự động hóa lập hóa đơn:** Nhân viên chỉ cần chọn tháng lập hóa đơn, hệ thống tự động quét và tính toán hàng loạt cho tất cả căn hộ có hợp đồng hoạt động:
+  $$\text{Tổng tiền} = \text{Tiền phòng} + (\text{Điện mới} - \text{Điện cũ}) \times \text{Đơn giá} + (\text{Số người} \times 100k) + \text{Tổng tiền dịch vụ} + \text{Phụ thu}$$
+* **Hạn đóng tiền hợp lệ:** Hạn thanh toán (`due_date`) được tính tự động vào tháng kế tiếp của kỳ hóa đơn (Ví dụ: hóa đơn kỳ 2026-05 có hạn nộp là ngày quy định trong hợp đồng của tháng 2026-06).
+
+#### Slide 11: Quản lý Quá hạn hóa đơn & Tối ưu hóa UI mới
+* **Trạng thái Quá hạn:** Tự động phát hiện hóa đơn quá hạn qua Cron Job hàng ngày (`due_date < today` và chưa hoàn tất thanh toán) hoặc cập nhật động ngay trên UI.
+* **Cải tiến thiết kế UI tối giản:**
+  * Di chuyển toàn bộ cảnh báo quá hạn từ cột "Hạn thanh toán" sang cột "Trạng thái". Cột Hạn thanh toán chỉ hiển thị ngày sạch sẽ.
+  * Tận dụng badge đỏ đậm đặc trưng (`bg-red-200 text-red-800 font-semibold`) cho trạng thái `Quá hạn` trên Invoices Page và Invoice Detail Page để gây chú ý mạnh với nhân viên thu ngân.
+
+#### Slide 12: Báo hỏng qua QR Code — Trải nghiệm "Zero-Login"
+* **Đột phá tiện ích cho Khách thuê:**
+  * Mỗi phòng có một mã QR động độc lập chứa token mã hóa thời hạn 90 ngày dán trực tiếp ở cửa.
+  * Khách chỉ cần quét mã bằng điện thoại để mở form gửi yêu cầu kỹ thuật trực tiếp mà không cần tài khoản đăng nhập hay cài đặt ứng dụng.
+  * Tự động ẩn thông tin nhạy cảm của khách thuê trên giao diện công cộng nhưng tự liên kết chính xác sự cố vào phòng tương ứng ở hệ thống quản lý.
+
+#### Slide 13: Tiếp nhận & Phân công Yêu cầu Kỹ thuật
+* **Phân cấp xử lý:**
+  * Tự động nhận diện nguồn gửi sự cố (Gửi từ Khách thuê qua QR code vs Gửi nội bộ do Lễ tân tạo).
+  * Quản lý tiến độ sửa chữa qua các trạng thái: `RECEIVED` -> `ASSIGNED` (Phân công kỹ thuật viên cụ thể) -> `IN_PROGRESS` -> `RESOLVED` (Kèm nhật ký thời gian hoàn thành cụ thể).
+
+#### Slide 14: Dashboard Phân tích Tài chính & Vận hành
+* **Trực quan hóa dữ liệu chỉ huy:**
+  * **8 chỉ số KPI cốt lõi:** Thống kê doanh thu, tỷ lệ lấp đầy phòng, số lượng khách thuê và tình trạng hóa đơn nợ nần.
+  * **Điều hướng đồng bộ:** Nhấn vào các chỉ số nợ/quá hạn trên Dashboard sẽ mở danh sách hóa đơn tương ứng với bộ lọc chính xác (`?status=OVERDUE`), loại bỏ lỗi rỗng trang.
+  * Biểu đồ doanh thu 6 tháng gần nhất (Đã thu vs Chưa thu) để hỗ trợ dòng tiền quản lý.
+
+#### Slide 15: Kết luận & Giá trị thực tiễn mang lại
+* **Giá trị cốt lõi:**
+  * Đạt tỷ lệ chính xác 100% trong tính toán công nợ và hạn chế thất thoát tài chính.
+  * Rút ngắn thời gian tiếp nhận sự cố kỹ thuật từ khách hàng lên tới 80%.
+  * Hệ thống đóng gói Docker nhẹ, ổn định, giao diện có độ tương phản cao, chống lóa và phân cấp thông tin rõ ràng.
+  * Sẵn sàng demo ngay lập tức với dữ liệu mẫu phong phú.
