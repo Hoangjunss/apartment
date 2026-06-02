@@ -101,6 +101,7 @@ model Apartments {
   utility_readings   UtilityReadings[]
   invoices           Invoices[]
   temp_registrations TemporaryRegistrations[]
+  service_requests   ServiceRequests[]
 
   @@index([floor_id])
   @@index([status])
@@ -381,19 +382,30 @@ model Payments {
   @@index([invoice_id])
 }
 
-// Missing ServiceRequests model to satisfy Users relation
+enum ServiceRequestStatus {
+  PENDING
+  IN_PROGRESS
+  RESOLVED
+}
+
+// ServiceRequests — Yêu cầu dịch vụ / kỹ thuật
 model ServiceRequests {
-  id           Int      @id @default(autoincrement())
+  id           Int                   @id @default(autoincrement())
   requested_by Int
   assigned_to  Int?
-  description  String   @db.Text
-  status       String   @db.VarChar(50) // Ví dụ: PENDING, IN_PROGRESS, RESOLVED
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  title        String                @db.VarChar(200)
+  description  String                @db.Text
+  status       ServiceRequestStatus  @default(PENDING)
+  apartment_id Int?
+  created_at   DateTime              @default(now())
+  updated_at   DateTime              @updatedAt
 
-  requester Users  @relation("RequestedBy", fields: [requested_by], references: [id])
-  assignee  Users? @relation("AssignedTo", fields: [assigned_to], references: [id])
+  requester Users       @relation("RequestedBy", fields: [requested_by], references: [id])
+  assignee  Users?      @relation("AssignedTo", fields: [assigned_to], references: [id])
+  apartment Apartments? @relation(fields: [apartment_id], references: [id])
 
   @@index([requested_by])
   @@index([assigned_to])
+  @@index([status])
+  @@index([apartment_id])
 }

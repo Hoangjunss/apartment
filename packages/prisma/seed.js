@@ -69,6 +69,16 @@ async function main() {
     },
   });
 
+  const receptionist = await prisma.users.create({
+    data: {
+      email: 'reception@qlchdc.com',
+      password_hash: passwordHash,
+      full_name: 'Phạm Thị Lễ Tân',
+      role: 'RECEPTIONIST',
+      phone: '0922334455',
+    },
+  });
+
   // 3. Create Services
   await prisma.services.createMany({
     data: [
@@ -446,6 +456,20 @@ async function main() {
   }
 
   console.log(`Generated ${totalInvoicesCreated} invoices and associated transactions.`);
+
+  // 9. ServiceRequests mẫu
+  const serviceReqData = [
+    { title: 'Điều hòa phòng A101 không mát', description: 'Máy lạnh chạy nhưng không giảm nhiệt độ, cần kiểm tra gas và bộ lọc', apartment_id: apartments[0].id, requested_by: receptionist.id, assigned_to: tech.id, status: 'IN_PROGRESS' },
+    { title: 'Két nước phòng B203 bị rỷ', description: 'Khách thuê báo có tiếng rậy nước trong tường, cần kiểm tra ngay', apartment_id: apartments[13].id, requested_by: manager.id, assigned_to: tech.id, status: 'PENDING' },
+    { title: 'Thay bóng đèn hành lang tầng 2', description: 'Hai bóng đèn LED hành lang tầng 2 Block A bị hỏng', apartment_id: null, requested_by: receptionist.id, assigned_to: null, status: 'PENDING' },
+    { title: 'Sửa khóa cửa phòng A204', description: 'Khóa cửa khó mở, khách phải dùng lực mạnh', apartment_id: apartments[3].id, requested_by: admin.id, assigned_to: tech.id, status: 'RESOLVED' },
+    { title: 'Thay bình nóng lạnh phòng B102', description: 'Bình nóng lạnh không đun được nước, có thể hỏng điện trở', apartment_id: apartments[12].id, requested_by: receptionist.id, assigned_to: tech.id, status: 'PENDING' },
+  ];
+
+  for (const sr of serviceReqData) {
+    await prisma.serviceRequests.create({ data: sr });
+  }
+  console.log(`Created ${serviceReqData.length} service requests.`);
   console.log('Seed finished successfully.');
 }
 
