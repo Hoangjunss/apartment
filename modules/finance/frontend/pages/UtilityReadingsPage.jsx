@@ -54,7 +54,7 @@ export default function UtilityReadingsPage() {
     {
       key: 'billing_month',
       label: 'Tháng',
-      render: (row) => <span className="table-cell-secondary font-medium">{row.billing_month}</span>,
+      render: (row) => <span className="table-cell-secondary">{row.billing_month}</span>,
     },
     {
       key: 'electricity',
@@ -63,11 +63,11 @@ export default function UtilityReadingsPage() {
         const usage = Number(row.electricity_curr) - Number(row.electricity_prev);
         return (
           <div className="text-sm">
-            <span className="table-cell-muted">{Number(row.electricity_prev)}</span>
+            <span className="table-cell-secondary">{Number(row.electricity_prev)}</span>
             <span className="mx-1 table-cell-muted">→</span>
-            <span className="table-cell-primary">{Number(row.electricity_curr)}</span>
-            <span className="ml-2 badge bg-amber-50 text-amber-700 border border-amber-200">
-              +{usage.toFixed(1)}
+            <span className="table-cell-secondary font-medium">{Number(row.electricity_curr)}</span>
+            <span className="ml-2 table-cell-muted">
+              (+{usage.toFixed(1)} kWh)
             </span>
           </div>
         );
@@ -150,15 +150,15 @@ export default function UtilityReadingsPage() {
       />
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-center bg-gray-50 dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+      <div className="flex flex-wrap gap-4 items-center bg-gray-50 p-4 rounded-xl border border-gray-200 shadow-sm">
         <div className="w-full sm:w-64">
-          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
             Lọc theo Căn hộ
           </label>
           <select
             value={filters.apartment_id}
             onChange={(e) => setFilter('apartment_id', e.target.value)}
-            className="input w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+            className="input w-full"
             id="filter-apt-select"
           >
             <option value="">Tất cả căn hộ</option>
@@ -171,14 +171,14 @@ export default function UtilityReadingsPage() {
         </div>
 
         <div className="w-full sm:w-48">
-          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
             Lọc theo Tháng
           </label>
           <input
             type="month"
             value={filters.billing_month}
             onChange={(e) => setFilter('billing_month', e.target.value)}
-            className="input w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-gray-100"
+            className="input w-full"
             id="filter-month-input"
           />
         </div>

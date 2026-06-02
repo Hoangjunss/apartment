@@ -70,12 +70,12 @@ export default function ApartmentsPage() {
     {
       key: 'area_sqm',
       label: 'Diện tích',
-      render: (row) => <span className="table-cell-primary">{row.area_sqm} m²</span>,
+      render: (row) => <span className="table-cell-secondary">{row.area_sqm} m²</span>,
     },
     {
       key: 'base_price',
       label: 'Giá cơ bản',
-      render: (row) => <span className="table-cell-primary font-semibold">{formatCurrency(row.base_price)}</span>,
+      render: (row) => <span className="table-cell-secondary">{formatCurrency(row.base_price)}</span>,
     },
     {
       key: 'status',
@@ -86,7 +86,7 @@ export default function ApartmentsPage() {
       key: 'location',
       label: 'Tầng / Tòa',
       render: (row) => (
-        <span className="table-cell-secondary">
+        <span className="table-cell-muted">
           {row.floor
             ? `Tầng ${row.floor.floor_number} / ${row.floor.building?.name ?? '—'}`
             : '—'}
