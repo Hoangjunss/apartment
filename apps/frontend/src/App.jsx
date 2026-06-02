@@ -10,6 +10,7 @@ import {
   MANAGEMENT_ROLES,
   TENANT_ACCESS_ROLES,
   CONTRACT_VIEW_ROLES,
+  FINANCE_ACCESS_ROLES,
 } from '@/constants/roles.js';
 
 // ── Auth Module Pages ──────────────────────────────────────────────────────────
@@ -39,6 +40,10 @@ import UtilityReadingsPage from 'modules/finance/frontend/pages/UtilityReadingsP
 import InvoicesPage from 'modules/finance/frontend/pages/InvoicesPage.jsx';
 import InvoiceDetailPage from 'modules/finance/frontend/pages/InvoiceDetailPage.jsx';
 
+// ── Service Requests Module Pages ───────────────────────────────────────────────────────
+import ServiceRequestsPage from 'modules/service-requests/frontend/pages/ServiceRequestsPage.jsx';
+import ServiceRequestDetailPage from 'modules/service-requests/frontend/pages/ServiceRequestDetailPage.jsx';
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -60,9 +65,23 @@ export default function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/profile" element={<ProfilePage />} />
 
-              {/* Building */}
-              <Route path="/buildings" element={<BuildingsPage />} />
-              <Route path="/buildings/:id" element={<BuildingDetailPage />} />
+              {/* Building — ADMIN/MANAGER only for list/detail */}
+              <Route
+                path="/buildings"
+                element={
+                  <ProtectedRoute roles={MANAGEMENT_ROLES}>
+                    <BuildingsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/buildings/:id"
+                element={
+                  <ProtectedRoute roles={MANAGEMENT_ROLES}>
+                    <BuildingDetailPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/apartments" element={<ApartmentsPage />} />
               <Route path="/apartments/:id" element={<ApartmentDetailPage />} />
 
@@ -118,11 +137,11 @@ export default function App() {
                 }
               />
 
-              {/* Finance */}
+              {/* Finance — TECHNICIAN không vào được */}
               <Route
                 path="/utilities"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute roles={FINANCE_ACCESS_ROLES}>
                     <UtilityReadingsPage />
                   </ProtectedRoute>
                 }
@@ -130,7 +149,7 @@ export default function App() {
               <Route
                 path="/invoices"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute roles={FINANCE_ACCESS_ROLES}>
                     <InvoicesPage />
                   </ProtectedRoute>
                 }
@@ -138,11 +157,15 @@ export default function App() {
               <Route
                 path="/invoices/:id"
                 element={
-                  <ProtectedRoute>
+                  <ProtectedRoute roles={FINANCE_ACCESS_ROLES}>
                     <InvoiceDetailPage />
                   </ProtectedRoute>
                 }
               />
+
+              {/* Service Requests — tất cả role */}
+              <Route path="/service-requests" element={<ProtectedRoute><ServiceRequestsPage /></ProtectedRoute>} />
+              <Route path="/service-requests/:id" element={<ProtectedRoute><ServiceRequestDetailPage /></ProtectedRoute>} />
 
               {/* Users — ADMIN only */}
               <Route

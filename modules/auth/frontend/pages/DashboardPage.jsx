@@ -1,4 +1,6 @@
 // modules/auth/frontend/pages/DashboardPage.jsx
+import ReceptionistDashboard from './ReceptionistDashboard.jsx';
+import TechnicianDashboard from './TechnicianDashboard.jsx';
 import { useNavigate, Link } from 'react-router-dom';
 import { 
   Building2, 
@@ -137,7 +139,7 @@ const ROOM_TYPE_MAP = {
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
 
-// ── Dashboard Page ─────────────────────────────────────────────────────────────
+// ── Dashboard Page ────────────────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -177,6 +179,11 @@ export default function DashboardPage() {
   const expiringSoonList = Array.isArray(expiringSoon)
     ? expiringSoon
     : (expiringSoon?.items ?? []);
+  // ─ Phân nhánh theo role ───────────────────────────────────────────────────────────
+  if (user?.role === 'TECHNICIAN') return <TechnicianDashboard />;
+  if (user?.role === 'RECEPTIONIST') return <ReceptionistDashboard />;
+
+  // ─ Full dashboard — ADMIN + MANAGER ───────────────────────────────────────────────
 
   const today = new Date();
   const greeting = today.getHours() < 12 ? 'Chào buổi sáng' : today.getHours() < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';
