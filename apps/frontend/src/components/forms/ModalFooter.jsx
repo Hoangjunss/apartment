@@ -1,7 +1,7 @@
 // src/components/forms/ModalFooter.jsx
 export function ModalFooter({ onCancel, isLoading, submitLabel = 'Lưu', submitVariant = 'primary', submitDisabled = false }) {
   return (
-    <div className="sticky bottom-0 bg-white dark:bg-gray-800 flex justify-end gap-2 pt-4 mt-4 border-t border-gray-100 dark:border-gray-700 shrink-0 z-10">
+    <div className="sticky bottom-0 bg-white flex justify-end gap-2 pt-4 mt-4 border-t border-gray-100 shrink-0 z-10">
       <button
         type="button"
         onClick={onCancel}
