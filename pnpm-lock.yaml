@@ -26,6 +26,9 @@ importers:
       '@my/finance-backend':
         specifier: workspace:*
         version: link:../../modules/finance/backend
+      '@my/service-requests-backend':
+        specifier: workspace:*
+        version: link:../../modules/service-requests/backend
       '@my/tenant-backend':
         specifier: workspace:*
         version: link:../../modules/tenant/backend
@@ -157,6 +160,9 @@ importers:
       react-router-dom:
         specifier: ^6.22.0
         version: 6.30.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      recharts:
+        specifier: ^3.8.1
+        version: 3.8.1(react-dom@18.3.1(react@18.3.1))(react-is@19.2.6)(react@18.3.1)(redux@5.0.1)
       zod:
         specifier: ^3.22.0
         version: 3.25.76
@@ -289,6 +295,18 @@ importers:
       zod:
         specifier: ^3.22.0
         version: 3.25.76
+
+  modules/service-requests/backend:
+    dependencies:
+      '@my/auth-backend':
+        specifier: workspace:*
+        version: link:../../auth/backend
+      '@my/prisma':
+        specifier: workspace:*
+        version: link:../../../packages/prisma
+      express:
+        specifier: ^4.19.2
+        version: 4.22.2
 
   modules/tenant/backend:
     dependencies:

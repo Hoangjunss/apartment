@@ -104,7 +104,7 @@ export default function InvoicesPage() {
       key: 'invoice_code',
       label: 'Mã hóa đơn',
       render: (row) => (
-        <span className="font-mono font-medium text-indigo-600 hover:underline cursor-pointer" onClick={() => navigate(`/invoices/${row.id}`)}>
+        <span className="font-mono table-cell-primary hover:text-blue-600 hover:underline cursor-pointer" onClick={() => navigate(`/invoices/${row.id}`)}>
           {row.invoice_code}
         </span>
       ),
@@ -121,12 +121,12 @@ export default function InvoicesPage() {
     {
       key: 'tenant_name',
       label: 'Khách thuê',
-      render: (row) => <span className="table-cell-secondary">{row.contract?.tenant?.full_name ?? '—'}</span>,
+      render: (row) => <span className="table-cell-primary">{row.contract?.tenant?.full_name ?? '—'}</span>,
     },
     {
       key: 'billing_month',
       label: 'Kỳ thanh toán',
-      render: (row) => <span className="table-cell-secondary font-medium">{row.billing_month}</span>,
+      render: (row) => <span className="table-cell-secondary">{row.billing_month}</span>,
     },
     {
       key: 'total_amount',
@@ -185,7 +185,7 @@ export default function InvoicesPage() {
       />
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-4 items-center bg-white dark:bg-gray-800 p-4 rounded-xl border border-slate-100 dark:border-gray-700 shadow-sm">
+      <div className="flex flex-wrap gap-4 items-center bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
         <div className="w-full sm:w-48">
           <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
             Trạng thái đóng tiền

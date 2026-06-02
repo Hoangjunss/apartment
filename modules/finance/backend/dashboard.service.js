@@ -1,6 +1,45 @@
 import { prisma } from '@my/prisma';
 
-export const getDashboardStats = async () => {
+export const getDashboardStats = async (role, userId) => {
+  // ── TECHNICIAN: chỉ cần task được giao ──────────────────────────────────────
+  if (role === 'TECHNICIAN') {
+    const [pending, inProgress] = await Promise.all([
+      prisma.serviceRequests.count({ where: { assigned_to: userId, status: 'PENDING' } }),
+      prisma.serviceRequests.count({ where: { assigned_to: userId, status: 'IN_PROGRESS' } }),
+    ]);
+    return { myPendingTasks: pending, myInProgressTasks: inProgress };
+  }
+
+  // ── RECEPTIONIST: HĐ sắp hết hạn + hóa đơn chưa thanh toán ─────────────────
+  if (role === 'RECEPTIONIST') {
+    const today = new Date();
+    const next30Days = new Date();
+    next30Days.setDate(today.getDate() + 30);
+
+    const [expiringContracts, unpaidInvoicesRaw] = await Promise.all([
+      prisma.contracts.count({
+        where: {
+          status: { in: ['ACTIVE', 'EXPIRING_SOON'] },
+          end_date: { lte: next30Days, gte: today }
+        }
+      }),
+      prisma.invoices.findMany({
+        where: { status: { in: ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE'] } },
+        include: { payments: true }
+      })
+    ]);
+
+    let unpaidAmount = 0;
+    let unpaidCount = 0;
+    for (const inv of unpaidInvoicesRaw) {
+      const totalPaid = inv.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const remaining = Number(inv.total_amount) - totalPaid;
+      if (remaining > 0) { unpaidAmount += remaining; unpaidCount++; }
+    }
+    return { expiringContracts, unpaidAmount, unpaidCount };
+  }
+
+  // ── ADMIN / MANAGER: full stats ──────────────────────────────────────────────
   const [
     totalApartments,
     emptyApartments,
@@ -18,11 +57,9 @@ export const getDashboardStats = async () => {
     })
   ]);
 
-  // Unique active tenants
   const tenantIds = new Set(activeContracts.map(c => c.tenant_id));
   const activeTenants = tenantIds.size;
 
-  // Contracts expiring in 30 days
   const today = new Date();
   const next30Days = new Date();
   next30Days.setDate(today.getDate() + 30);
@@ -31,28 +68,17 @@ export const getDashboardStats = async () => {
     return end >= today && end <= next30Days;
   }).length;
 
-  // Revenue this month (collected from payments this month)
   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
   const paymentsAgg = await prisma.payments.aggregate({
     _sum: { amount: true },
-    where: {
-      payment_date: {
-        gte: startOfMonth,
-        lte: endOfMonth
-      }
-    }
+    where: { payment_date: { gte: startOfMonth, lte: endOfMonth } }
   });
   const revenueThisMonth = Number(paymentsAgg._sum.amount || 0);
 
-  // Unpaid invoices total amount and count
   const unpaidInvoices = await prisma.invoices.findMany({
-    where: {
-      status: { in: ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE'] }
-    },
-    include: {
-      payments: true
-    }
+    where: { status: { in: ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE'] } },
+    include: { payments: true }
   });
 
   let unpaidAmount = 0;
@@ -60,13 +86,9 @@ export const getDashboardStats = async () => {
   for (const inv of unpaidInvoices) {
     const totalPaid = inv.payments.reduce((sum, p) => sum + Number(p.amount), 0);
     const remaining = Number(inv.total_amount) - totalPaid;
-    if (remaining > 0) {
-      unpaidAmount += remaining;
-      unpaidCount++;
-    }
+    if (remaining > 0) { unpaidAmount += remaining; unpaidCount++; }
   }
 
-  // Occupancy rate
   const occupancyRate = totalApartments > 0 ? Math.round((rentingApartments / totalApartments) * 100) : 0;
 
   return {

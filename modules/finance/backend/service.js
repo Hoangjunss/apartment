@@ -251,7 +251,7 @@ export const generateInvoice = async (data, userId) => {
     throw new Error(`Hợp đồng ${contract.contract_code} chưa cấu hình Số người ở hoặc bằng 0. Không thể tạo hóa đơn.`);
   }
 
-  const water_amount = calculateWaterCost(contract.soNguoiO);
+  const water_amount = contract.water_price_per_month ? Number(contract.water_price_per_month) : calculateWaterCost(contract.soNguoiO);
 
   let service_amount = 0;
   for (const sub of contract.service_subscriptions) {

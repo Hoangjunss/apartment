@@ -73,23 +73,23 @@ export default function ContractsPage() {
       key: 'apartment',
       label: 'Phòng',
       render: (row) => (
-        <span className="font-mono table-cell-primary">{row.apartment?.apartment_code ?? '—'}</span>
+        <span className="font-mono table-cell-secondary">{row.apartment?.apartment_code ?? '—'}</span>
       ),
     },
     {
       key: 'start_date',
       label: 'Bắt đầu',
-      render: (row) => row.start_date ? <span className="table-cell-secondary">{format(parseISO(row.start_date), 'dd/MM/yyyy')}</span> : '—',
+      render: (row) => row.start_date ? <span className="table-cell-muted">{format(parseISO(row.start_date), 'dd/MM/yyyy')}</span> : '—',
     },
     {
       key: 'end_date',
       label: 'Kết thúc',
-      render: (row) => row.end_date ? <span className="table-cell-secondary">{format(parseISO(row.end_date), 'dd/MM/yyyy')}</span> : '—',
+      render: (row) => row.end_date ? <span className="table-cell-muted">{format(parseISO(row.end_date), 'dd/MM/yyyy')}</span> : '—',
     },
     {
       key: 'monthly_rent',
       label: 'Giá thuê',
-      render: (row) => <span className="table-cell-primary font-semibold">{formatCurrency(row.monthly_rent)}</span>,
+      render: (row) => <span className="table-cell-secondary font-medium">{formatCurrency(row.monthly_rent)}</span>,
     },
     {
       key: 'status',

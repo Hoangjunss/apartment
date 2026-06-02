@@ -46,12 +46,12 @@ export default function TenantsPage() {
       render: (row) => (
         <div>
           <p className="table-cell-primary">{row.full_name}</p>
-          <p className="table-cell-secondary">{row.email || ''}</p>
+          <p className="table-cell-muted">{row.email || ''}</p>
         </div>
       ),
     },
     { key: 'national_id', label: 'Số CCCD', render: (row) => <span className="font-mono table-cell-secondary">{row.national_id}</span> },
-    { key: 'phone', label: 'SĐT', render: (row) => <span className="table-cell-primary">{row.phone}</span> },
+    { key: 'phone', label: 'SĐT', render: (row) => <span className="table-cell-secondary">{row.phone}</span> },
     {
       key: 'current_room',
       label: 'Phòng hiện tại',

@@ -6,7 +6,7 @@ const router = express.Router();
 
 router.get('/stats', authenticate, async (req, res) => {
   try {
-    const data = await service.getDashboardStats();
+    const data = await service.getDashboardStats(req.user.role, req.user.userId);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

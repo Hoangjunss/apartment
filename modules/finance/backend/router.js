@@ -7,13 +7,13 @@ const router = Router();
 const STAFF_ROLES = ['ADMIN', 'MANAGER', 'RECEPTIONIST'];
 const MGT_ROLES = ['ADMIN', 'MANAGER'];
 
-// Utilities (Điện Nước)
-router.get('/utilities', authenticate, ctrl.getUtilities);
+// Utilities (Điện Nước) — TECHNICIAN không có quyền
+router.get('/utilities', authenticate, requireRole(STAFF_ROLES), ctrl.getUtilities);
 router.post('/utilities', authenticate, requireRole(STAFF_ROLES), ctrl.recordUtility);
 
-// Invoices (Hóa Đơn)
-router.get('/invoices', authenticate, ctrl.getInvoices);
-router.get('/invoices/:id', authenticate, ctrl.getInvoiceById);
+// Invoices (Hóa Đơn) — TECHNICIAN không có quyền xem hóa đơn
+router.get('/invoices', authenticate, requireRole(STAFF_ROLES), ctrl.getInvoices);
+router.get('/invoices/:id', authenticate, requireRole(STAFF_ROLES), ctrl.getInvoiceById);
 router.post('/invoices/generate', authenticate, requireRole(MGT_ROLES), ctrl.generateInvoice);
 router.patch('/invoices/:id/status', authenticate, requireRole(MGT_ROLES), ctrl.updateInvoiceStatus);
 

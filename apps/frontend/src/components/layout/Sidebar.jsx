@@ -9,6 +9,7 @@ import {
   UserCog,
   Zap,
   Receipt,
+  Wrench,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import {
@@ -16,6 +17,7 @@ import {
   MANAGEMENT_ROLES,
   TENANT_ACCESS_ROLES,
   CONTRACT_VIEW_ROLES,
+  FINANCE_ACCESS_ROLES,
   ROLES,
 } from '@/constants/roles.js';
 
@@ -30,37 +32,43 @@ const NAV_ITEMS = [
     to: '/buildings',
     label: 'Tòa nhà',
     icon: Building2,
-    roles: ALL_ROLES,
+    roles: MANAGEMENT_ROLES,             // TECHNICIAN không thấy
   },
   {
     to: '/apartments',
     label: 'Căn hộ',
     icon: Home,
-    roles: ALL_ROLES,
+    roles: ALL_ROLES,                    // TECHNICIAN được xem
   },
   {
     to: '/tenants',
     label: 'Khách thuê',
     icon: Users,
-    roles: TENANT_ACCESS_ROLES,
+    roles: TENANT_ACCESS_ROLES,          // TECHNICIAN không thấy
   },
   {
     to: '/contracts',
     label: 'Hợp đồng',
     icon: FileText,
-    roles: CONTRACT_VIEW_ROLES,
+    roles: CONTRACT_VIEW_ROLES,          // TECHNICIAN không thấy
   },
   {
     to: '/utilities',
     label: 'Điện nước',
     icon: Zap,
-    roles: ALL_ROLES,
+    roles: FINANCE_ACCESS_ROLES,         // TECHNICIAN không thấy
   },
   {
     to: '/invoices',
     label: 'Hóa đơn',
     icon: Receipt,
-    roles: ALL_ROLES,
+    roles: FINANCE_ACCESS_ROLES,         // TECHNICIAN không thấy
+  },
+  {
+    to: '/service-requests',
+    label: 'Yêu cầu kỹ thuật',
+    icon: Wrench,
+    roles: ALL_ROLES,                    // Tất cả đều thấy
   },
   {
     to: '/users',
@@ -112,7 +120,7 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="p-3 border-t border-gray-200">
-        <p className="text-xs text-gray-400 text-center">v1.0.0</p>
+        <p className="text-xs text-gray-400 text-center">v2.0.0</p>
       </div>
     </aside>
   );
