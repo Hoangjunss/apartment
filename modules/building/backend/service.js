@@ -144,7 +144,8 @@ export const getApartmentById = async (id) => {
         include: {
           tenant: true
         }
-      }
+      },
+      tokens: true
     },
   });
 };
@@ -296,4 +297,32 @@ export const checkApartmentCode = async (code, excludeId) => {
   if (excludeId && apartment.id === excludeId) return false;
   return true;
 };
+
+export const generateApartmentToken = async (apartmentId) => {
+  const apt = await prisma.apartments.findUnique({ where: { id: apartmentId } });
+  if (!apt) throw new Error('Không tìm thấy căn hộ');
+
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let token = '';
+  for (let i = 0; i < 8; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 90);
+
+  return prisma.apartmentTokens.upsert({
+    where: { apartment_id: apartmentId },
+    update: {
+      token,
+      expires_at: expiresAt,
+    },
+    create: {
+      apartment_id: apartmentId,
+      token,
+      expires_at: expiresAt,
+    },
+  });
+};
+
 

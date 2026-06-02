@@ -27,6 +27,7 @@ router.post('/apartments', authenticate, requireRole(['ADMIN', 'MANAGER']), ctrl
 router.put('/apartments/:id', authenticate, requireRole(['ADMIN', 'MANAGER']), ctrl.updateApartment);
 router.patch('/apartments/:id/status', authenticate, requireRole(['ADMIN', 'MANAGER']), ctrl.updateApartmentStatus);
 router.get('/apartments/:id/status-logs', authenticate, requireRole(['ADMIN', 'MANAGER']), ctrl.getApartmentStatusLogs);
+router.post('/apartments/:id/generate-token', authenticate, requireRole(['ADMIN', 'MANAGER']), ctrl.generateApartmentToken);
 
 // FURNITURE (Nested under apartments)
 router.get('/apartments/:id/furniture', authenticate, ctrl.getFurnitureByApartmentId);

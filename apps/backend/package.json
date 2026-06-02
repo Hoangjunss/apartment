@@ -8,6 +8,7 @@
     "@my/finance-backend": "workspace:*",
     "@my/service-requests-backend": "workspace:*",
     "@my/tenant-backend": "workspace:*",
+    "@my/public-backend": "workspace:*",
     "cors": "^2.8.6",
     "express": "^4.18.2",
     "jsonwebtoken": "^9.0.2"

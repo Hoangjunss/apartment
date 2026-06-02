@@ -6,6 +6,7 @@ import tenantRouter from '@my/tenant-backend';
 import contractRouter from '@my/contract-backend';
 import financeRouter from '@my/finance-backend';
 import serviceRequestRouter from '@my/service-requests-backend';
+import publicRouter from '@my/public-backend';
 import dashboardRouter from '../../modules/finance/backend/dashboard.router.js';
 import '@my/contract-backend/cron.js';
 
@@ -19,6 +20,7 @@ app.get('/', (req, res) => {
   res.send('Backend is running!');
 });
 
+app.use('/api/public', publicRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/building', buildingRouter);
 app.use('/api/tenant', tenantRouter);
