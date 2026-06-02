@@ -1,0 +1,11 @@
+{
+  "name": "@my/service-requests-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "dependencies": {
+    "@my/auth-backend": "workspace:*",
+    "@my/prisma": "workspace:*",
+    "express": "^4.19.2"
+  }
+}
