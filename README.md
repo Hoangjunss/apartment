@@ -297,8 +297,37 @@ Hệ thống quản lý căn hộ dịch vụ vận hành thông tin theo các l
      - `OVERDUE` (Quá hạn) nếu quá hạn đóng tiền mà chưa thanh toán đủ.
 
 5. **Kết thúc / Thay đổi Hợp đồng:**
-   - **Gia hạn (`ContractRenewals`):** Hợp đồng được kéo dài thời gian kết thúc, cập nhật giá thuê mới nếu có, và chuyển trạng thái về `ACTIVE`.
-   - **Chấm dứt sớm (`TERMINATED`) / Hết hạn (`EXPIRED`):** Hợp đồng kết thúc, trạng thái căn hộ tự động hoàn về `AVAILABLE` để sẵn sàng cho chu kỳ thuê mới. Toàn bộ lịch sử liên quan đến căn hộ, khách thuê, hóa đơn và thanh toán đều được lưu trữ phục vụ thống kê báo cáo doanh thu.
+    - **Gia hạn (`ContractRenewals`):** Hợp đồng được kéo dài thời gian kết thúc, cập nhật giá thuê mới nếu có, và chuyển trạng thái về `ACTIVE`.
+    - **Chấm dứt sớm (`TERMINATED`) / Hết hạn (`EXPIRED`):** Hợp đồng kết thúc, trạng thái căn hộ tự động hoàn về `AVAILABLE` để sẵn sàng cho chu kỳ thuê mới. Toàn bộ lịch sử liên quan đến căn hộ, khách thuê, hóa đơn và thanh toán đều được lưu trữ phục vụ thống kê báo cáo doanh thu.
+
+  6. **Tiếp nhận & Xử lý Yêu cầu Kỹ thuật / Khiếu nại (Service Requests):**
+     - **Gửi yêu cầu:**
+       - *Nội bộ (`INTERNAL`):* Nhân viên (Lễ tân, Quản lý) tạo yêu cầu trực tiếp trong hệ thống khi phát hiện sự cố.
+       - *Khách thuê (`PUBLIC_FORM`):* Khách thuê quét mã QR tại căn hộ (với mã token xác thực phòng trong 90 ngày) để truy cập form gửi yêu cầu trực tuyến mà không cần đăng nhập.
+     - **Phân công & Xử lý:**
+       - Admin/Manager xem danh sách và tiến hành **Phân công (`ASSIGNED`)** cho kỹ thuật viên (`Technician`).
+       - Trạng thái yêu cầu chuyển qua `IN_PROGRESS` khi kỹ thuật viên bắt đầu xử lý, và `RESOLVED` kèm thời gian hoàn thành `resolved_at` khi sự cố được khắc phục xong.
+
+---
+
+### 10. 📱 Hệ thống Tiếp nhận Yêu cầu Kỹ thuật qua QR (Public Service Requests)
+
+Hệ thống cho phép khách thuê gửi báo hỏng, sửa chữa hoặc khiếu nại cực kỳ tiện lợi bằng cách quét mã QR dán tại phòng mà không cần tài khoản đăng nhập.
+
+- **Cơ sở dữ liệu:**
+  - Nâng cấp bảng `ServiceRequests` bổ sung thông tin loại yêu cầu (`type`), độ ưu tiên (`priority`), nguồn gốc (`source`: Nội bộ / Khách thuê), thông tin người báo (`requester_name`, `requester_phone`), và thời gian hoàn thành (`resolved_at`).
+  - Thêm bảng `ApartmentTokens` quản lý mã token ngẫu nhiên thời hạn 90 ngày của từng phòng.
+- **Backend API:**
+  - `/api/public/room-info?t=xxx`: Trả về thông tin căn hộ (Block, Tầng, Số phòng) dạng công khai, không lộ thông tin nhạy cảm của khách thuê.
+  - `/api/public/service-requests`: Tiếp nhận form gửi từ khách thuê, tự động liên kết với hợp đồng đang có hiệu lực của phòng đó.
+  - `/api/building/apartments/:id/generate-token`: API tạo/làm mới mã QR cho phòng (ADMIN/MANAGER).
+- **Giao diện quản lý nội bộ:**
+  - Thêm thẻ **"QR Code Yêu Cầu Hỗ Trợ"** trên trang chi tiết căn hộ, hiển thị mã QR động, hỗ trợ sao chép liên kết hoặc in poster QR khổ lớn dán ở cửa phòng.
+  - Tích hợp cột **"Nguồn"** và badges phân biệt **"Nội bộ"** (nhân viên tạo) vs **"Khách thuê"** (gửi qua QR) trong bảng quản lý yêu cầu kỹ thuật.
+- **Form gửi công khai (`/submit?t=xxx`):**
+  - Giao diện cao cấp tối ưu cho thiết bị di động, tự động nhận diện thông tin phòng.
+  - Hỗ trợ đầy đủ các trường thông tin, phân loại sự cố (Sửa điện, nước, vệ sinh, khóa cửa...) và xác thực dữ liệu chặt chẽ (họ tên, số điện thoại Việt Nam).
+  - Tự động hiển thị màn hình báo thành công kèm mã số yêu cầu để khách dễ theo dõi.
 
 ---
 
