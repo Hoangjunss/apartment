@@ -197,3 +197,16 @@ export function useCheckApartmentCode(code, excludeId, enabled = true) {
     refetchOnWindowFocus: false,
   });
 }
+
+export function useGenerateApartmentToken(options = {}) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: buildingApi.generateApartmentToken,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.apartment(data.apartment_id) });
+      options.onSuccess?.(data);
+    },
+    onError: options.onError,
+  });
+}
+

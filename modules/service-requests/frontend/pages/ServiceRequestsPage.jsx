@@ -16,14 +16,30 @@ import { format, parseISO } from 'date-fns';
 
 const STATUS_LABELS = {
   PENDING: { label: 'Chờ xử lý', color: 'bg-amber-100 text-amber-700' },
+  ASSIGNED: { label: 'Đã phân công', color: 'bg-indigo-100 text-indigo-700' },
   IN_PROGRESS: { label: 'Đang xử lý', color: 'bg-blue-100 text-blue-700' },
   RESOLVED: { label: 'Đã xong', color: 'bg-emerald-100 text-emerald-700' },
+  CANCELLED: { label: 'Đã hủy', color: 'bg-rose-100 text-rose-700' },
+};
+
+const SOURCE_LABELS = {
+  INTERNAL: { label: 'Nội bộ', color: 'bg-green-50 text-green-700 border border-green-200' },
+  PUBLIC_FORM: { label: 'Khách thuê', color: 'bg-orange-50 text-orange-700 border border-orange-200' },
 };
 
 function StatusBadge({ status }) {
   const cfg = STATUS_LABELS[status] ?? { label: status, color: 'bg-gray-100 text-gray-600' };
   return (
     <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full ${cfg.color}`}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function SourceBadge({ source }) {
+  const cfg = SOURCE_LABELS[source] ?? { label: source || 'Nội bộ', color: 'bg-gray-50 text-gray-700 border border-gray-200' };
+  return (
+    <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded ${cfg.color}`}>
       {cfg.label}
     </span>
   );
@@ -48,7 +64,11 @@ function RequestRow({ req, onAssign }) {
         ) : <span className="text-slate-400 text-xs">—</span>}
       </td>
       <td className="px-4 py-3">
-        <p className="text-xs text-slate-600">{req.requester?.full_name ?? '—'}</p>
+        <SourceBadge source={req.source} />
+      </td>
+      <td className="px-4 py-3">
+        <p className="text-xs font-semibold text-slate-700">{req.requester_name ?? '—'}</p>
+        {req.requester_phone && <p className="text-[10px] text-slate-400 font-mono mt-0.5">{req.requester_phone}</p>}
       </td>
       <td className="px-4 py-3">
         {req.assignee ? (
@@ -103,7 +123,7 @@ export default function ServiceRequestsPage() {
     onError: (err) => toast.error(err.response?.data?.message || 'Assign thất bại'),
   });
 
-  const statuses = ['', 'PENDING', 'IN_PROGRESS', 'RESOLVED'];
+  const statuses = ['', 'PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED'];
   const statusLabels = { '': 'Tất cả', ...Object.fromEntries(Object.entries(STATUS_LABELS).map(([k, v]) => [k, v.label])) };
 
   return (
@@ -159,7 +179,8 @@ export default function ServiceRequestsPage() {
                 <tr className="border-b border-gray-100 bg-gray-50 text-slate-500 font-semibold uppercase text-[10px] tracking-wider">
                   <th className="px-4 py-3 text-left">Tiêu đề / Mô tả</th>
                   <th className="px-4 py-3 text-left">Căn hộ</th>
-                  <th className="px-4 py-3 text-left">Người tạo</th>
+                  <th className="px-4 py-3 text-left">Nguồn</th>
+                  <th className="px-4 py-3 text-left">Người yêu cầu</th>
                   <th className="px-4 py-3 text-left">Phân công</th>
                   <th className="px-4 py-3 text-left">Trạng thái</th>
                   <th className="px-4 py-3 text-left">Ngày tạo</th>

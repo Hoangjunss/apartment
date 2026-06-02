@@ -1,8 +1,9 @@
 // modules/building/frontend/pages/ApartmentDetailPage.jsx
 import { useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Edit2, RefreshCw, Trash2, Plus } from 'lucide-react';
+import { Edit2, RefreshCw, Trash2, Plus, QrCode, Copy, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { QRCodeSVG } from 'qrcode.react';
 import { PageHeader } from '@/components/common/PageHeader.jsx';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner.jsx';
 import { EmptyState } from '@/components/common/EmptyState.jsx';
@@ -19,6 +20,7 @@ import {
   useApartmentStatusLogs,
   useFurniture,
   useDeleteFurniture,
+  useGenerateApartmentToken,
 } from '../hooks/useBuilding.js';
 import { ApartmentForm } from '../components/ApartmentForm.jsx';
 import { FurnitureForm } from '../components/FurnitureForm.jsx';
@@ -182,6 +184,29 @@ export default function ApartmentDetailPage() {
   const [isStatusOpen, setIsStatusOpen] = useState(false);
 
   const { data: apartment, isLoading } = useApartmentById(apartmentId);
+  const { mutate: generateToken, isPending: generating } = useGenerateApartmentToken({
+    onSuccess: () => {
+      toast.success('Đã tạo mã QR mới thành công!');
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Tạo QR code thất bại');
+    }
+  });
+
+  const handleGenerateToken = () => {
+    generateToken(apartmentId);
+  };
+
+  const handleCopyLink = () => {
+    if (!apartment?.tokens?.token) return;
+    const link = `${window.location.origin}/submit?t=${apartment.tokens.token}`;
+    navigator.clipboard.writeText(link);
+    toast.success('Đã sao chép liên kết vào bộ nhớ tạm!');
+  };
+
+  const handlePrintQR = () => {
+    window.print();
+  };
 
   if (isLoading) return <LoadingSpinner />;
   if (!apartment) return <EmptyState message="Không tìm thấy căn hộ" />;
@@ -195,113 +220,225 @@ export default function ApartmentDetailPage() {
   const activeContract = apartment.contracts?.find((c) => c.status === 'ACTIVE' || c.status === 'EXPIRING_SOON');
 
   return (
-    <div>
-      <PageHeader
-        title={apartment.apartment_code}
-        subtitle={`${ROOM_TYPE_LABELS[apartment.room_type] ?? apartment.room_type} • Tầng ${apartment.floor?.floor_number} / ${apartment.floor?.building?.name}`}
-        backUrl="/apartments"
-        action={
-          <div className="flex gap-2">
-            <RoleGuard roles={MANAGEMENT_ROLES}>
-              <button onClick={() => setIsStatusOpen(true)} className="btn-secondary" id="change-status-btn">
-                <RefreshCw size={14} />
-                Đổi trạng thái
-              </button>
-              <button onClick={() => setIsEditOpen(true)} className="btn-secondary" id="edit-apt-btn">
-                <Edit2 size={14} />
-                Sửa thông tin
-              </button>
-            </RoleGuard>
-          </div>
-        }
-      />
+    <>
+      <div className="print:hidden">
+        <PageHeader
+          title={apartment.apartment_code}
+          subtitle={`${ROOM_TYPE_LABELS[apartment.room_type] ?? apartment.room_type} • Tầng ${apartment.floor?.floor_number} / ${apartment.floor?.building?.name}`}
+          backUrl="/apartments"
+          action={
+            <div className="flex gap-2">
+              <RoleGuard roles={MANAGEMENT_ROLES}>
+                <button onClick={() => setIsStatusOpen(true)} className="btn-secondary" id="change-status-btn">
+                  <RefreshCw size={14} />
+                  Đổi trạng thái
+                </button>
+                <button onClick={() => setIsEditOpen(true)} className="btn-secondary" id="edit-apt-btn">
+                  <Edit2 size={14} />
+                  Sửa thông tin
+                </button>
+              </RoleGuard>
+            </div>
+          }
+        />
 
-      {/* Info Card */}
-      <div className="card p-5 mb-6">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div>
-            <p className="info-label">Trạng thái</p>
-            <div className="mt-0.5"><ApartmentStatusBadge status={apartment.status} /></div>
-          </div>
-          <div>
-            <p className="info-label">Diện tích</p>
-            <p className="info-value">{apartment.area_sqm} m²</p>
-          </div>
-          <div>
-            <p className="info-label">Giá cơ bản</p>
-            <p className="info-value">{formatCurrency(apartment.base_price)}</p>
-          </div>
-          <div>
-            <p className="info-label">Đặt cọc</p>
-            <p className="info-value">{formatCurrency(apartment.deposit_amount)}</p>
-          </div>
-          <div>
-            <p className="info-label">Sức chứa</p>
-            <p className="info-value">{apartment.max_occupants} người</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="border-b border-gray-200 mb-5">
-        <div className="flex gap-0">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`tab-btn ${activeTab === tab.key ? 'tab-btn-active' : 'tab-btn-inactive'}`}
-              id={`tab-${tab.key}`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {activeTab === 'furniture' && <FurnitureTab apartmentId={apartmentId} />}
-      {activeTab === 'status-logs' && <StatusLogsTab apartmentId={apartmentId} />}
-      {activeTab === 'contract' && (
-        <div>
-          {activeContract ? (
-            <div className="card p-5">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="info-label">Khách thuê</p>
-                  <Link to={`/tenants/${activeContract.tenant?.id}`} className="text-sm text-blue-600 hover:underline mt-0.5 inline-block">
-                    {activeContract.tenant?.full_name}
-                  </Link>
-                </div>
-                <div>
-                  <p className="info-label">Giá thuê</p>
-                  <p className="info-value">{formatCurrency(activeContract.monthly_rent)}/tháng</p>
-                </div>
-                <div>
-                  <p className="info-label">Ngày bắt đầu</p>
-                  <p className="info-value">{format(parseISO(activeContract.start_date), 'dd/MM/yyyy')}</p>
-                </div>
-                <div>
-                  <p className="info-label">Ngày kết thúc</p>
-                  <p className="info-value">{format(parseISO(activeContract.end_date), 'dd/MM/yyyy')}</p>
-                </div>
+        {/* Top Section: Info Card and QR Card */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          {/* Info Card */}
+          <div className="card p-5 lg:col-span-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div>
+                <p className="info-label">Trạng thái</p>
+                <div className="mt-0.5"><ApartmentStatusBadge status={apartment.status} /></div>
               </div>
-              <div className="mt-4">
-                <Link to={`/contracts/${activeContract.id}`} className="btn-secondary">
-                  Xem hợp đồng →
-                </Link>
+              <div>
+                <p className="info-label">Diện tích</p>
+                <p className="info-value">{apartment.area_sqm} m²</p>
+              </div>
+              <div>
+                <p className="info-label">Giá cơ bản</p>
+                <p className="info-value">{formatCurrency(apartment.base_price)}</p>
+              </div>
+              <div>
+                <p className="info-label">Đặt cọc</p>
+                <p className="info-value">{formatCurrency(apartment.deposit_amount)}</p>
+              </div>
+              <div>
+                <p className="info-label">Sức chứa</p>
+                <p className="info-value">{apartment.max_occupants} người</p>
               </div>
             </div>
-          ) : (
-            <EmptyState message="Không có hợp đồng đang hiệu lực" />
-          )}
+          </div>
+
+          {/* QR Section Card */}
+          <div className="card p-5 flex flex-col justify-between" id="qr-request-card">
+            <div className="space-y-3">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">QR Code Yêu Cầu Hỗ Trợ</h3>
+              {apartment.tokens ? (
+                <div className="space-y-3">
+                  <div className="flex justify-center bg-gray-50 p-3 rounded-xl border border-gray-200 relative group">
+                    <QRCodeSVG
+                      value={`${window.location.origin}/submit?t=${apartment.tokens.token}`}
+                      size={140}
+                      level="H"
+                      includeMargin={true}
+                    />
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col gap-2 items-center justify-center transition-opacity duration-200 rounded-xl">
+                      <button
+                        onClick={handlePrintQR}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition"
+                      >
+                        <Printer size={13} />
+                        In QR Code
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-center space-y-1">
+                    <p className="text-xs text-gray-500">
+                      Hạn dùng: <span className="font-semibold text-gray-700">{format(parseISO(apartment.tokens.expires_at), 'dd/MM/yyyy')}</span>
+                    </p>
+                    <p className="text-[11px] text-gray-400 leading-normal">
+                      Khách thuê quét QR để gửi yêu cầu hỗ trợ mà không cần đăng nhập.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 text-center space-y-2.5">
+                  <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                    <QrCode size={20} />
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-semibold text-gray-700">Chưa tạo QR Code</p>
+                    <p className="text-[11px] text-gray-400 max-w-[200px]">Tạo mã QR cho phòng này để nhận yêu cầu sửa chữa/khiếu nại.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              <RoleGuard roles={MANAGEMENT_ROLES}>
+                {apartment.tokens ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={handleCopyLink}
+                      className="btn-secondary w-full justify-center text-xs py-1.5"
+                      id="copy-qr-link-btn"
+                    >
+                      <Copy size={13} />
+                      Copy Link
+                    </button>
+                    <button
+                      onClick={handleGenerateToken}
+                      disabled={generating}
+                      className="btn-primary w-full justify-center text-xs py-1.5 bg-blue-650"
+                      id="regenerate-qr-btn"
+                    >
+                      {generating ? 'Đang tạo...' : 'Tạo lại'}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleGenerateToken}
+                    disabled={generating}
+                    className="btn-primary w-full justify-center text-xs py-1.5"
+                    id="generate-qr-btn"
+                  >
+                    <QrCode size={13} />
+                    {generating ? 'Đang tạo...' : 'Tạo QR Code'}
+                  </button>
+                )}
+              </RoleGuard>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="border-b border-gray-200 mb-5">
+          <div className="flex gap-0">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={`tab-btn ${activeTab === tab.key ? 'tab-btn-active' : 'tab-btn-inactive'}`}
+                id={`tab-${tab.key}`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {activeTab === 'furniture' && <FurnitureTab apartmentId={apartmentId} />}
+        {activeTab === 'status-logs' && <StatusLogsTab apartmentId={apartmentId} />}
+        {activeTab === 'contract' && (
+          <div>
+            {activeContract ? (
+              <div className="card p-5">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="info-label">Khách thuê</p>
+                    <Link to={`/tenants/${activeContract.tenant?.id}`} className="text-sm text-blue-600 hover:underline mt-0.5 inline-block">
+                      {activeContract.tenant?.full_name}
+                    </Link>
+                  </div>
+                  <div>
+                    <p className="info-label">Giá thuê</p>
+                    <p className="info-value">{formatCurrency(activeContract.monthly_rent)}/tháng</p>
+                  </div>
+                  <div>
+                    <p className="info-label">Ngày bắt đầu</p>
+                    <p className="info-value">{format(parseISO(activeContract.start_date), 'dd/MM/yyyy')}</p>
+                  </div>
+                  <div>
+                    <p className="info-label">Ngày kết thúc</p>
+                    <p className="info-value">{format(parseISO(activeContract.end_date), 'dd/MM/yyyy')}</p>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <Link to={`/contracts/${activeContract.id}`} className="btn-secondary">
+                    Xem hợp đồng →
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <EmptyState message="Không có hợp đồng đang hiệu lực" />
+            )}
+          </div>
+        )}
+
+        {isEditOpen && (
+          <ApartmentForm onClose={() => setIsEditOpen(false)} apartment={apartment} />
+        )}
+        {isStatusOpen && (
+          <StatusChangeForm onClose={() => setIsStatusOpen(false)} apartment={apartment} />
+        )}
+      </div>
+
+      {/* Printable QR Code View */}
+      {apartment.tokens && (
+        <div className="hidden print:flex flex-col items-center justify-center min-h-screen text-black bg-white p-8 space-y-8 text-center">
+          <h1 className="text-3xl font-extrabold tracking-wide uppercase">Căn Hộ Dịch Vụ Cao Cấp</h1>
+          <div className="border-4 border-black p-6 rounded-2xl bg-white">
+            <QRCodeSVG
+              value={`${window.location.origin}/submit?t=${apartment.tokens.token}`}
+              size={320}
+              level="H"
+            />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-5xl font-black text-black">PHÒNG {apartment.apartment_code}</h2>
+            <p className="text-xl text-gray-700 font-medium">
+              {apartment.floor?.building?.name} — Tầng {apartment.floor?.floor_number}
+            </p>
+          </div>
+          <div className="max-w-md pt-6 border-t border-dashed border-gray-400">
+            <p className="text-sm font-semibold text-gray-800 uppercase tracking-wider">Hướng dẫn gửi yêu cầu hỗ trợ</p>
+            <p className="text-xs text-gray-650 mt-1.5 leading-relaxed">
+              Quét mã QR ở trên bằng điện thoại để gửi yêu cầu kỹ thuật, báo hỏng thiết bị, vệ sinh hoặc khiếu nại trực tiếp đến Ban quản lý mà không cần đăng nhập.
+            </p>
+          </div>
         </div>
       )}
-
-      {isEditOpen && (
-        <ApartmentForm onClose={() => setIsEditOpen(false)} apartment={apartment} />
-      )}
-      {isStatusOpen && (
-        <StatusChangeForm onClose={() => setIsStatusOpen(false)} apartment={apartment} />
-      )}
-    </div>
+    </>
   );
 }

@@ -43,6 +43,7 @@ import InvoiceDetailPage from 'modules/finance/frontend/pages/InvoiceDetailPage.
 // ── Service Requests Module Pages ───────────────────────────────────────────────────────
 import ServiceRequestsPage from 'modules/service-requests/frontend/pages/ServiceRequestsPage.jsx';
 import ServiceRequestDetailPage from 'modules/service-requests/frontend/pages/ServiceRequestDetailPage.jsx';
+import PublicRequestPage from '@/pages/PublicRequestPage.jsx';
 
 export default function App() {
   return (
@@ -52,6 +53,7 @@ export default function App() {
           <Routes>
             {/* ── Public ──────────────────────────────────────── */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/submit" element={<PublicRequestPage />} />
 
             {/* ── Protected (requires auth + AppLayout) ────────── */}
             <Route

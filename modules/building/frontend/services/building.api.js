@@ -96,3 +96,9 @@ export async function checkApartmentCode(code, excludeId) {
   });
   return res.data.data;
 }
+
+export async function generateApartmentToken(id) {
+  const res = await api.post(`/building/apartments/${id}/generate-token`);
+  return res.data.data;
+}
+
