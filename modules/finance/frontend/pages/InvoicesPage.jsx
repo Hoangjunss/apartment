@@ -138,13 +138,21 @@ export default function InvoicesPage() {
       label: 'Hạn thanh toán',
       render: (row) => {
         if (!row.due_date) return '—';
-        return <span className="table-cell-muted">{new Date(row.due_date).toLocaleDateString('vi-VN')}</span>;
+        return (
+          <span className="table-cell-muted">
+            {new Date(row.due_date).toLocaleDateString('vi-VN')}
+          </span>
+        );
       },
     },
     {
       key: 'status',
       label: 'Trạng thái',
-      render: (row) => <InvoiceStatusBadge status={row.status} />,
+      render: (row) => {
+        const isOverdue = row.status === 'OVERDUE' ||
+          (row.status !== 'PAID' && new Date(row.due_date) < new Date());
+        return <InvoiceStatusBadge status={isOverdue ? 'OVERDUE' : row.status} />;
+      },
     },
     {
       key: 'actions',

@@ -269,7 +269,7 @@ export default function DashboardPage() {
                 icon={Receipt}
                 color="bg-rose-500"
                 sub="Tổng hóa đơn chưa nộp tiền"
-                onClick={() => navigate('/invoices?status=UNPAID')}
+                onClick={() => navigate('/invoices?status=OVERDUE')}
               />
               <StatCard
                 title="Hóa đơn chưa thanh toán"
@@ -501,7 +501,7 @@ export default function DashboardPage() {
               <h2 className="text-sm font-bold text-gray-900">Hóa đơn chưa thanh toán</h2>
             </div>
             <button
-              onClick={() => navigate('/invoices?status=UNPAID')}
+              onClick={() => navigate('/invoices')}
               className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
             >
               Xem tất cả →

@@ -39,10 +39,10 @@ export const REGISTRATION_TYPE_LABELS = {
 };
 
 export const INVOICE_STATUS_CONFIG = {
-  UNPAID:         { label: 'Chưa thanh toán', className: 'bg-rose-100 text-rose-800' },
+  UNPAID:         { label: 'Chưa thanh toán', className: 'bg-rose-100 text-rose-700' },
   PARTIALLY_PAID: { label: 'Trả một phần',    className: 'bg-amber-100 text-amber-800' },
   PAID:           { label: 'Đã thanh toán',   className: 'bg-emerald-100 text-emerald-800' },
-  OVERDUE:        { label: 'Quá hạn',         className: 'bg-red-100 text-red-800' },
+  OVERDUE:        { label: 'Quá hạn',         className: 'bg-red-200 text-red-800 font-semibold' },
 };
 
 // State machine: trạng thái tiếp theo hợp lệ

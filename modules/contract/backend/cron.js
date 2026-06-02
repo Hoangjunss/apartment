@@ -64,7 +64,17 @@ cron.schedule('0 0 * * *', async () => {
     }
     console.log(`[CRON] Đã giải phóng ${freeApartmentCount} căn hộ về AVAILABLE.`);
 
+    // 4. Rà soát hóa đơn quá hạn (UNPAID / PARTIALLY_PAID và due_date < today) -> OVERDUE
+    const overdueResult = await prisma.invoices.updateMany({
+      where: {
+        status: { in: ['UNPAID', 'PARTIALLY_PAID'] },
+        due_date: { lt: today }
+      },
+      data: { status: 'OVERDUE' }
+    });
+    console.log(`[CRON] Đã cập nhật ${overdueResult.count} hóa đơn sang OVERDUE.`);
+
   } catch (error) {
-    console.error('[CRON] Lỗi khi chạy rà soát hợp đồng:', error);
+    console.error('[CRON] Lỗi khi chạy rà soát hợp đồng/hóa đơn:', error);
   }
 });

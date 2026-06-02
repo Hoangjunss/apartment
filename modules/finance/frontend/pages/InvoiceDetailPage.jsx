@@ -43,6 +43,8 @@ export default function InvoiceDetailPage() {
   const payments = invoice.payments ?? [];
   const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
   const remaining = Math.max(0, Number(invoice.total_amount) - totalPaid);
+  const isOverdue = invoice.status === 'OVERDUE' ||
+    (invoice.status !== 'PAID' && new Date(invoice.due_date) < new Date());
 
   return (
     <div className="space-y-6">
@@ -93,14 +95,16 @@ export default function InvoiceDetailPage() {
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <h2 className="text-xl font-bold text-slate-800">PHIẾU THU THÁNG {invoice.billing_month}</h2>
-                    <InvoiceStatusBadge status={invoice.status} />
+                    <InvoiceStatusBadge status={isOverdue ? 'OVERDUE' : invoice.status} />
                   </div>
                   <p className="text-sm text-slate-400 font-mono">{invoice.invoice_code}</p>
                 </div>
                 <div className="text-right text-sm text-slate-500">
                   <div className="flex items-center gap-1.5 md:justify-end">
                     <Calendar size={14} />
-                    <span>Hạn nộp: <strong className="text-rose-600">{new Date(invoice.due_date).toLocaleDateString('vi-VN')}</strong></span>
+                    <span>Hạn nộp: <strong className="text-slate-800">
+                      {new Date(invoice.due_date).toLocaleDateString('vi-VN')}
+                    </strong></span>
                   </div>
                   <div>Căn hộ: <span className="font-semibold font-mono text-slate-800">{invoice.apartment?.apartment_code}</span></div>
                 </div>

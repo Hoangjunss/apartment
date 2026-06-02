@@ -179,6 +179,29 @@ export const getInvoiceById = async (id) => {
   });
 };
 
+/**
+ * Tính ngày hạn thanh toán dựa trên billing_month và payment_due_day.
+ * due_date = payment_due_day của tháng KẾ TIẾP billing_month.
+ * Ví dụ: billingMonth="2026-05", paymentDueDay=5 → 2026-06-05
+ * Edge case: paymentDueDay=31, tháng 2 → lấy ngày cuối tháng (28 hoặc 29)
+ */
+function calcDueDate(billingMonth, paymentDueDay) {
+  const [year, month] = billingMonth.split('-').map(Number);
+
+  let dueYear = year;
+  let dueMonth = month + 1;
+  if (dueMonth > 12) {
+    dueMonth = 1;
+    dueYear += 1;
+  }
+
+  // Xử lý edge case: payment_due_day vượt quá số ngày trong tháng
+  const lastDayOfDueMonth = new Date(dueYear, dueMonth, 0).getDate();
+  const actualDueDay = Math.min(paymentDueDay, lastDayOfDueMonth);
+
+  return new Date(dueYear, dueMonth - 1, actualDueDay);
+}
+
 export const generateInvoice = async (data, userId) => {
   const { contract_id, billing_month, other_amount = 0 } = data;
 
@@ -272,15 +295,8 @@ export const generateInvoice = async (data, userId) => {
     throw new Error(`Mã hóa đơn ${invoice_code} đã tồn tại`);
   }
 
-  // Due date: set to contract.payment_due_day of billing_month or next month if day is invalid
-  const [year, month] = billing_month.split('-').map(Number);
-  const dueDay = contract.payment_due_day || 5;
-  // standard js month is 0-indexed
-  let due_date = new Date(year, month - 1, dueDay);
-  if (isNaN(due_date.getTime())) {
-    due_date = new Date();
-    due_date.setDate(due_date.getDate() + 7);
-  }
+  // Due date: ngày payment_due_day của tháng KẾ TIẾP billing_month
+  const due_date = calcDueDate(billing_month, contract.payment_due_day || 5);
 
   return prisma.invoices.create({
     data: {
@@ -367,12 +383,15 @@ export const recordPayment = async (data, userId) => {
 
     const totalPaid = allPayments.reduce((sum, p) => sum + Number(p.amount), 0);
     const totalAmount = Number(invoice.total_amount);
+    const isPastDue = new Date(invoice.due_date) < new Date();
 
     let status = 'UNPAID';
     if (totalPaid >= totalAmount) {
       status = 'PAID';
     } else if (totalPaid > 0) {
-      status = 'PARTIALLY_PAID';
+      status = isPastDue ? 'OVERDUE' : 'PARTIALLY_PAID';
+    } else {
+      status = isPastDue ? 'OVERDUE' : 'UNPAID';
     }
 
     await tx.invoices.update({

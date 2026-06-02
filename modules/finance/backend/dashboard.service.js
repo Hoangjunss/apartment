@@ -61,12 +61,12 @@ export const getDashboardStats = async (role, userId) => {
   const activeTenants = tenantIds.size;
 
   const today = new Date();
-  const next30Days = new Date();
-  next30Days.setDate(today.getDate() + 30);
-  const expiringContracts = activeContracts.filter(c => {
-    const end = new Date(c.end_date);
-    return end >= today && end <= next30Days;
-  }).length;
+
+  // Đếm số hợp đồng đã được cron chuyển sang EXPIRING_SOON
+  // (khớp với dữ liệu hiển thị ở trang Hợp đồng khi filter EXPIRING_SOON)
+  const expiringContracts = await prisma.contracts.count({
+    where: { status: 'EXPIRING_SOON' }
+  });
 
   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);

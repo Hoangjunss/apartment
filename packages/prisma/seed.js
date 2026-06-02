@@ -29,6 +29,7 @@ async function main() {
   await prisma.tenants.deleteMany({});
   await prisma.apartmentFurniture.deleteMany({});
   await prisma.apartmentStatusLogs.deleteMany({});
+  await prisma.apartmentTokens.deleteMany({});
   await prisma.apartments.deleteMany({});
   await prisma.floors.deleteMany({});
   await prisma.buildings.deleteMany({});
@@ -459,11 +460,61 @@ async function main() {
 
   // 9. ServiceRequests mẫu
   const serviceReqData = [
-    { title: 'Điều hòa phòng A101 không mát', description: 'Máy lạnh chạy nhưng không giảm nhiệt độ, cần kiểm tra gas và bộ lọc', apartment_id: apartments[0].id, requested_by: receptionist.id, assigned_to: tech.id, status: 'IN_PROGRESS' },
-    { title: 'Két nước phòng B203 bị rỷ', description: 'Khách thuê báo có tiếng rậy nước trong tường, cần kiểm tra ngay', apartment_id: apartments[13].id, requested_by: manager.id, assigned_to: tech.id, status: 'PENDING' },
-    { title: 'Thay bóng đèn hành lang tầng 2', description: 'Hai bóng đèn LED hành lang tầng 2 Block A bị hỏng', apartment_id: null, requested_by: receptionist.id, assigned_to: null, status: 'PENDING' },
-    { title: 'Sửa khóa cửa phòng A204', description: 'Khóa cửa khó mở, khách phải dùng lực mạnh', apartment_id: apartments[3].id, requested_by: admin.id, assigned_to: tech.id, status: 'RESOLVED' },
-    { title: 'Thay bình nóng lạnh phòng B102', description: 'Bình nóng lạnh không đun được nước, có thể hỏng điện trở', apartment_id: apartments[12].id, requested_by: receptionist.id, assigned_to: tech.id, status: 'PENDING' },
+    {
+      title: 'Điều hòa phòng A101 không mát',
+      description: 'Máy lạnh chạy nhưng không giảm nhiệt độ, cần kiểm tra gas và bộ lọc',
+      apartment_id: apartments[0].id,
+      requester_name: 'Phạm Thị Lễ Tân',
+      requester_phone: '0922334455',
+      assigned_to: tech.id,
+      status: 'IN_PROGRESS',
+      source: 'INTERNAL',
+      type: 'MAINTENANCE'
+    },
+    {
+      title: 'Két nước phòng B203 bị rò rỉ',
+      description: 'Khách thuê báo có tiếng rò rỉ nước trong tường, cần kiểm tra ngay',
+      apartment_id: apartments[13].id,
+      requester_name: 'Trần Thị Manager',
+      requester_phone: '0907654321',
+      assigned_to: tech.id,
+      status: 'PENDING',
+      source: 'INTERNAL',
+      type: 'MAINTENANCE'
+    },
+    {
+      title: 'Thay bóng đèn hành lang tầng 2',
+      description: 'Hai bóng đèn LED hành lang tầng 2 Block A bị hỏng',
+      apartment_id: apartments[0].id,
+      requester_name: 'Phạm Thị Lễ Tân',
+      requester_phone: '0922334455',
+      assigned_to: null,
+      status: 'PENDING',
+      source: 'INTERNAL',
+      type: 'MAINTENANCE'
+    },
+    {
+      title: 'Sửa khóa cửa phòng A204',
+      description: 'Khóa cửa khó mở, khách phải dùng lực mạnh',
+      apartment_id: apartments[3].id,
+      requester_name: 'Nguyễn Văn Admin',
+      requester_phone: '0901234567',
+      assigned_to: tech.id,
+      status: 'RESOLVED',
+      source: 'INTERNAL',
+      type: 'MAINTENANCE'
+    },
+    {
+      title: 'Thay bình nóng lạnh phòng B102',
+      description: 'Bình nóng lạnh không đun được nước, có thể hỏng điện trở',
+      apartment_id: apartments[12].id,
+      requester_name: 'Phạm Thị Lễ Tân',
+      requester_phone: '0922334455',
+      assigned_to: tech.id,
+      status: 'PENDING',
+      source: 'INTERNAL',
+      type: 'MAINTENANCE'
+    },
   ];
 
   for (const sr of serviceReqData) {

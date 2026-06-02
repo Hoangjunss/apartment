@@ -1,13 +1,19 @@
 import { prisma } from '@my/prisma';
 
 const INCLUDE_FULL = {
-  requester: { select: { id: true, full_name: true, role: true } },
   assignee: { select: { id: true, full_name: true, role: true } },
   apartment: {
     select: {
       id: true,
       apartment_code: true,
       floor: { select: { floor_number: true, building: { select: { name: true } } } }
+    }
+  },
+  contract: {
+    select: {
+      id: true,
+      contract_code: true,
+      tenant: { select: { id: true, full_name: true } }
     }
   }
 };
@@ -30,7 +36,7 @@ export const getAll = async (filters = {}) => {
 export const getMy = async (userId, role) => {
   const where = role === 'TECHNICIAN'
     ? { assigned_to: userId }
-    : { requested_by: userId };
+    : {};
 
   return prisma.serviceRequests.findMany({
     where,
@@ -48,14 +54,43 @@ export const getById = async (id) => {
 };
 
 // POST / — Tạo mới
-export const create = async (data, requestedBy) => {
+export const create = async (data, requestedByUserId) => {
+  let requesterName = data.requester_name;
+  let requesterPhone = data.requester_phone;
+  if (!requesterName && requestedByUserId) {
+    const user = await prisma.users.findUnique({ where: { id: requestedByUserId } });
+    if (user) {
+      requesterName = user.full_name;
+      requesterPhone = user.phone;
+    }
+  }
+
+  let contractId = data.contract_id ? Number(data.contract_id) : null;
+  if (!contractId && data.apartment_id) {
+    const activeContract = await prisma.contracts.findFirst({
+      where: {
+        apartment_id: Number(data.apartment_id),
+        status: 'ACTIVE'
+      }
+    });
+    if (activeContract) {
+      contractId = activeContract.id;
+    }
+  }
+
   return prisma.serviceRequests.create({
     data: {
       title: data.title,
       description: data.description,
-      apartment_id: data.apartment_id ? Number(data.apartment_id) : null,
-      requested_by: requestedBy,
-      status: 'PENDING',
+      apartment_id: Number(data.apartment_id),
+      contract_id: contractId,
+      type: data.type || 'MAINTENANCE',
+      priority: data.priority || 'NORMAL',
+      status: data.status || 'PENDING',
+      source: data.source || 'INTERNAL',
+      requester_name: requesterName,
+      requester_phone: requesterPhone,
+      assigned_to: data.assigned_to ? Number(data.assigned_to) : null,
     },
     include: INCLUDE_FULL,
   });
@@ -63,13 +98,16 @@ export const create = async (data, requestedBy) => {
 
 // PATCH /:id/assign — Assign cho kỹ thuật viên
 export const assign = async (id, assignedTo) => {
-  // Validate assignee là TECHNICIAN
+  // Validate assignee
   const user = await prisma.users.findUnique({ where: { id: assignedTo } });
   if (!user) throw new Error('Nhân viên không tồn tại');
 
   return prisma.serviceRequests.update({
     where: { id },
-    data: { assigned_to: assignedTo },
+    data: { 
+      assigned_to: assignedTo,
+      status: 'ASSIGNED'
+    },
     include: INCLUDE_FULL,
   });
 };
@@ -85,14 +123,21 @@ export const updateStatus = async (id, status, requesterId, requesterRole) => {
     throw new Error('Bạn chỉ có thể cập nhật yêu cầu được giao cho mình');
   }
 
-  const validStatuses = ['PENDING', 'IN_PROGRESS', 'RESOLVED'];
+  const validStatuses = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED'];
   if (!validStatuses.includes(status)) {
     throw new Error('Trạng thái không hợp lệ');
   }
 
+  const updateData = { status };
+  if (status === 'RESOLVED') {
+    updateData.resolved_at = new Date();
+  } else {
+    updateData.resolved_at = null;
+  }
+
   return prisma.serviceRequests.update({
     where: { id },
-    data: { status },
+    data: updateData,
     include: INCLUDE_FULL,
   });
 };

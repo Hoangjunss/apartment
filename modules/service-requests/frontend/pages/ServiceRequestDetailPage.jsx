@@ -13,8 +13,10 @@ import toast from 'react-hot-toast';
 
 const STATUS_LABELS = {
   PENDING: { label: 'Chờ xử lý', color: 'bg-amber-100 text-amber-700' },
+  ASSIGNED: { label: 'Đã phân công', color: 'bg-indigo-100 text-indigo-700' },
   IN_PROGRESS: { label: 'Đang xử lý', color: 'bg-blue-100 text-blue-700' },
   RESOLVED: { label: 'Đã xong', color: 'bg-emerald-100 text-emerald-700' },
+  CANCELLED: { label: 'Đã hủy', color: 'bg-rose-100 text-rose-700' },
 };
 
 function StatusBadge({ status }) {
@@ -108,9 +110,12 @@ export default function ServiceRequestDetailPage() {
         <div className="space-y-4">
           <div className="card p-5 bg-white space-y-4">
             <div>
-              <p className="info-label flex items-center gap-1"><User size={12} />Người tạo yêu cầu</p>
-              <p className="text-sm font-medium text-slate-800 mt-1">{req.requester?.full_name ?? '—'}</p>
-              <p className="text-xs text-slate-400">{req.requester?.role}</p>
+              <p className="info-label flex items-center gap-1"><User size={12} />Người yêu cầu</p>
+              <p className="text-sm font-semibold text-slate-800 mt-1">{req.requester_name ?? '—'}</p>
+              {req.requester_phone && <p className="text-xs text-slate-500 font-mono mt-0.5">{req.requester_phone}</p>}
+              <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-wider">
+                Nguồn: {req.source === 'PUBLIC_FORM' ? 'Khách thuê (QR)' : 'Nội bộ (Nhân viên)'}
+              </p>
             </div>
             <div>
               <p className="info-label flex items-center gap-1"><User size={12} />Được phân công cho</p>
