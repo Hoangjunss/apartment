@@ -35,7 +35,6 @@ model Users {
   invoice_creations   Invoices[]
   payment_records     Payments[]
   service_assignments ServiceRequests[]        @relation("AssignedTo")
-  service_requests_by ServiceRequests[]        @relation("RequestedBy")
   contract_renewals   ContractRenewals[]
   temp_registrations  TemporaryRegistrations[]
 }
@@ -102,6 +101,7 @@ model Apartments {
   invoices           Invoices[]
   temp_registrations TemporaryRegistrations[]
   service_requests   ServiceRequests[]
+  tokens             ApartmentTokens?
 
   @@index([floor_id])
   @@index([status])
@@ -215,6 +215,7 @@ model Contracts {
   renewals              ContractRenewals[]
   service_subscriptions ServiceSubscriptions[]
   invoices              Invoices[]
+  service_requests      ServiceRequests[]
 
   @@index([tenant_id])
   @@index([apartment_id])
@@ -382,30 +383,68 @@ model Payments {
   @@index([invoice_id])
 }
 
-enum ServiceRequestStatus {
-  PENDING
-  IN_PROGRESS
-  RESOLVED
+enum ServiceRequestType {
+  MAINTENANCE
+  CLEANING
+  COMPLAINT
+  OTHER
 }
 
-// ServiceRequests — Yêu cầu dịch vụ / kỹ thuật
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum ServiceRequestStatus {
+  PENDING
+  ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  CANCELLED
+}
+
+enum RequestSource {
+  INTERNAL
+  PUBLIC_FORM
+}
+
 model ServiceRequests {
-  id           Int                   @id @default(autoincrement())
-  requested_by Int
-  assigned_to  Int?
-  title        String                @db.VarChar(200)
-  description  String                @db.Text
-  status       ServiceRequestStatus  @default(PENDING)
-  apartment_id Int?
-  created_at   DateTime              @default(now())
-  updated_at   DateTime              @updatedAt
+  id              Int                  @id @default(autoincrement())
+  apartment_id    Int
+  contract_id     Int?
+  title           String               @db.VarChar(200)
+  description     String               @db.Text
+  type            ServiceRequestType   @default(MAINTENANCE)
+  priority        Priority             @default(NORMAL)
+  status          ServiceRequestStatus @default(PENDING)
+  source          RequestSource        @default(INTERNAL)
+  requester_name  String?              @db.VarChar(100)
+  requester_phone String?              @db.VarChar(20)
+  assigned_to     Int?
+  resolved_at     DateTime?
+  created_at      DateTime             @default(now())
+  updated_at      DateTime             @updatedAt
 
-  requester Users       @relation("RequestedBy", fields: [requested_by], references: [id])
-  assignee  Users?      @relation("AssignedTo", fields: [assigned_to], references: [id])
-  apartment Apartments? @relation(fields: [apartment_id], references: [id])
+  apartment Apartments @relation(fields: [apartment_id], references: [id])
+  contract  Contracts? @relation(fields: [contract_id], references: [id])
+  assignee  Users?     @relation("AssignedTo", fields: [assigned_to], references: [id])
 
-  @@index([requested_by])
+  @@index([apartment_id])
+  @@index([contract_id])
   @@index([assigned_to])
   @@index([status])
+}
+
+model ApartmentTokens {
+  id           Int        @id @default(autoincrement())
+  apartment_id Int        @unique
+  token        String     @unique @db.VarChar(16)
+  expires_at   DateTime
+  created_at   DateTime   @default(now())
+
+  apartment Apartments @relation(fields: [apartment_id], references: [id])
+
   @@index([apartment_id])
 }
