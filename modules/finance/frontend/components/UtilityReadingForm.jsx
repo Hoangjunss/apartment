@@ -3,6 +3,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import toast from 'react-hot-toast';
 import { useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/axios.js';
 import { Modal } from '@/components/common/Modal.jsx';
 import { FormField } from '@/components/forms/FormField.jsx';
 import { ModalFooter } from '@/components/forms/ModalFooter.jsx';
@@ -29,10 +31,15 @@ const getCurrentMonthStr = () => {
 
 export function UtilityReadingForm({ onClose, preselectedApartmentId }) {
   const { data: apartmentsData } = useApartments({ limit: 100 });
-  const apartments = apartmentsData?.items ?? [];
+  const allApartments = apartmentsData?.items ?? [];
 
   const { data: contractsData } = useContracts({ status: 'ACTIVE', limit: 100 });
   const activeContracts = contractsData?.items ?? [];
+
+  // Chỉ hiển thị các phòng đang có hợp đồng đang hoạt động (ACTIVE)
+  const apartments = allApartments.filter(apt =>
+    activeContracts.some(c => Number(c.apartment_id) === Number(apt.id))
+  );
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
@@ -49,12 +56,26 @@ export function UtilityReadingForm({ onClose, preselectedApartmentId }) {
   const selectedAptId = watch('apartment_id');
   const soNguoiO = watch('soNguoiO') ?? 1;
 
-  // Prefill soNguoiO when an apartment is selected based on its active contract
+  // Lấy chỉ số điện nước cuối cùng của phòng được chọn
+  const { data: latestReading } = useQuery({
+    queryKey: ['utility-readings', 'latest', selectedAptId],
+    queryFn: () => api.get('/finance/utilities', { params: { apartment_id: selectedAptId, limit: 1 } }).then(r => r.data.data?.items?.[0] ?? null),
+    enabled: !!selectedAptId,
+  });
+
+  const matchedContract = activeContracts.find(c => Number(c.apartment_id) === Number(selectedAptId));
+  const initialElectricity = matchedContract ? Number(matchedContract.initial_electricity) : 0;
+
+  // Chỉ số điện cũ = chỉ số điện mới của tháng trước, hoặc chỉ số điện ban đầu của hợp đồng
+  const prevElectricityIndex = latestReading ? Number(latestReading.electricity_curr) : initialElectricity;
+
+  // Tự động điền số người ở và đơn giá điện từ hợp đồng hoạt động
   useEffect(() => {
     if (selectedAptId && activeContracts.length > 0) {
       const matched = activeContracts.find(c => Number(c.apartment_id) === Number(selectedAptId));
       if (matched) {
         setValue('soNguoiO', matched.soNguoiO || matched.occupants_count || 1);
+        setValue('electricity_unit_price', matched.electricity_price ? Number(matched.electricity_price) : 3500);
       }
     }
   }, [selectedAptId, activeContracts, setValue]);
@@ -114,6 +135,16 @@ export function UtilityReadingForm({ onClose, preselectedApartmentId }) {
         </FormField>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField label="Chỉ số điện cũ">
+            <input
+              type="number"
+              value={selectedAptId ? prevElectricityIndex : ''}
+              className="input bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200"
+              disabled
+              id="electricity-prev-input"
+            />
+          </FormField>
+
           <FormField label="Chỉ số điện mới" required error={errors.electricity_curr?.message}>
             <input
               type="number"
@@ -124,29 +155,32 @@ export function UtilityReadingForm({ onClose, preselectedApartmentId }) {
               id="electricity-curr-input"
             />
           </FormField>
+        </div>
 
-          <FormField label="Số người ở" required error={errors.soNguoiO?.message}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <FormField label="Số người ở (Được lấy từ hợp đồng)" required error={errors.soNguoiO?.message}>
             <input
               type="number"
-              min="1"
               placeholder="Số người ở"
               {...register('soNguoiO', { valueAsNumber: true })}
-              className="input"
+              className="input bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200"
+              readOnly
               id="so-nguoi-o-input"
+            />
+          </FormField>
+
+          <FormField label="Đơn giá điện (Được lấy từ hợp đồng)" required error={errors.electricity_unit_price?.message}>
+            <input
+              type="number"
+              {...register('electricity_unit_price')}
+              className="input bg-slate-50 text-slate-500 cursor-not-allowed border-slate-200"
+              readOnly
+              id="electricity-price-input"
             />
           </FormField>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <FormField label="Đơn giá điện (VND/kWh)" required error={errors.electricity_unit_price?.message}>
-            <input
-              type="number"
-              {...register('electricity_unit_price')}
-              className="input"
-              id="electricity-price-input"
-            />
-          </FormField>
-
           <FormField label="Đơn giá nước (Cố định)">
             <input
               type="text"

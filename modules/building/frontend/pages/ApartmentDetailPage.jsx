@@ -182,6 +182,7 @@ export default function ApartmentDetailPage() {
   const [activeTab, setActiveTab] = useState('furniture');
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const showQR = false; // Tạm ẩn QR code
 
   const { data: apartment, isLoading } = useApartmentById(apartmentId);
   const { mutate: generateToken, isPending: generating } = useGenerateApartmentToken({
@@ -243,9 +244,9 @@ export default function ApartmentDetailPage() {
         />
 
         {/* Top Section: Info Card and QR Card */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div className={showQR ? "grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6" : "grid grid-cols-1 gap-6 mb-6"}>
           {/* Info Card */}
-          <div className="card p-5 lg:col-span-2">
+          <div className={showQR ? "card p-5 lg:col-span-2" : "card p-5"}>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <div>
                 <p className="info-label">Trạng thái</p>
@@ -271,85 +272,87 @@ export default function ApartmentDetailPage() {
           </div>
 
           {/* QR Section Card */}
-          <div className="card p-5 flex flex-col justify-between" id="qr-request-card">
-            <div className="space-y-3">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">QR Code Yêu Cầu Hỗ Trợ</h3>
-              {apartment.tokens ? (
-                <div className="space-y-3">
-                  <div className="flex justify-center bg-gray-50 p-3 rounded-xl border border-gray-200 relative group">
-                    <QRCodeSVG
-                      value={`${window.location.origin}/submit?t=${apartment.tokens.token}`}
-                      size={140}
-                      level="H"
-                      includeMargin={true}
-                    />
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col gap-2 items-center justify-center transition-opacity duration-200 rounded-xl">
-                      <button
-                        onClick={handlePrintQR}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition"
-                      >
-                        <Printer size={13} />
-                        In QR Code
-                      </button>
+          {showQR && (
+            <div className="card p-5 flex flex-col justify-between" id="qr-request-card">
+              <div className="space-y-3">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">QR Code Yêu Cầu Hỗ Trợ</h3>
+                {apartment.tokens ? (
+                  <div className="space-y-3">
+                    <div className="flex justify-center bg-gray-50 p-3 rounded-xl border border-gray-200 relative group">
+                      <QRCodeSVG
+                        value={`${window.location.origin}/submit?t=${apartment.tokens.token}`}
+                        size={140}
+                        level="H"
+                        includeMargin={true}
+                      />
+                      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col gap-2 items-center justify-center transition-opacity duration-200 rounded-xl">
+                        <button
+                          onClick={handlePrintQR}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition"
+                        >
+                          <Printer size={13} />
+                          In QR Code
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-center space-y-1">
+                      <p className="text-xs text-gray-500">
+                        Hạn dùng: <span className="font-semibold text-gray-700">{format(parseISO(apartment.tokens.expires_at), 'dd/MM/yyyy')}</span>
+                      </p>
+                      <p className="text-[11px] text-gray-400 leading-normal">
+                        Khách thuê quét QR để gửi yêu cầu hỗ trợ mà không cần đăng nhập.
+                      </p>
                     </div>
                   </div>
-                  <div className="text-center space-y-1">
-                    <p className="text-xs text-gray-500">
-                      Hạn dùng: <span className="font-semibold text-gray-700">{format(parseISO(apartment.tokens.expires_at), 'dd/MM/yyyy')}</span>
-                    </p>
-                    <p className="text-[11px] text-gray-400 leading-normal">
-                      Khách thuê quét QR để gửi yêu cầu hỗ trợ mà không cần đăng nhập.
-                    </p>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 text-center space-y-2.5">
+                    <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
+                      <QrCode size={20} />
+                    </div>
+                    <div className="space-y-0.5">
+                      <p className="text-xs font-semibold text-gray-700">Chưa tạo QR Code</p>
+                      <p className="text-[11px] text-gray-400 max-w-[200px]">Tạo mã QR cho phòng này để nhận yêu cầu sửa chữa/khiếu nại.</p>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-6 text-center space-y-2.5">
-                  <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-                    <QrCode size={20} />
-                  </div>
-                  <div className="space-y-0.5">
-                    <p className="text-xs font-semibold text-gray-700">Chưa tạo QR Code</p>
-                    <p className="text-[11px] text-gray-400 max-w-[200px]">Tạo mã QR cho phòng này để nhận yêu cầu sửa chữa/khiếu nại.</p>
-                  </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
 
-            <div className="mt-3 pt-3 border-t border-gray-100">
-              <RoleGuard roles={MANAGEMENT_ROLES}>
-                {apartment.tokens ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={handleCopyLink}
-                      className="btn-secondary w-full justify-center text-xs py-1.5"
-                      id="copy-qr-link-btn"
-                    >
-                      <Copy size={13} />
-                      Copy Link
-                    </button>
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <RoleGuard roles={MANAGEMENT_ROLES}>
+                  {apartment.tokens ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={handleCopyLink}
+                        className="btn-secondary w-full justify-center text-xs py-1.5"
+                        id="copy-qr-link-btn"
+                      >
+                        <Copy size={13} />
+                        Copy Link
+                      </button>
+                      <button
+                        onClick={handleGenerateToken}
+                        disabled={generating}
+                        className="btn-primary w-full justify-center text-xs py-1.5 bg-blue-650"
+                        id="regenerate-qr-btn"
+                      >
+                        {generating ? 'Đang tạo...' : 'Tạo lại'}
+                      </button>
+                    </div>
+                  ) : (
                     <button
                       onClick={handleGenerateToken}
                       disabled={generating}
-                      className="btn-primary w-full justify-center text-xs py-1.5 bg-blue-650"
-                      id="regenerate-qr-btn"
+                      className="btn-primary w-full justify-center text-xs py-1.5"
+                      id="generate-qr-btn"
                     >
-                      {generating ? 'Đang tạo...' : 'Tạo lại'}
+                      <QrCode size={13} />
+                      {generating ? 'Đang tạo...' : 'Tạo QR Code'}
                     </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={handleGenerateToken}
-                    disabled={generating}
-                    className="btn-primary w-full justify-center text-xs py-1.5"
-                    id="generate-qr-btn"
-                  >
-                    <QrCode size={13} />
-                    {generating ? 'Đang tạo...' : 'Tạo QR Code'}
-                  </button>
-                )}
-              </RoleGuard>
+                  )}
+                </RoleGuard>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Tabs */}

@@ -29,6 +29,7 @@ async function main() {
   await prisma.tenants.deleteMany({});
   await prisma.apartmentFurniture.deleteMany({});
   await prisma.apartmentStatusLogs.deleteMany({});
+  await prisma.apartmentTokens.deleteMany({});
   await prisma.apartments.deleteMany({});
   await prisma.floors.deleteMany({});
   await prisma.buildings.deleteMany({});
