@@ -373,3 +373,47 @@ cd apps/frontend && pnpm dev
 | React Components | **20+** components |
 | DB Models (Prisma) | **14** models |
 | Dữ liệu seed | 24 căn hộ · 16 khách thuê · 16 HĐ · ~80 hóa đơn |
+
+---
+
+## 📽️ Tài liệu phục vụ Slide PPTX (Presentation Design & Prompts)
+
+Dưới đây là cấu trúc nội dung và các điểm nhấn (Key Takeaways) được biên soạn sẵn để làm Prompt cho AI tạo file thuyết trình PowerPoint (PPTX) về dự án **Hệ thống Quản lý Căn hộ Dịch vụ (QLCHDC)**.
+
+### 💡 Gợi ý Prompt để sinh PPTX nhanh (Dùng cho Gamma.app, Tome, hoặc ChatGPT Marp):
+> *"Tạo một slide thuyết trình chuyên nghiệp có cấu trúc dựa trên nội dung sau: Giới thiệu hệ thống QLCHDC, quy trình chuyển đổi trạng thái hóa đơn tự động bằng Cron Job + kiểm tra động trên giao diện UI, tính toán tiền nước theo đầu người thay vì m³, tối ưu trải nghiệm người dùng với việc đồng bộ hóa điều hướng bộ lọc quá hạn từ Dashboard, và hệ thống báo hỏng QR Code không cần đăng nhập cho khách thuê. Thiết kế theo tông màu chuyên nghiệp (xanh dương đậm và xám nhạt). Cụ thể như sau..."*
+
+---
+
+### 🗂️ Phác thảo cấu trúc Slide (Slide Outline & Content):
+
+#### Slide 1: Trang tiêu đề & Giới thiệu
+* **Tiêu đề:** Hệ thống Quản lý Nội bộ Căn hộ Dịch vụ (QLCHDC)
+* **Phụ đề:** Giải pháp tối ưu hóa vận hành, tài chính và kỹ thuật dành cho Ban quản lý tòa nhà
+* **Điểm nhấn:** Kiến trúc Monorepo (pnpm workspaces), kết hợp Express.js + React.js + Prisma ORM.
+
+#### Slide 2: Vòng đời Hóa đơn & Quản lý Tài chính (Invoice Lifecycle)
+* **Nội dung trọng tâm:** Quy trình chuyển dịch trạng thái khép kín:
+  1. **Khởi tạo:** Hệ thống chốt chỉ số điện nước + phí dịch vụ cố định theo số lượng người ở (`soNguoiO`) để tự động tạo hóa đơn `UNPAID` với hạn nộp (`due_date`) vào tháng tiếp theo.
+  2. **Thanh toán:** Cập nhật trạng thái tự động thành `PARTIALLY_PAID` (đóng một phần) hoặc `PAID` (đã thu đủ).
+  3. **Quá hạn:** Chạy Cron Job tự động lúc 00:00 hàng ngày quét trạng thái hóa đơn trễ hạn chuyển thành `OVERDUE` dựa trên múi giờ Việt Nam (`TZ=Asia/Ho_Chi_Minh`).
+* **Logic tối ưu UI mới:** Cột "Hạn thanh toán" được thiết kế tối giản, loại bỏ chữ cảnh báo rác; toàn bộ cảnh báo quá hạn được gom sang cột **"Trạng thái"** với badge đỏ đậm (`bg-red-200 text-red-800 font-semibold`) hiển thị trực quan và đồng bộ.
+
+#### Slide 3: Hệ thống Báo hỏng & Yêu cầu Kỹ thuật qua QR Code (QR Support)
+* **Nội dung trọng tâm:** Trải nghiệm "Zero-Login" cho khách thuê phòng:
+  * Mỗi phòng có một mã QR động riêng biệt (chứa token bảo mật thời hạn 90 ngày).
+  * Khách quét mã để truy cập giao diện báo sự cố di động, điền form báo hỏng (điện, nước, khóa cửa...).
+  * Hệ thống tự động phân loại, ghi nhận nguồn gửi ("Khách thuê" qua QR vs "Nội bộ" do nhân viên tạo), và thông báo cho kỹ thuật viên xử lý thông qua Dashboard của Ban quản lý.
+
+#### Slide 4: Bảng điều khiển (Dashboard) thông minh hỗ trợ Quyết định
+* **Nội dung trọng tâm:**
+  * **8 chỉ số KPI thời gian thực:** Phân làm 2 nhóm Bất động sản (Lấp đầy, HĐ hoạt động, Sắp hết hạn) và Tài chính (Doanh thu tháng, Còn phải thu, Số HĐ chưa TT).
+  * **Đồng bộ hóa điều hướng:** Click vào các chỉ số như "Còn cần thu" hay "Hóa đơn quá hạn" sẽ điều hướng chính xác đến trang danh sách hóa đơn được áp bộ lọc tương ứng (`?status=OVERDUE`), khắc phục triệt để lỗi mất dữ liệu khi lọc.
+  * **Biểu đồ trực quan:** Thống kê doanh thu 6 tháng gần nhất (đã thu vs chưa thu) và phân bố cơ cấu loại phòng.
+
+#### Slide 5: Tổng kết hiệu quả vận hành & Công nghệ
+* **Lợi ích:**
+  * Tránh thất thoát tài chính nhờ tự động hóa toàn bộ hóa đơn từ hợp đồng gốc.
+  * Giảm 80% thời gian xử lý sự cố thông qua quy trình QR Code không cần đăng nhập.
+  * Hệ thống hoạt động độc lập, gọn nhẹ trên nền Docker, cấu hình múi giờ chuẩn xác giúp báo cáo tài chính luôn nhất quán.
+
