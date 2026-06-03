@@ -64,3 +64,13 @@ export async function bulkSaveUtilities(readings) {
   const res = await api.post('/finance/utilities/bulk-save', { readings });
   return res.data.data;
 }
+
+export async function getContractCredits(contractId) {
+  const res = await api.get(`/finance/contracts/${contractId}/credits`);
+  return res.data.data;
+}
+
+export async function refundContractCredit(contractId, { amount, note }) {
+  const res = await api.post(`/finance/contracts/${contractId}/credits/refund`, { amount, note });
+  return res.data.data;
+}

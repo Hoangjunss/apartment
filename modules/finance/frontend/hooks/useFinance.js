@@ -111,3 +111,23 @@ export function useBulkSaveUtilities(options = {}) {
     onError: options.onError,
   });
 }
+
+export function useContractCredits(contractId) {
+  return useQuery({
+    queryKey: ['contractCredits', contractId],
+    queryFn: () => financeApi.getContractCredits(contractId),
+    enabled: !!contractId,
+  });
+}
+
+export function useRefundContractCredit(contractId, options = {}) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data) => financeApi.refundContractCredit(contractId, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['contractCredits', contractId] });
+      options.onSuccess?.(data);
+    },
+    onError: options.onError,
+  });
+}
