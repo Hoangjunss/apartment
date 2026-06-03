@@ -16,6 +16,7 @@ import commentsRouter from '@my/comments-backend';
 import attachmentsRouter from '@my/attachments-backend';
 import searchRouter from '@my/search-backend';
 import reportRouter from '@my/report-backend';
+import expenseRouter from '@my/expense-backend';
 import '@my/contract-backend/cron.js';
 
 const app = express();
@@ -73,6 +74,7 @@ app.use('/api/comments', commentsRouter);
 app.use('/api/attachments', attachmentsRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/report', reportRouter);
+app.use('/api/expense', expenseRouter);
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 httpServer.listen(port, () => {
