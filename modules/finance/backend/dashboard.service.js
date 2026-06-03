@@ -16,7 +16,10 @@ export const getDashboardStats = async (role, userId) => {
     const next30Days = new Date();
     next30Days.setDate(today.getDate() + 30);
 
-    const [expiringContracts, unpaidInvoicesRaw] = await Promise.all([
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const [expiringContracts, unpaidInvoicesRaw, paymentsAgg, expensesAgg] = await Promise.all([
       prisma.contracts.count({
         where: {
           status: { in: ['ACTIVE', 'EXPIRING_SOON'] },
@@ -26,6 +29,18 @@ export const getDashboardStats = async (role, userId) => {
       prisma.invoices.findMany({
         where: { status: { in: ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE'] } },
         include: { payments: true }
+      }),
+      prisma.payments.aggregate({
+        _sum: { amount: true },
+        where: { payment_date: { gte: startOfMonth, lte: endOfMonth } }
+      }),
+      prisma.buildingExpenses.aggregate({
+        _sum: { amount: true },
+        where: {
+          status: 'PAID',
+          deleted_at: null,
+          expense_date: { gte: startOfMonth, lte: endOfMonth }
+        }
       })
     ]);
 
@@ -36,7 +51,19 @@ export const getDashboardStats = async (role, userId) => {
       const remaining = Number(inv.total_amount) - totalPaid;
       if (remaining > 0) { unpaidAmount += remaining; unpaidCount++; }
     }
-    return { expiringContracts, unpaidAmount, unpaidCount };
+
+    const revenueThisMonth = Number(paymentsAgg._sum.amount || 0);
+    const expensesThisMonth = Number(expensesAgg._sum.amount || 0);
+    const grossProfit = revenueThisMonth - expensesThisMonth;
+
+    return {
+      expiringContracts,
+      unpaidAmount,
+      unpaidCount,
+      revenueThisMonth,
+      expensesThisMonth,
+      grossProfit
+    };
   }
 
   // ── ADMIN / MANAGER: full stats ──────────────────────────────────────────────
@@ -70,11 +97,23 @@ export const getDashboardStats = async (role, userId) => {
 
   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
-  const paymentsAgg = await prisma.payments.aggregate({
-    _sum: { amount: true },
-    where: { payment_date: { gte: startOfMonth, lte: endOfMonth } }
-  });
+  const [paymentsAgg, expensesAgg] = await Promise.all([
+    prisma.payments.aggregate({
+      _sum: { amount: true },
+      where: { payment_date: { gte: startOfMonth, lte: endOfMonth } }
+    }),
+    prisma.buildingExpenses.aggregate({
+      _sum: { amount: true },
+      where: {
+        status: 'PAID',
+        deleted_at: null,
+        expense_date: { gte: startOfMonth, lte: endOfMonth }
+      }
+    })
+  ]);
   const revenueThisMonth = Number(paymentsAgg._sum.amount || 0);
+  const expensesThisMonth = Number(expensesAgg._sum.amount || 0);
+  const grossProfit = revenueThisMonth - expensesThisMonth;
 
   const unpaidInvoices = await prisma.invoices.findMany({
     where: { status: { in: ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE'] } },
@@ -99,6 +138,8 @@ export const getDashboardStats = async (role, userId) => {
     activeTenants,
     expiringContracts,
     revenueThisMonth,
+    expensesThisMonth,
+    grossProfit,
     unpaidAmount,
     unpaidCount,
     occupancyRate
@@ -115,10 +156,23 @@ export const getRevenueHistory = async (monthsCount = 6) => {
     const monthStr = String(d.getMonth() + 1).padStart(2, '0');
     const billing_month = `${year}-${monthStr}`;
 
-    const invoicesInMonth = await prisma.invoices.findMany({
-      where: { billing_month },
-      include: { payments: true }
-    });
+    const startOfMonth = new Date(year, d.getMonth(), 1);
+    const endOfMonth = new Date(year, d.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const [invoicesInMonth, expensesAgg] = await Promise.all([
+      prisma.invoices.findMany({
+        where: { billing_month },
+        include: { payments: true }
+      }),
+      prisma.buildingExpenses.aggregate({
+        _sum: { amount: true },
+        where: {
+          status: 'PAID',
+          deleted_at: null,
+          expense_date: { gte: startOfMonth, lte: endOfMonth }
+        }
+      })
+    ]);
 
     let collected = 0;
     let uncollected = 0;
@@ -129,10 +183,13 @@ export const getRevenueHistory = async (monthsCount = 6) => {
       uncollected += Math.max(0, Number(inv.total_amount) - paid);
     }
 
+    const expenses = Number(expensesAgg._sum.amount || 0);
+
     result.push({
       month: billing_month,
       collected,
-      uncollected
+      uncollected,
+      expenses
     });
   }
 
