@@ -376,6 +376,28 @@ Nâng cao trải nghiệm người dùng, cho phép xem nhanh thông tin tổng 
 
 ---
 
+### 15. 💳 Hệ thống Ví dư (Credit) & Cộng dồn nợ (Debt Rollover)
+
+Tự động hóa xử lý các khoản thanh toán thừa/thiếu của khách thuê một cách minh bạch và chính xác:
+
+- **Ví dư Credit (`ContractCredits` & `CreditTransactions`):** Khi ghi nhận thanh toán vượt quá số tiền còn lại của hóa đơn, phần tiền dư sẽ tự động chuyển vào ví dư của Hợp đồng (`CREDIT_IN`).
+- **Khấu trừ tự động (Credit Apply):** Khi lập hóa đơn tháng mới, nếu ví dư của hợp đồng có số dư khả dụng, hệ thống sẽ tự động trừ ví dư và áp dụng trực tiếp làm giảm số tiền cần nộp của hóa đơn mới (`CREDIT_APPLY`).
+- **Cộng dồn nợ cũ (Debt Rollover):** Khi khách trả thiếu (hóa đơn ở trạng thái `PARTIALLY_PAID` hoặc `OVERDUE`), khi tạo hóa đơn tháng tiếp theo, số tiền nợ còn lại sẽ tự động được cộng dồn sang hóa đơn mới dưới dạng trường `debt_amount`, đồng thời hóa đơn cũ tự động chuyển trạng thái thành `PAID` kèm ghi chú cụ thể để tránh tính trùng.
+- **Giao diện quản lý ví dư:** Bổ sung tab "Ví dư & Công nợ" trong chi tiết Hợp đồng để theo dõi số dư và lịch sử giao dịch. Hỗ trợ Quản lý/Admin thực hiện hoàn tiền ví dư thủ công (`CREDIT_REFUND`).
+
+---
+
+### 16. 💸 Quản lý Chi phí Tòa nhà (Building Expenses)
+
+Theo dõi và ghi nhận các khoản chi phí vận hành chung của toàn tòa nhà:
+
+- **Quản lý CRUD Chi phí:** Hỗ trợ tạo mới, chỉnh sửa thông tin, cập nhật trạng thái thanh toán (Chờ thanh toán / Đã thanh toán) và xóa mềm (ADMIN only) các khoản chi phí tòa nhà.
+- **Tích hợp Attachment Module:** Hỗ trợ đính kèm nhiều file, hóa đơn chứng từ (PDF, Excel, hình ảnh) trực tiếp cho chứng từ chi phí qua giao diện `AttachmentsSection`.
+- **Thống kê Dashboard:** Tích hợp số liệu "Chi phí tháng này" và "Lợi nhuận gộp" (bằng Thực thu - Chi phí đã thanh toán) vào Dashboard, đồng thời vẽ biểu đồ cột so sánh tương quan Doanh thu vs Chi phí trong 6 tháng qua.
+- **Phân quyền Lễ tân:** Cấp quyền cho Lễ tân (`RECEPTIONIST`) được tạo, xem và chỉnh sửa trạng thái chi phí tòa nhà nhằm giảm tải cho ban quản lý.
+
+---
+
 ## 🚀 Chạy dự án
 
 ### Khởi động với Docker
