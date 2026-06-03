@@ -361,6 +361,7 @@ model Invoices {
   total_amount       Decimal       @db.Decimal(15, 2)
   status             InvoiceStatus @default(UNPAID)
   due_date           DateTime      @db.Date
+  note               String?       @db.Text
   created_by         Int
   created_at         DateTime      @default(now())
   deleted_at         DateTime?

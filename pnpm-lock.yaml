@@ -32,6 +32,9 @@ importers:
       '@my/contract-backend':
         specifier: workspace:*
         version: link:../../modules/contract/backend
+      '@my/expense-backend':
+        specifier: workspace:*
+        version: link:../../modules/expense/backend
       '@my/finance-backend':
         specifier: workspace:*
         version: link:../../modules/finance/backend
@@ -80,6 +83,9 @@ importers:
       '@my/contract-frontend':
         specifier: workspace:*
         version: link:../../modules/contract/frontend
+      '@my/expense-frontend':
+        specifier: workspace:*
+        version: link:../../modules/expense/frontend
       '@my/finance-frontend':
         specifier: workspace:*
         version: link:../../modules/finance/frontend
@@ -312,6 +318,48 @@ importers:
         version: 3.0.3
 
   modules/contract/frontend:
+    dependencies:
+      '@hookform/resolvers':
+        specifier: ^3.3.0
+        version: 3.10.0(react-hook-form@7.76.1(react@18.3.1))
+      '@tanstack/react-query':
+        specifier: ^5.17.0
+        version: 5.100.14(react@18.3.1)
+      date-fns:
+        specifier: ^3.3.0
+        version: 3.6.0
+      lucide-react:
+        specifier: ^0.309.0
+        version: 0.309.0(react@18.3.1)
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-hook-form:
+        specifier: ^7.49.0
+        version: 7.76.1(react@18.3.1)
+      react-hot-toast:
+        specifier: ^2.4.1
+        version: 2.6.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react-router-dom:
+        specifier: ^6.22.0
+        version: 6.30.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      zod:
+        specifier: ^3.22.0
+        version: 3.25.76
+
+  modules/expense/backend:
+    dependencies:
+      '@my/auth-backend':
+        specifier: workspace:*
+        version: link:../../auth/backend
+      '@my/prisma':
+        specifier: workspace:*
+        version: link:../../../packages/prisma
+      express:
+        specifier: ^4.19.2
+        version: 4.22.2
+
+  modules/expense/frontend:
     dependencies:
       '@hookform/resolvers':
         specifier: ^3.3.0
