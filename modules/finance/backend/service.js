@@ -1,6 +1,8 @@
 import { prisma } from '@my/prisma';
+import { createNotification } from '@my/notifications-backend/service';
 import { WATER_PRICE_PER_PERSON } from './constants.js';
 import { calculateWaterCost } from './utils.js';
+import xlsx from 'xlsx';
 
 // ==========================================
 // UTILITY READINGS (ĐIỆN NƯỚC)
@@ -349,7 +351,7 @@ export const recordPayment = async (data, userId) => {
     throw new Error('Số tiền thanh toán phải lớn hơn 0');
   }
 
-  return prisma.$transaction(async (tx) => {
+  const payment = await prisma.$transaction(async (tx) => {
     // 1. Fetch invoice
     const invoice = await tx.invoices.findUnique({
       where: { id: invoice_id }
@@ -401,4 +403,436 @@ export const recordPayment = async (data, userId) => {
 
     return payment;
   });
+
+  // Gửi thông báo tới Admin và Manager
+  (async () => {
+    try {
+      const managers = await prisma.users.findMany({
+        where: { role: { in: ['ADMIN', 'MANAGER'] }, is_active: true },
+        select: { id: true }
+      });
+      
+      const invoice = await prisma.invoices.findUnique({
+        where: { id: invoice_id },
+        include: { apartment: { select: { apartment_code: true } } }
+      });
+
+      const aptCode = invoice?.apartment?.apartment_code ?? '';
+
+      for (const manager of managers) {
+        await createNotification({
+          userId: manager.id,
+          title: 'Đã nhận thanh toán',
+          message: `Căn hộ ${aptCode}: Nhận thanh toán ${Number(amount).toLocaleString('vi-VN')} đ cho hóa đơn ${invoice?.invoice_code}.`,
+          type: 'PAYMENT_RECEIVED',
+          entityType: 'Invoice',
+          entityId: invoice_id
+        });
+      }
+    } catch (err) {
+      console.error('[Notification] Failed to send payment notification:', err.message);
+    }
+  })();
+
+  return payment;
+};
+
+// ==========================================
+// EXCEL UTILITY BULK IMPORT & TEMPLATE
+// ==========================================
+
+export const getUtilityTemplateBuffer = async () => {
+  const activeContracts = await prisma.contracts.findMany({
+    where: {
+      status: { in: ['ACTIVE', 'EXPIRING_SOON'] },
+      deleted_at: null
+    },
+    include: {
+      apartment: true
+    }
+  });
+
+  const currentMonth = new Date().toISOString().substring(0, 7); // e.g., "2026-06"
+
+  const data = [];
+  for (const contract of activeContracts) {
+    // Find latest reading
+    const latestReading = await prisma.utilityReadings.findFirst({
+      where: { apartment_id: contract.apartment_id },
+      orderBy: { billing_month: 'desc' }
+    });
+
+    const electricity_prev = latestReading ? Number(latestReading.electricity_curr) : Number(contract.initial_electricity);
+
+    data.push({
+      'Mã Căn Hộ': contract.apartment.apartment_code,
+      'Tháng Thanh Toán (YYYY-MM)': currentMonth,
+      'Chỉ Số Điện Cũ (Tham khảo - Không sửa)': electricity_prev,
+      'Chỉ Số Điện Mới (kWh)': '',
+      'Đơn Giá Điện (VND - Tùy chọn)': Number(contract.electricity_price),
+      'Đơn Giá Nước (VND - Tùy chọn)': WATER_PRICE_PER_PERSON
+    });
+  }
+
+  // Fallback to sample data if no active contracts
+  if (data.length === 0) {
+    data.push({
+      'Mã Căn Hộ': 'A.101',
+      'Tháng Thanh Toán (YYYY-MM)': currentMonth,
+      'Chỉ Số Điện Cũ (Tham khảo - Không sửa)': 100,
+      'Chỉ Số Điện Mới (kWh)': 150,
+      'Đơn Giá Điện (VND - Tùy chọn)': 3500,
+      'Đơn Giá Nước (VND - Tùy chọn)': WATER_PRICE_PER_PERSON
+    });
+  }
+
+  const wb = xlsx.utils.book_new();
+  const ws = xlsx.utils.json_to_sheet(data);
+  xlsx.utils.book_append_sheet(wb, ws, 'Template');
+  return xlsx.write(wb, { type: 'buffer', bookType: 'xlsx' });
+};
+
+export const bulkImportUtilities = async (fileBuffer, userId) => {
+  const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) {
+    throw new Error('File Excel không có sheet nào');
+  }
+  const sheet = workbook.Sheets[sheetName];
+  const rawRows = xlsx.utils.sheet_to_json(sheet);
+  if (rawRows.length === 0) {
+    throw new Error('File Excel không chứa dữ liệu hoặc trống');
+  }
+
+  const results = [];
+  let successCount = 0;
+  let errorCount = 0;
+
+  for (let i = 0; i < rawRows.length; i++) {
+    const row = rawRows[i];
+    const rowNum = i + 2; // header is row 1, data starts at row 2
+
+    let apartment_code = '';
+    let billing_month = '';
+    let electricity_curr = undefined;
+    let water_curr = null;
+    let electricity_unit_price = undefined;
+    let water_unit_price = undefined;
+
+    for (const key of Object.keys(row)) {
+      const cleanKey = key.trim().toLowerCase();
+      const val = row[key];
+      if (cleanKey.includes('căn hộ') || cleanKey.includes('apartment') || cleanKey.includes('phòng')) {
+        apartment_code = String(val).trim();
+      } else if (cleanKey.includes('tháng') || cleanKey.includes('month')) {
+        billing_month = String(val).trim();
+      } else if (cleanKey.includes('điện mới') || cleanKey.includes('electricity') || cleanKey.includes('số điện')) {
+        electricity_curr = val;
+      } else if (cleanKey.includes('nước mới') || cleanKey.includes('water') || cleanKey.includes('số nước')) {
+        water_curr = val;
+      } else if (cleanKey.includes('đơn giá điện') || cleanKey.includes('electricity price')) {
+        electricity_unit_price = val;
+      } else if (cleanKey.includes('đơn giá nước') || cleanKey.includes('water price')) {
+        water_unit_price = val;
+      }
+    }
+
+    try {
+      if (!apartment_code) throw new Error('Thiếu mã căn hộ');
+      if (!billing_month) throw new Error('Thiếu tháng thanh toán');
+      if (electricity_curr === undefined || electricity_curr === '') throw new Error('Thiếu chỉ số điện mới');
+
+      if (!/^\d{4}-\d{2}$/.test(billing_month)) {
+        throw new Error('Tháng thanh toán không hợp lệ (yêu cầu định dạng YYYY-MM)');
+      }
+
+      const apartment = await prisma.apartments.findUnique({
+        where: { apartment_code }
+      });
+      if (!apartment) {
+        throw new Error(`Căn hộ "${apartment_code}" không tồn tại trong hệ thống`);
+      }
+
+      // Check active contract
+      const activeContract = await prisma.contracts.findFirst({
+        where: {
+          apartment_id: apartment.id,
+          status: { in: ['ACTIVE', 'EXPIRING_SOON'] }
+        }
+      });
+      if (!activeContract) {
+        throw new Error(`Căn hộ "${apartment_code}" hiện đang trống hoặc không có hợp đồng thuê hoạt động`);
+      }
+
+      // Unique billing month check
+      const existing = await prisma.utilityReadings.findUnique({
+        where: {
+          apartment_id_billing_month: {
+            apartment_id: apartment.id,
+            billing_month
+          }
+        }
+      });
+      if (existing) {
+        throw new Error(`Căn hộ đã được ghi nhận chỉ số tháng ${billing_month} trước đó`);
+      }
+
+      // Find previous reading
+      const prevReading = await prisma.utilityReadings.findFirst({
+        where: {
+          apartment_id: apartment.id,
+          billing_month: { lt: billing_month }
+        },
+        orderBy: { billing_month: 'desc' }
+      });
+
+      const electricity_prev = prevReading ? Number(prevReading.electricity_curr) : 0;
+      const water_prev = prevReading && prevReading.water_curr !== null ? Number(prevReading.water_curr) : null;
+
+      if (Number(electricity_curr) < electricity_prev) {
+        throw new Error(`Chỉ số điện mới (${electricity_curr}) nhỏ hơn số điện cũ (${electricity_prev})`);
+      }
+
+      if (water_curr !== undefined && water_curr !== null && water_curr !== '' && water_prev !== null) {
+        if (Number(water_curr) < water_prev) {
+          throw new Error(`Chỉ số nước mới (${water_curr}) nhỏ hơn số nước cũ (${water_prev})`);
+        }
+      }
+
+      const final_water_curr = water_curr !== undefined && water_curr !== null && water_curr !== '' ? Number(water_curr) : null;
+      const final_water_prev = final_water_curr !== null ? (water_prev !== null ? water_prev : 0) : null;
+
+      const soNguoiO = activeContract.soNguoiO || 1;
+
+      await prisma.utilityReadings.create({
+        data: {
+          apartment_id: apartment.id,
+          billing_month,
+          electricity_prev,
+          electricity_curr: Number(electricity_curr),
+          water_prev: final_water_prev,
+          water_curr: final_water_curr,
+          electricity_unit_price: electricity_unit_price !== undefined && electricity_unit_price !== '' ? Number(electricity_unit_price) : 3500,
+          water_unit_price: water_unit_price !== undefined && water_unit_price !== '' ? Number(water_unit_price) : WATER_PRICE_PER_PERSON,
+          soNguoiO,
+          recorded_by: userId
+        }
+      });
+
+      results.push({
+        row: rowNum,
+        apartment_code,
+        billing_month,
+        status: 'SUCCESS',
+        message: 'Ghi nhận thành công'
+      });
+      successCount++;
+    } catch (err) {
+      results.push({
+        row: rowNum,
+        apartment_code: apartment_code || 'Chưa rõ',
+        billing_month: billing_month || 'Chưa rõ',
+        status: 'ERROR',
+        message: err.message
+      });
+      errorCount++;
+    }
+  }
+
+  return {
+    totalRows: rawRows.length,
+    successCount,
+    errorCount,
+    results
+  };
+};
+
+export const importPreview = async (fileBuffer) => {
+  const workbook = xlsx.read(fileBuffer, { type: 'buffer' });
+  const sheetName = workbook.SheetNames[0];
+  if (!sheetName) {
+    throw new Error('File Excel không có sheet nào');
+  }
+  const sheet = workbook.Sheets[sheetName];
+  const rawRows = xlsx.utils.sheet_to_json(sheet);
+  if (rawRows.length === 0) {
+    throw new Error('File Excel không chứa dữ liệu hoặc trống');
+  }
+
+  const list = [];
+  for (let i = 0; i < rawRows.length; i++) {
+    const row = rawRows[i];
+    const rowNum = i + 2;
+
+    let apartment_code = '';
+    let billing_month = '';
+    let electricity_curr = undefined;
+    let electricity_unit_price = undefined;
+    let water_unit_price = undefined;
+
+    for (const key of Object.keys(row)) {
+      const cleanKey = key.trim().toLowerCase();
+      const val = row[key];
+      if (cleanKey.includes('căn hộ') || cleanKey.includes('apartment') || cleanKey.includes('phòng')) {
+        apartment_code = String(val).trim();
+      } else if (cleanKey.includes('tháng') || cleanKey.includes('month')) {
+        billing_month = String(val).trim();
+      } else if (cleanKey.includes('điện mới') || cleanKey.includes('electricity') || cleanKey.includes('chỉ số điện mới') || cleanKey.includes('số điện new')) {
+        electricity_curr = val !== undefined && val !== '' ? Number(val) : undefined;
+      } else if (cleanKey.includes('đơn giá điện') || cleanKey.includes('electricity price')) {
+        electricity_unit_price = val !== undefined && val !== '' ? Number(val) : undefined;
+      } else if (cleanKey.includes('đơn giá nước') || cleanKey.includes('water price')) {
+        water_unit_price = val !== undefined && val !== '' ? Number(val) : undefined;
+      }
+    }
+
+    let isValid = true;
+    let error = null;
+    let apartment = null;
+    let activeContract = null;
+    let electricity_prev = 0;
+    let soNguoiO = 1;
+
+    try {
+      if (!apartment_code) throw new Error('Thiếu mã căn hộ');
+      if (!billing_month) throw new Error('Thiếu tháng thanh toán');
+      if (electricity_curr === undefined || isNaN(electricity_curr)) throw new Error('Thiếu hoặc sai định dạng chỉ số điện mới');
+
+      if (!/^\d{4}-\d{2}$/.test(billing_month)) {
+        throw new Error('Tháng thanh toán không hợp lệ (yêu cầu định dạng YYYY-MM)');
+      }
+
+      apartment = await prisma.apartments.findUnique({
+        where: { apartment_code }
+      });
+      if (!apartment) {
+        throw new Error(`Căn hộ "${apartment_code}" không tồn tại trong hệ thống`);
+      }
+
+      activeContract = await prisma.contracts.findFirst({
+        where: {
+          apartment_id: apartment.id,
+          status: { in: ['ACTIVE', 'EXPIRING_SOON'] }
+        }
+      });
+      if (!activeContract) {
+        throw new Error(`Căn hộ "${apartment_code}" hiện đang trống hoặc không có hợp đồng thuê hoạt động`);
+      }
+
+      soNguoiO = activeContract.soNguoiO || 1;
+
+      // Unique billing month check
+      const existing = await prisma.utilityReadings.findUnique({
+        where: {
+          apartment_id_billing_month: {
+            apartment_id: apartment.id,
+            billing_month
+          }
+        }
+      });
+      if (existing) {
+        throw new Error(`Căn hộ đã được ghi nhận chỉ số tháng ${billing_month} trước đó`);
+      }
+
+      // Find previous reading
+      const prevReading = await prisma.utilityReadings.findFirst({
+        where: {
+          apartment_id: apartment.id,
+          billing_month: { lt: billing_month }
+        },
+        orderBy: { billing_month: 'desc' }
+      });
+
+      electricity_prev = prevReading ? Number(prevReading.electricity_curr) : Number(activeContract.initial_electricity);
+
+      if (electricity_curr < electricity_prev) {
+        throw new Error(`Chỉ số điện mới (${electricity_curr}) nhỏ hơn số điện cũ (${electricity_prev})`);
+      }
+
+      electricity_unit_price = electricity_unit_price !== undefined ? electricity_unit_price : Number(activeContract.electricity_price);
+      water_unit_price = water_unit_price !== undefined ? water_unit_price : WATER_PRICE_PER_PERSON;
+    } catch (err) {
+      isValid = false;
+      error = err.message;
+    }
+
+    list.push({
+      row: rowNum,
+      apartment_id: apartment?.id || null,
+      apartment_code,
+      billing_month,
+      electricity_prev,
+      electricity_curr: electricity_curr !== undefined ? electricity_curr : '',
+      electricity_unit_price: electricity_unit_price || 3500,
+      water_unit_price: water_unit_price || WATER_PRICE_PER_PERSON,
+      soNguoiO,
+      isValid,
+      error
+    });
+  }
+
+  return list;
+};
+
+export const bulkSaveUtilities = async (readings, userId) => {
+  let successCount = 0;
+  let errorCount = 0;
+  const results = [];
+
+  for (let i = 0; i < readings.length; i++) {
+    const r = readings[i];
+    try {
+      if (!r.apartment_id) throw new Error('Căn hộ không hợp lệ');
+      if (!r.billing_month) throw new Error('Thiếu tháng thanh toán');
+      if (r.electricity_curr === undefined || r.electricity_curr === '') throw new Error('Thiếu chỉ số điện mới');
+
+      // Double check in DB to avoid race conditions
+      const existing = await prisma.utilityReadings.findUnique({
+        where: {
+          apartment_id_billing_month: {
+            apartment_id: Number(r.apartment_id),
+            billing_month: r.billing_month
+          }
+        }
+      });
+      if (existing) {
+        throw new Error(`Đã ghi nhận chỉ số tháng ${r.billing_month}`);
+      }
+
+      await prisma.utilityReadings.create({
+        data: {
+          apartment_id: Number(r.apartment_id),
+          billing_month: r.billing_month,
+          electricity_prev: Number(r.electricity_prev || 0),
+          electricity_curr: Number(r.electricity_curr),
+          water_prev: null,
+          water_curr: null,
+          electricity_unit_price: Number(r.electricity_unit_price || 3500),
+          water_unit_price: Number(r.water_unit_price || WATER_PRICE_PER_PERSON),
+          soNguoiO: Number(r.soNguoiO || 1),
+          recorded_by: userId
+        }
+      });
+
+      successCount++;
+      results.push({
+        apartment_code: r.apartment_code,
+        status: 'SUCCESS',
+        message: 'Lưu thành công'
+      });
+    } catch (err) {
+      errorCount++;
+      results.push({
+        apartment_code: r.apartment_code || 'Chưa rõ',
+        status: 'ERROR',
+        message: err.message
+      });
+    }
+  }
+
+  return {
+    successCount,
+    errorCount,
+    results
+  };
 };

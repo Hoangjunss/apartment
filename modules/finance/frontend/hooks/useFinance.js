@@ -77,3 +77,37 @@ export function useRecordPayment(options = {}) {
     onError: options.onError,
   });
 }
+
+export function useBulkImportUtilities(options = {}) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: financeApi.bulkImportUtilities,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.utilities({}) });
+      options.onSuccess?.(data);
+    },
+    onError: options.onError,
+  });
+}
+
+export function useImportUtilityPreview(options = {}) {
+  return useMutation({
+    mutationFn: financeApi.importUtilityPreview,
+    onSuccess: (data) => {
+      options.onSuccess?.(data);
+    },
+    onError: options.onError,
+  });
+}
+
+export function useBulkSaveUtilities(options = {}) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: financeApi.bulkSaveUtilities,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.utilities({}) });
+      options.onSuccess?.(data);
+    },
+    onError: options.onError,
+  });
+}

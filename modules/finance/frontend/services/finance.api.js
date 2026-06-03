@@ -34,3 +34,33 @@ export async function recordPayment(data) {
   const res = await api.post('/finance/payments', data);
   return res.data.data;
 }
+
+export async function bulkImportUtilities(formData) {
+  const res = await api.post('/finance/utilities/bulk-import', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return res.data.data;
+}
+
+export async function downloadUtilityTemplate() {
+  const res = await api.get('/finance/utilities/template', {
+    responseType: 'blob',
+  });
+  return res.data;
+}
+
+export async function importUtilityPreview(formData) {
+  const res = await api.post('/finance/utilities/import-preview', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return res.data.data;
+}
+
+export async function bulkSaveUtilities(readings) {
+  const res = await api.post('/finance/utilities/bulk-save', { readings });
+  return res.data.data;
+}

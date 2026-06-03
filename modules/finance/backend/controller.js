@@ -1,4 +1,5 @@
 import * as service from './service.js';
+import multer from 'multer';
 
 const getErrorStatus = (message) => {
   if (message.includes('Không tìm thấy')) return 404;
@@ -137,5 +138,57 @@ export const recordPayment = async (req, res) => {
     res.status(201).json({ success: true, data, message: 'Ghi nhận thanh toán thành công' });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });
+  }
+};
+
+// Excel Utility Import Handlers
+const upload = multer({ storage: multer.memoryStorage() });
+export const uploadMiddleware = upload.single('file');
+
+export const downloadTemplate = async (req, res) => {
+  try {
+    const buffer = await service.getUtilityTemplateBuffer();
+    res.setHeader('Content-Disposition', 'attachment; filename=utility_readings_template.xlsx');
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.send(buffer);
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const bulkImportUtilities = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp file Excel cần nhập' });
+    }
+    const data = await service.bulkImportUtilities(req.file.buffer, req.user.userId);
+    res.json({ success: true, data, message: `Nhập chỉ số điện nước thành công. Thành công: ${data.successCount}, Thất bại: ${data.errorCount}` });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const importPreview = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp file Excel' });
+    }
+    const data = await service.importPreview(req.file.buffer);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const bulkSaveUtilities = async (req, res) => {
+  try {
+    const { readings } = req.body;
+    if (!readings || !Array.isArray(readings)) {
+      return res.status(400).json({ success: false, message: 'Dữ liệu không hợp lệ' });
+    }
+    const data = await service.bulkSaveUtilities(readings, req.user.userId);
+    res.json({ success: true, data, message: 'Lưu chỉ số điện nước thành công' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };

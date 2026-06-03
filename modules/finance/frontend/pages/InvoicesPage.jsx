@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Eye, Receipt, CheckCircle, AlertTriangle, Search, RotateCcw } from 'lucide-react';
+import { Plus, Eye, Receipt, CheckCircle, AlertTriangle, Search, RotateCcw, Download } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { api } from '@/lib/axios.js';
 import { PageHeader } from '@/components/common/PageHeader.jsx';
 import { DataTable } from '@/components/common/DataTable.jsx';
 import { RoleGuard } from '@/components/common/RoleGuard.jsx';
@@ -66,6 +68,31 @@ export default function InvoicesPage() {
   const handlePageChange = useCallback((p) => setPage(p), []);
 
   const { mutateAsync: generateInvoiceMutate } = useGenerateInvoice();
+
+  const handleExport = async (format) => {
+    try {
+      toast.loading('Đang chuẩn bị file tải xuống...', { id: 'export-toast' });
+      const res = await api.get('/report/export/invoices', {
+        params: {
+          status: filters.status || undefined,
+          billing_month: filters.billing_month || undefined,
+          format
+        },
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `danh_sach_hoa_don.${format === 'csv' ? 'csv' : 'xlsx'}`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      toast.success('Đã tải xuống file thành công!', { id: 'export-toast' });
+    } catch (err) {
+      console.error(err);
+      toast.error('Có lỗi xảy ra khi xuất dữ liệu', { id: 'export-toast' });
+    }
+  };
 
   const handleBatchGenerate = async () => {
     if (!batchMonth) return;
@@ -176,19 +203,33 @@ export default function InvoicesPage() {
         title="Quản lý Hóa đơn"
         subtitle={`Quản lý công nợ và hóa đơn tháng (${total} hóa đơn)`}
         action={
-          <RoleGuard roles={MANAGEMENT_ROLES}>
+          <div className="flex gap-2">
             <button
-              onClick={() => {
-                setGenerationResults([]);
-                setIsGenerateModalOpen(true);
-              }}
-              className="btn-primary flex items-center gap-2"
-              id="generate-invoices-btn"
+              onClick={() => handleExport('excel')}
+              className="btn-secondary flex items-center gap-1.5"
             >
-              <Receipt size={16} />
-              Lập hóa đơn tháng
+              <Download size={14} /> Excel
             </button>
-          </RoleGuard>
+            <button
+              onClick={() => handleExport('csv')}
+              className="btn-secondary flex items-center gap-1.5"
+            >
+              <Download size={14} /> CSV
+            </button>
+            <RoleGuard roles={MANAGEMENT_ROLES}>
+              <button
+                onClick={() => {
+                  setGenerationResults([]);
+                  setIsGenerateModalOpen(true);
+                }}
+                className="btn-primary flex items-center gap-2"
+                id="generate-invoices-btn"
+              >
+                <Receipt size={16} />
+                Lập hóa đơn tháng
+              </button>
+            </RoleGuard>
+          </div>
         }
       />
 
