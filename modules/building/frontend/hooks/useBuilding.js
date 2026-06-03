@@ -210,3 +210,13 @@ export function useGenerateApartmentToken(options = {}) {
   });
 }
 
+export function useApartmentPreview(id, enabled = true) {
+  return useQuery({
+    queryKey: ['apartment-preview', id],
+    queryFn: () => buildingApi.getApartmentPreview(id),
+    enabled: enabled && !!id,
+    staleTime: 60000, // 1 minute cache
+  });
+}
+
+

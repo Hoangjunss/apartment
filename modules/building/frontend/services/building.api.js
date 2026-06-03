@@ -102,3 +102,9 @@ export async function generateApartmentToken(id) {
   return res.data.data;
 }
 
+export async function getApartmentPreview(id) {
+  const res = await api.get(`/building/apartments/${id}/preview`);
+  return res.data.data;
+}
+
+
