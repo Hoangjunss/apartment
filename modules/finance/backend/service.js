@@ -284,38 +284,121 @@ export const generateInvoice = async (data, userId) => {
   }
 
   const other = Number(other_amount);
-  const total_amount = rent_amount + electricity_amount + water_amount + service_amount + other;
 
-  // Generate unique invoice_code
-  const cleanCode = contract.contract_code.replace(/-/g, '');
-  const monthCode = billing_month.replace('-', '');
-  const invoice_code = `HD-${cleanCode}-${monthCode}`;
+  return prisma.$transaction(async (tx) => {
+    // 1. Quét nợ cũ (Debt Rollover)
+    const unpaidInvoices = await tx.invoices.findMany({
+      where: {
+        contract_id,
+        status: { in: ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE'] },
+        billing_month: { lt: billing_month }
+      },
+      include: {
+        payments: true
+      },
+      orderBy: { billing_month: 'asc' }
+    });
 
-  // Check unique invoice_code
-  const checkCode = await prisma.invoices.findUnique({ where: { invoice_code } });
-  if (checkCode) {
-    throw new Error(`Mã hóa đơn ${invoice_code} đã tồn tại`);
-  }
-
-  // Due date: ngày payment_due_day của tháng KẾ TIẾP billing_month
-  const due_date = calcDueDate(billing_month, contract.payment_due_day || 5);
-
-  return prisma.invoices.create({
-    data: {
-      invoice_code,
-      contract_id,
-      apartment_id: contract.apartment_id,
-      billing_month,
-      rent_amount,
-      electricity_amount,
-      water_amount,
-      service_amount,
-      other_amount: other,
-      total_amount,
-      status: 'UNPAID',
-      due_date,
-      created_by: userId
+    let debt_amount = 0;
+    for (const oldInv of unpaidInvoices) {
+      const paymentsSum = oldInv.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const remaining = Number(oldInv.total_amount) - Number(oldInv.credit_applied) - paymentsSum;
+      if (remaining > 0) {
+        debt_amount += remaining;
+        
+        const currentNote = oldInv.note ? `${oldInv.note}\n` : '';
+        await tx.invoices.update({
+          where: { id: oldInv.id },
+          data: {
+            status: 'PAID',
+            note: `${currentNote}[Cộng dồn nợ] Nợ cũ ${remaining.toLocaleString('vi-VN')} đ được chuyển tiếp sang hóa đơn tháng ${billing_month}.`
+          }
+        });
+      }
     }
+
+    // 2. Quét Credit (Ví dư)
+    const creditRecord = await tx.contractCredits.findUnique({
+      where: { contract_id }
+    });
+    let availableCredit = creditRecord ? Number(creditRecord.balance) : 0;
+
+    // Calculate base total amount & final total amount (including rolled over debt)
+    const base_total = rent_amount + electricity_amount + water_amount + service_amount + other;
+    const total_amount = base_total + debt_amount;
+
+    let credit_applied = 0;
+    if (availableCredit > 0) {
+      if (availableCredit >= total_amount) {
+        credit_applied = total_amount;
+        availableCredit -= total_amount;
+      } else {
+        credit_applied = availableCredit;
+        availableCredit = 0;
+      }
+    }
+
+    // Generate unique invoice_code
+    const cleanCode = contract.contract_code.replace(/-/g, '');
+    const monthCode = billing_month.replace('-', '');
+    const invoice_code = `HD-${cleanCode}-${monthCode}`;
+
+    // Check unique invoice_code
+    const checkCode = await tx.invoices.findUnique({ where: { invoice_code } });
+    if (checkCode) {
+      throw new Error(`Mã hóa đơn ${invoice_code} đã tồn tại`);
+    }
+
+    const due_date = calcDueDate(billing_month, contract.payment_due_day || 5);
+
+    // Determine status
+    let status = 'UNPAID';
+    if (credit_applied >= total_amount) {
+      status = 'PAID';
+    }
+
+    // Create invoice
+    const newInvoice = await tx.invoices.create({
+      data: {
+        invoice_code,
+        contract_id,
+        apartment_id: contract.apartment_id,
+        billing_month,
+        rent_amount,
+        electricity_amount,
+        water_amount,
+        service_amount,
+        other_amount: other,
+        debt_amount,
+        credit_applied,
+        total_amount,
+        status,
+        due_date,
+        created_by: userId
+      }
+    });
+
+    // Update credit wallet if credit was applied
+    if (credit_applied > 0) {
+      await tx.contractCredits.update({
+        where: { contract_id },
+        data: { balance: availableCredit }
+      });
+
+      // Log credit transaction
+      await tx.creditTransactions.create({
+        data: {
+          contract_id,
+          invoice_id: newInvoice.id,
+          type: 'CREDIT_APPLY',
+          amount: credit_applied,
+          description: `Khấu trừ tự động tiền dư vào hóa đơn tháng ${billing_month} (Số tiền: ${credit_applied.toLocaleString('vi-VN')} đ)`,
+          recorded_by: userId
+        }
+      });
+    }
+
+    return newInvoice;
   });
 };
 
@@ -351,10 +434,11 @@ export const recordPayment = async (data, userId) => {
     throw new Error('Số tiền thanh toán phải lớn hơn 0');
   }
 
-  const payment = await prisma.$transaction(async (tx) => {
-    // 1. Fetch invoice
+  const { paymentRecord, creditSurplus } = await prisma.$transaction(async (tx) => {
+    // 1. Fetch invoice and related payments
     const invoice = await tx.invoices.findUnique({
-      where: { id: invoice_id }
+      where: { id: invoice_id },
+      include: { payments: true }
     });
 
     if (!invoice) {
@@ -365,30 +449,68 @@ export const recordPayment = async (data, userId) => {
       throw new Error('Hóa đơn này đã được thanh toán đầy đủ');
     }
 
-    // 2. Create payment record
-    const payment = await tx.payments.create({
+    const paymentsSumBefore = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+    const remaining = Number(invoice.total_amount) - Number(invoice.credit_applied) - paymentsSumBefore;
+
+    if (remaining <= 0) {
+      throw new Error('Hóa đơn này đã được thanh toán đầy đủ hoặc khấu trừ hết bằng credit');
+    }
+
+    const amountInput = Number(amount);
+    let amountAppliedToInvoice = amountInput;
+    let creditSurplus = 0;
+
+    if (amountInput > remaining) {
+      amountAppliedToInvoice = remaining;
+      creditSurplus = amountInput - remaining;
+    }
+
+    // 2. Create payment record (capped at remaining)
+    const paymentRecord = await tx.payments.create({
       data: {
         invoice_id,
-        amount: Number(amount),
+        amount: amountAppliedToInvoice,
         payment_method,
         payment_date: new Date(payment_date),
         reference_number,
-        note,
+        note: note || (creditSurplus > 0 ? `Thanh toán hóa đơn. Thừa ${creditSurplus.toLocaleString('vi-VN')} đ chuyển vào ví credit.` : undefined),
         recorded_by: userId
       }
     });
 
-    // 3. Re-calculate paid sum
-    const allPayments = await tx.payments.findMany({
-      where: { invoice_id }
-    });
+    // 3. If there is surplus, add to contract credits and write a transaction
+    if (creditSurplus > 0) {
+      await tx.contractCredits.upsert({
+        where: { contract_id: invoice.contract_id },
+        update: {
+          balance: { increment: creditSurplus }
+        },
+        create: {
+          contract_id: invoice.contract_id,
+          balance: creditSurplus
+        }
+      });
 
-    const totalPaid = allPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+      await tx.creditTransactions.create({
+        data: {
+          contract_id: invoice.contract_id,
+          invoice_id: invoice.id,
+          payment_id: paymentRecord.id,
+          type: 'CREDIT_IN',
+          amount: creditSurplus,
+          description: `Nạp tiền dư từ thanh toán hóa đơn ${invoice.invoice_code} (Thực nộp: ${amountInput.toLocaleString('vi-VN')} đ, Thanh toán: ${amountAppliedToInvoice.toLocaleString('vi-VN')} đ)`,
+          recorded_by: userId
+        }
+      });
+    }
+
+    // 4. Update invoice status
+    const totalPaid = paymentsSumBefore + amountAppliedToInvoice;
     const totalAmount = Number(invoice.total_amount);
     const isPastDue = new Date(invoice.due_date) < new Date();
 
     let status = 'UNPAID';
-    if (totalPaid >= totalAmount) {
+    if (totalPaid + Number(invoice.credit_applied) >= totalAmount) {
       status = 'PAID';
     } else if (totalPaid > 0) {
       status = isPastDue ? 'OVERDUE' : 'PARTIALLY_PAID';
@@ -401,7 +523,7 @@ export const recordPayment = async (data, userId) => {
       data: { status }
     });
 
-    return payment;
+    return { paymentRecord, creditSurplus };
   });
 
   // Gửi thông báo tới Admin và Manager
@@ -434,7 +556,69 @@ export const recordPayment = async (data, userId) => {
     }
   })();
 
-  return payment;
+  return paymentRecord;
+};
+
+// Credits service functions
+export const getContractCreditDetails = async (contractId) => {
+  const credit = await prisma.contractCredits.findUnique({
+    where: { contract_id: contractId }
+  });
+  
+  const transactions = await prisma.creditTransactions.findMany({
+    where: { contract_id: contractId },
+    orderBy: { created_at: 'desc' },
+    include: {
+      invoice: { select: { invoice_code: true } },
+      payment: { select: { id: true, reference_number: true } },
+      recorder: { select: { id: true, full_name: true } }
+    }
+  });
+
+  return {
+    balance: credit ? Number(credit.balance) : 0,
+    transactions
+  };
+};
+
+export const refundContractCredit = async (data, userId) => {
+  const { contract_id, amount, note } = data;
+
+  if (Number(amount) <= 0) {
+    throw new Error('Số tiền hoàn trả phải lớn hơn 0');
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const credit = await tx.contractCredits.findUnique({
+      where: { contract_id }
+    });
+
+    const currentBalance = credit ? Number(credit.balance) : 0;
+    if (currentBalance < Number(amount)) {
+      throw new Error(`Số dư ví credit (${currentBalance.toLocaleString('vi-VN')} đ) không đủ để hoàn trả ${Number(amount).toLocaleString('vi-VN')} đ`);
+    }
+
+    // Update balance
+    const updatedCredit = await tx.contractCredits.update({
+      where: { contract_id },
+      data: {
+        balance: { decrement: Number(amount) }
+      }
+    });
+
+    // Create transaction log
+    const txLog = await tx.creditTransactions.create({
+      data: {
+        contract_id,
+        type: 'CREDIT_REFUND',
+        amount: Number(amount),
+        description: note || 'Hoàn tiền ví credit cho khách hàng',
+        recorded_by: userId
+      }
+    });
+
+    return { credit: updatedCredit, transaction: txLog };
+  });
 };
 
 // ==========================================

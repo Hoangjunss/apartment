@@ -24,4 +24,8 @@ router.patch('/invoices/:id/status', authenticate, requireRole(MGT_ROLES), ctrl.
 // Payments (Phiếu Thu)
 router.post('/payments', authenticate, requireRole(STAFF_ROLES), ctrl.recordPayment);
 
+// Credits (Ví dư & Hoàn trả)
+router.get('/contracts/:id/credits', authenticate, requireRole(STAFF_ROLES), ctrl.getContractCreditDetails);
+router.post('/contracts/:id/credits/refund', authenticate, requireRole(MGT_ROLES), ctrl.refundContractCredit);
+
 export default router;

@@ -39,6 +39,8 @@ model Users {
   temp_registrations  TemporaryRegistrations[]
   comments            ServiceRequestComments[] @relation("UserComments")
   attachments         Attachments[]            @relation("UserAttachments")
+  credit_transactions CreditTransactions[]     @relation("CreditTxRecorder")
+  expense_creations   BuildingExpenses[]       @relation("ExpenseCreator")
 }
 
 // ─── BUILDING & APARTMENT ────────────────────────────────
@@ -54,6 +56,7 @@ model Buildings {
   deleted_at   DateTime?
 
   floors Floors[]
+  expenses BuildingExpenses[]
 }
 
 model Floors {
@@ -222,6 +225,8 @@ model Contracts {
   service_subscriptions ServiceSubscriptions[]
   invoices              Invoices[]
   service_requests      ServiceRequests[]
+  credit                ContractCredits?
+  credit_transactions   CreditTransactions[]
 
   @@index([tenant_id])
   @@index([apartment_id])
@@ -351,6 +356,8 @@ model Invoices {
   water_amount       Decimal       @db.Decimal(15, 2)
   service_amount     Decimal       @db.Decimal(15, 2)
   other_amount       Decimal       @default(0) @db.Decimal(15, 2)
+  credit_applied     Decimal       @default(0.00) @db.Decimal(15, 2)
+  debt_amount        Decimal       @default(0.00) @db.Decimal(15, 2)
   total_amount       Decimal       @db.Decimal(15, 2)
   status             InvoiceStatus @default(UNPAID)
   due_date           DateTime      @db.Date
@@ -358,10 +365,11 @@ model Invoices {
   created_at         DateTime      @default(now())
   deleted_at         DateTime?
 
-  contract  Contracts  @relation(fields: [contract_id], references: [id])
-  apartment Apartments @relation(fields: [apartment_id], references: [id])
-  creator   Users      @relation(fields: [created_by], references: [id])
-  payments  Payments[]
+  contract            Contracts            @relation(fields: [contract_id], references: [id])
+  apartment           Apartments           @relation(fields: [apartment_id], references: [id])
+  creator             Users                @relation(fields: [created_by], references: [id])
+  payments            Payments[]
+  credit_transactions CreditTransactions[]
 
   @@unique([contract_id, billing_month])
   @@index([status])
@@ -384,8 +392,9 @@ model Payments {
   recorded_by      Int
   created_at       DateTime      @default(now())
 
-  invoice  Invoices @relation(fields: [invoice_id], references: [id])
-  recorder Users    @relation(fields: [recorded_by], references: [id])
+  invoice             Invoices             @relation(fields: [invoice_id], references: [id])
+  recorder            Users                @relation(fields: [recorded_by], references: [id])
+  credit_transactions CreditTransactions[]
 
   @@index([invoice_id])
 }
@@ -541,3 +550,78 @@ model ServiceRequestExpenses {
 
   @@index([service_request_id])
 }
+
+// ─── CONTRACT CREDITS & TRANSACTIONS ──────────────────────
+
+enum CreditTxType {
+  CREDIT_IN
+  CREDIT_APPLY
+  CREDIT_REFUND
+}
+
+model ContractCredits {
+  id          Int      @id @default(autoincrement())
+  contract_id Int      @unique
+  balance     Decimal  @db.Decimal(15, 2) @default(0.00)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  contract Contracts @relation(fields: [contract_id], references: [id], onDelete: Cascade)
+}
+
+model CreditTransactions {
+  id          Int          @id @default(autoincrement())
+  contract_id Int
+  invoice_id  Int?
+  payment_id  Int?
+  type        CreditTxType
+  amount      Decimal      @db.Decimal(15, 2)
+  description String?      @db.Text
+  recorded_by Int
+  created_at  DateTime     @default(now())
+
+  contract Contracts @relation(fields: [contract_id], references: [id], onDelete: Cascade)
+  invoice  Invoices? @relation(fields: [invoice_id], references: [id], onDelete: SetNull)
+  payment  Payments? @relation(fields: [payment_id], references: [id], onDelete: SetNull)
+  recorder Users     @relation("CreditTxRecorder", fields: [recorded_by], references: [id])
+
+  @@index([contract_id])
+  @@index([invoice_id])
+  @@index([payment_id])
+}
+
+// ─── BUILDING EXPENSES ────────────────────────────────────
+
+enum ExpenseCategory {
+  OPERATIONS
+  MAINTENANCE
+}
+
+enum ExpenseStatus {
+  PENDING
+  PAID
+}
+
+model BuildingExpenses {
+  id           Int             @id @default(autoincrement())
+  building_id  Int
+  category     ExpenseCategory
+  title        String          @db.VarChar(200)
+  amount       Decimal         @db.Decimal(15, 2)
+  expense_date DateTime        @db.Date
+  status       ExpenseStatus   @default(PENDING)
+  description  String?         @db.Text
+  receipt_url  String?         @db.VarChar(512)
+  created_by   Int
+  created_at   DateTime        @default(now())
+  updated_at   DateTime        @updatedAt
+  deleted_at   DateTime?
+
+  building   Buildings @relation(fields: [building_id], references: [id], onDelete: Cascade)
+  creator    Users     @relation("ExpenseCreator", fields: [created_by], references: [id])
+
+  @@index([building_id])
+  @@index([status])
+  @@index([expense_date])
+}
+

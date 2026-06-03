@@ -192,3 +192,29 @@ export const bulkSaveUtilities = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+export const getContractCreditDetails = async (req, res) => {
+  try {
+    const data = await service.getContractCreditDetails(+req.params.id);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const refundContractCredit = async (req, res) => {
+  try {
+    const { amount, note } = req.body;
+    if (amount === undefined) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp số tiền hoàn trả' });
+    }
+    const data = await service.refundContractCredit({
+      contract_id: +req.params.id,
+      amount: +amount,
+      note
+    }, req.user.userId);
+    res.json({ success: true, data, message: 'Hoàn trả tiền dư thành công' });
+  } catch (err) {
+    res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });
+  }
+};
