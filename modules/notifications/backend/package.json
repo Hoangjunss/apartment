@@ -1,0 +1,15 @@
+{
+  "name": "@my/notifications-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./service": "./service.js"
+  },
+  "dependencies": {
+    "@my/prisma": "workspace:*",
+    "@my/auth-backend": "workspace:*",
+    "express": "^4.19.2"
+  }
+}

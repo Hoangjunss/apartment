@@ -1,12 +1,15 @@
 {
-  "name": "@my/service-requests-backend",
+  "name": "@my/audit-log-backend",
   "version": "1.0.0",
   "type": "module",
   "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./service": "./service.js"
+  },
   "dependencies": {
-    "@my/auth-backend": "workspace:*",
     "@my/prisma": "workspace:*",
-    "@my/notifications-backend": "workspace:*",
+    "@my/auth-backend": "workspace:*",
     "express": "^4.19.2"
   }
 }

@@ -55,7 +55,7 @@ export const useAssignServiceRequest = (options = {}) => {
 export const useUpdateServiceRequestStatus = (options = {}) => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, status }) => serviceRequestApi.updateStatus(id, status),
+    mutationFn: ({ id, status, expenses }) => serviceRequestApi.updateStatus(id, status, { expenses }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: SR_KEYS.all });
       options.onSuccess?.();

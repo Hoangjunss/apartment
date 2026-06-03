@@ -20,6 +20,7 @@ const STATUS_LABELS = {
   IN_PROGRESS: { label: 'Đang xử lý', color: 'bg-blue-100 text-blue-700' },
   RESOLVED: { label: 'Đã xong', color: 'bg-emerald-100 text-emerald-700' },
   CANCELLED: { label: 'Đã hủy', color: 'bg-rose-100 text-rose-700' },
+  POSTPONED: { label: 'Tạm hoãn', color: 'bg-slate-200 text-slate-700' },
 };
 
 const SOURCE_LABELS = {
@@ -123,7 +124,7 @@ export default function ServiceRequestsPage() {
     onError: (err) => toast.error(err.response?.data?.message || 'Assign thất bại'),
   });
 
-  const statuses = ['', 'PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED'];
+  const statuses = ['', 'PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED', 'POSTPONED'];
   const statusLabels = { '': 'Tất cả', ...Object.fromEntries(Object.entries(STATUS_LABELS).map(([k, v]) => [k, v.label])) };
 
   return (
