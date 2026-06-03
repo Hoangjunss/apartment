@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '@my/auth-backend';
 import * as ctrl from './controller.js';
+import { getAuditHistory } from '@my/audit-log-backend/service';
 
 const router = Router();
 
@@ -16,6 +17,17 @@ router.get('/tenants/:id', authenticate, requireRole(ALL_ROLES), ctrl.getTenantB
 router.put('/tenants/:id', authenticate, requireRole(ALL_ROLES), ctrl.updateTenant);
 
 router.get('/tenants/:id/history', authenticate, requireRole(MGT_ROLES), ctrl.getTenantHistory);
+
+// Audit history của 1 khách thuê
+router.get('/tenants/:id/audit-history', authenticate, requireRole(MGT_ROLES), async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const data = await getAuditHistory('Tenant', +req.params.id, { page: +page, limit: +limit });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 
 // ==========================================
 // TEMPORARY REGISTRATIONS

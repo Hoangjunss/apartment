@@ -1,4 +1,5 @@
 import { prisma } from '@my/prisma';
+import { createLog } from '@my/audit-log-backend';
 
 // ==========================================
 // TENANTS
@@ -114,7 +115,7 @@ export const getTenantHistory = async (id) => {
   }));
 };
 
-export const createTenant = async (data) => {
+export const createTenant = async (data, userId) => {
   const existing = await prisma.tenants.findUnique({
     where: { national_id: data.national_id },
   });
@@ -126,10 +127,26 @@ export const createTenant = async (data) => {
   if (data.national_id_issued_date) data.national_id_issued_date = new Date(data.national_id_issued_date);
   if (data.date_of_birth) data.date_of_birth = new Date(data.date_of_birth);
 
-  return prisma.tenants.create({ data });
+  const newTenant = await prisma.tenants.create({ data });
+
+  if (userId) {
+    await createLog({
+      actorId: userId,
+      action: 'CREATE',
+      resourceType: 'Tenant',
+      resourceId: newTenant.id,
+      newData: {
+        full_name: newTenant.full_name,
+        national_id: newTenant.national_id,
+        phone: newTenant.phone,
+      },
+    });
+  }
+
+  return newTenant;
 };
 
-export const updateTenant = async (id, data) => {
+export const updateTenant = async (id, data, userId) => {
   if (data.national_id) {
     const existing = await prisma.tenants.findUnique({
       where: { national_id: data.national_id },
@@ -142,10 +159,36 @@ export const updateTenant = async (id, data) => {
   if (data.national_id_issued_date) data.national_id_issued_date = new Date(data.national_id_issued_date);
   if (data.date_of_birth) data.date_of_birth = new Date(data.date_of_birth);
 
-  return prisma.tenants.update({
+  const oldTenant = await prisma.tenants.findUnique({ where: { id } });
+
+  const updated = await prisma.tenants.update({
     where: { id },
     data,
   });
+
+  if (userId && oldTenant) {
+    const oldData = {};
+    const newData = {};
+    for (const key of Object.keys(data)) {
+      if (key === 'national_id_issued_date' || key === 'date_of_birth') {
+        oldData[key] = oldTenant[key] ? new Date(oldTenant[key]).toISOString().split('T')[0] : null;
+        newData[key] = updated[key] ? new Date(updated[key]).toISOString().split('T')[0] : null;
+      } else {
+        oldData[key] = oldTenant[key];
+        newData[key] = updated[key];
+      }
+    }
+    await createLog({
+      actorId: userId,
+      action: 'UPDATE',
+      resourceType: 'Tenant',
+      resourceId: id,
+      oldData,
+      newData,
+    });
+  }
+
+  return updated;
 };
 
 // ==========================================
