@@ -1,7 +1,8 @@
-// modules/contract/frontend/pages/ContractDetailPage.jsx
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Edit2, RefreshCw, XCircle, Printer } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { useAuth } from '@/contexts/AuthContext.jsx';
 import { PageHeader } from '@/components/common/PageHeader.jsx';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner.jsx';
 import { EmptyState } from '@/components/common/EmptyState.jsx';
@@ -9,6 +10,7 @@ import { ContractStatusBadge } from '@/components/common/StatusBadge.jsx';
 import { RoleGuard } from '@/components/common/RoleGuard.jsx';
 import { MANAGEMENT_ROLES } from '@/constants/roles.js';
 import { useContractById, useRenewals } from '../hooks/useContract.js';
+import { useContractCredits, useRefundContractCredit } from 'modules/finance/frontend/hooks/useFinance.js';
 import { RenewForm } from '../components/RenewForm.jsx';
 import { TerminateForm } from '../components/TerminateForm.jsx';
 import { ContractEditForm } from '../components/ContractEditForm.jsx';
@@ -57,6 +59,170 @@ function RenewalsTab({ contractId }) {
   );
 }
 
+// ── Credits Tab ────────────────────────────────────────────────────────────────
+function ContractCreditsTab({ contractId }) {
+  const { user } = useAuth();
+  const { data, isLoading, refetch } = useContractCredits(contractId);
+  const [refundAmount, setRefundAmount] = useState('');
+  const [refundNote, setRefundNote] = useState('');
+  const [isRefundOpen, setIsRefundOpen] = useState(false);
+
+  const isMgt = ['ADMIN', 'MANAGER'].includes(user?.role);
+
+  const refundMutation = useRefundContractCredit(contractId, {
+    onSuccess: () => {
+      toast.success('Hoàn trả tiền dư thành công');
+      setIsRefundOpen(false);
+      setRefundAmount('');
+      setRefundNote('');
+      refetch();
+    },
+    onError: (err) => {
+      toast.error(err.response?.data?.message || 'Hoàn trả tiền dư thất bại');
+    }
+  });
+
+  if (isLoading) return <LoadingSpinner />;
+
+  const balance = data?.balance ?? 0;
+  const transactions = data?.transactions ?? [];
+
+  const handleRefund = (e) => {
+    e.preventDefault();
+    if (!refundAmount || Number(refundAmount) <= 0) {
+      toast.error('Vui lòng nhập số tiền hoàn trả hợp lệ');
+      return;
+    }
+    if (Number(refundAmount) > balance) {
+      toast.error('Số tiền hoàn trả vượt quá số dư hiện tại');
+      return;
+    }
+    refundMutation.mutate({ amount: Number(refundAmount), note: refundNote });
+  };
+
+  const getTxTypeLabel = (type) => {
+    return {
+      CREDIT_IN: { label: 'Nạp dư', className: 'bg-emerald-50 text-emerald-700 border-emerald-100' },
+      CREDIT_APPLY: { label: 'Khấu trừ hóa đơn', className: 'bg-blue-50 text-blue-700 border-blue-100' },
+      CREDIT_REFUND: { label: 'Hoàn trả', className: 'bg-rose-50 text-rose-700 border-rose-100' }
+    }[type] ?? { label: type, className: 'bg-gray-50 text-gray-700 border-gray-100' };
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Wallet Balance Card */}
+      <div className="bg-white border border-slate-100 p-6 rounded-2xl shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Số dư ví tiền dư hiện tại (Credit)</p>
+          <h3 className="text-3xl font-extrabold text-indigo-600 mt-1">{formatCurrency(balance)}</h3>
+          <p className="text-xs text-slate-400 mt-1">Tiền trả dư sẽ tự động khấu trừ vào hóa đơn tháng tiếp theo.</p>
+        </div>
+        {isMgt && balance > 0 && (
+          <button
+            onClick={() => setIsRefundOpen(true)}
+            className="btn-secondary text-xs flex items-center gap-1 shrink-0 font-semibold"
+            id="open-refund-credit-btn"
+          >
+            Hoàn trả tiền dư
+          </button>
+        )}
+      </div>
+
+      {/* Refund Form Modal */}
+      {isRefundOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <h3 className="font-bold text-slate-800 text-base">Hoàn trả tiền dư ví credit</h3>
+            <form onSubmit={handleRefund} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Số tiền hoàn (VND)</label>
+                <input
+                  type="number"
+                  className="input w-full"
+                  value={refundAmount}
+                  onChange={(e) => setRefundAmount(e.target.value)}
+                  placeholder={`Tối đa: ${balance}`}
+                  max={balance}
+                  min="1"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Lý do hoàn trả</label>
+                <textarea
+                  className="input w-full"
+                  rows={2}
+                  value={refundNote}
+                  onChange={(e) => setRefundNote(e.target.value)}
+                  placeholder="Ví dụ: Hoàn tiền thừa khi thanh lý hợp đồng..."
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setIsRefundOpen(false)} className="btn-secondary text-xs py-1.5 px-3">Hủy</button>
+                <button
+                  type="submit"
+                  disabled={refundMutation.isPending}
+                  className="btn-primary text-xs py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700"
+                  id="submit-refund-credit-btn"
+                >
+                  {refundMutation.isPending ? 'Đang xử lý...' : 'Xác nhận hoàn tiền'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Transaction History Table */}
+      <div className="card overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/70 flex justify-between items-center">
+          <h4 className="font-bold text-slate-700 text-sm">Lịch sử biến động ví dư</h4>
+        </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 bg-gray-50/40">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Thời gian</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Loại giao dịch</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase">Số tiền</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Nội dung / Chi tiết</th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">Người ghi nhận</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {transactions.length === 0 ? (
+              <tr>
+                <td colSpan="5" className="px-4 py-8 text-center text-gray-400 text-sm">Chưa có giao dịch ví credit nào.</td>
+              </tr>
+            ) : (
+              transactions.map((tx) => {
+                const badge = getTxTypeLabel(tx.type);
+                return (
+                  <tr key={tx.id} className="hover:bg-slate-50/50">
+                    <td className="px-4 py-3 text-slate-500 text-xs">{format(parseISO(tx.created_at), 'dd/MM/yyyy HH:mm')}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border ${badge.className}`}>
+                        {badge.label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-bold text-slate-800">
+                      {tx.type === 'CREDIT_IN' ? '+' : '-'}{formatCurrency(tx.amount)}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600 text-xs">
+                      {tx.description}
+                      {tx.invoice && <span className="ml-1 font-mono text-[10px] text-indigo-500">({tx.invoice.invoice_code})</span>}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 text-xs">{tx.recorder?.full_name ?? '—'}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 export default function ContractDetailPage() {
   const { id } = useParams();
@@ -78,6 +244,7 @@ export default function ContractDetailPage() {
     { key: 'tenant', label: 'Thông tin khách thuê' },
     { key: 'apartment', label: 'Thông tin phòng' },
     { key: 'renewals', label: 'Lịch sử gia hạn' },
+    { key: 'credits', label: 'Ví dư & Công nợ' },
     { key: 'audit', label: 'Lịch sử thay đổi' },
   ];
 
@@ -284,6 +451,7 @@ export default function ContractDetailPage() {
             )}
 
             {activeTab === 'renewals' && <RenewalsTab contractId={contractId} />}
+            {activeTab === 'credits' && <ContractCreditsTab contractId={contractId} />}
             {activeTab === 'audit' && <AuditHistoryTab resourceType="Contract" resourceId={contractId} />}
           </div>
 

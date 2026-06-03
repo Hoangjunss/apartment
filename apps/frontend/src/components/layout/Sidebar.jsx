@@ -12,6 +12,7 @@ import {
   Wrench,
   History,
   BarChart3,
+  TrendingDown,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import {
@@ -65,6 +66,12 @@ const NAV_ITEMS = [
     label: 'Hóa đơn',
     icon: Receipt,
     roles: FINANCE_ACCESS_ROLES,         // TECHNICIAN không thấy
+  },
+  {
+    to: '/expenses',
+    label: 'Chi phí vận hành',
+    icon: TrendingDown,
+    roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.RECEPTIONIST],
   },
   {
     to: '/service-requests',

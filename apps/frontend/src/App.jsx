@@ -40,6 +40,7 @@ import UtilityReadingsPage from 'modules/finance/frontend/pages/UtilityReadingsP
 import InvoicesPage from 'modules/finance/frontend/pages/InvoicesPage.jsx';
 import InvoiceDetailPage from 'modules/finance/frontend/pages/InvoiceDetailPage.jsx';
 import ReportsPage from 'modules/report/frontend/pages/ReportsPage.jsx';
+import ExpensesPage from 'modules/expense/frontend/pages/ExpensesPage.jsx';
 
 // ── Service Requests Module Pages ───────────────────────────────────────────────────────
 import ServiceRequestsPage from 'modules/service-requests/frontend/pages/ServiceRequestsPage.jsx';
@@ -175,6 +176,14 @@ export default function App() {
                 element={
                   <ProtectedRoute roles={MANAGEMENT_ROLES}>
                     <ReportsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/expenses"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.RECEPTIONIST]}>
+                    <ExpensesPage />
                   </ProtectedRoute>
                 }
               />

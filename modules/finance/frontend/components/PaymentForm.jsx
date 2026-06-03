@@ -18,6 +18,8 @@ const schema = z.object({
   note: z.string().optional(),
 });
 
+import { useContractCredits, useRecordPayment } from '../hooks/useFinance.js';
+
 const getTodayStr = () => {
   const d = new Date();
   const year = d.getFullYear();
@@ -28,7 +30,10 @@ const getTodayStr = () => {
 
 export function PaymentForm({ onClose, invoice }) {
   const totalPaid = invoice.payments?.reduce((sum, p) => sum + Number(p.amount), 0) ?? 0;
-  const remainingAmount = Math.max(0, Number(invoice.total_amount) - totalPaid);
+  const remainingAmount = Math.max(0, Number(invoice.total_amount) - Number(invoice.credit_applied || 0) - totalPaid);
+
+  const { data: creditsData } = useContractCredits(invoice.contract_id);
+  const creditBalance = creditsData?.balance ?? 0;
 
   const { register, handleSubmit, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
@@ -63,6 +68,14 @@ export function PaymentForm({ onClose, invoice }) {
             {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(invoice.total_amount))}
           </span>
         </div>
+        {Number(invoice.credit_applied || 0) > 0 && (
+          <div className="flex justify-between text-indigo-600 font-medium">
+            <span>Ví dư đã khấu trừ:</span>
+            <span>
+              -{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(invoice.credit_applied))}
+            </span>
+          </div>
+        )}
         <div className="flex justify-between">
           <span className="text-gray-500">Đã thanh toán:</span>
           <span className="font-semibold text-emerald-600">
@@ -75,6 +88,12 @@ export function PaymentForm({ onClose, invoice }) {
             {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(remainingAmount)}
           </span>
         </div>
+        {creditBalance > 0 && (
+          <div className="flex justify-between bg-indigo-50 border border-indigo-100 p-2 rounded-lg text-indigo-700 text-xs font-semibold mt-2">
+            <span>Ví dư khả dụng của hợp đồng:</span>
+            <span>{new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(creditBalance)}</span>
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

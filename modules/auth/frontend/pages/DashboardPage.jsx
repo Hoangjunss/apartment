@@ -8,6 +8,7 @@ import {
   Users, 
   AlertTriangle, 
   TrendingUp, 
+  TrendingDown,
   DollarSign, 
   Receipt, 
   Percent, 
@@ -250,9 +251,9 @@ export default function DashboardPage() {
 
         {/* Hàng 2 — Tài chính tháng này */}
         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider pt-2">Tài chính & Hiệu suất</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {loadingStats ? (
-            Array(4).fill(0).map((_, i) => <StatCardSkeleton key={i} />)
+            Array(6).fill(0).map((_, i) => <StatCardSkeleton key={i} />)
           ) : (
             <>
               <StatCard
@@ -264,10 +265,25 @@ export default function DashboardPage() {
                 onClick={() => navigate('/invoices?status=PAID')}
               />
               <StatCard
+                title="Chi phí tháng này"
+                value={formatValue(stats?.expensesThisMonth)}
+                icon={TrendingDown}
+                color="bg-rose-500"
+                sub="Tổng chi phí tòa nhà đã thanh toán"
+                onClick={() => navigate('/expenses')}
+              />
+              <StatCard
+                title="Lợi nhuận gộp"
+                value={formatValue(stats?.grossProfit)}
+                icon={TrendingUp}
+                color="bg-blue-600"
+                sub="Doanh thu thực tế - Chi phí"
+              />
+              <StatCard
                 title="Còn cần thu"
                 value={formatValue(stats?.unpaidAmount)}
                 icon={Receipt}
-                color="bg-rose-500"
+                color="bg-orange-500"
                 sub="Tổng hóa đơn chưa nộp tiền"
                 onClick={() => navigate('/invoices?status=OVERDUE')}
               />
@@ -305,7 +321,7 @@ export default function DashboardPage() {
           <ChartSkeleton />
         ) : (
           <div className="card p-6 bg-white space-y-4">
-            <h2 className="text-base font-bold text-gray-900">Biểu đồ doanh thu 6 tháng gần nhất</h2>
+            <h2 className="text-base font-bold text-gray-900">Biểu đồ doanh thu vs chi phí 6 tháng gần nhất</h2>
             <div className="h-[280px] w-full mt-2">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={revenueData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
@@ -317,8 +333,9 @@ export default function DashboardPage() {
                     contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   />
                   <RechartsLegend verticalAlign="top" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '13px' }} />
-                  <Bar name="Đã thu" dataKey="collected" fill="#10b981" radius={[4, 4, 0, 0]} />
-                  <Bar name="Chưa thu" dataKey="uncollected" fill="#fca5a5" radius={[4, 4, 0, 0]} />
+                  <Bar name="Doanh thu thực tế" dataKey="collected" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Bar name="Chi phí tòa nhà" dataKey="expenses" fill="#f43f5e" radius={[4, 4, 0, 0]} />
+                  <Bar name="Doanh thu chưa thu" dataKey="uncollected" fill="#94a3b8" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

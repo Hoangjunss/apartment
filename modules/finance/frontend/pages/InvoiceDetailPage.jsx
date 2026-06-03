@@ -43,7 +43,7 @@ export default function InvoiceDetailPage() {
 
   const payments = invoice.payments ?? [];
   const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
-  const remaining = Math.max(0, Number(invoice.total_amount) - totalPaid);
+  const remaining = Math.max(0, Number(invoice.total_amount) - Number(invoice.credit_applied || 0) - totalPaid);
   const isOverdue = invoice.status === 'OVERDUE' ||
     (invoice.status !== 'PAID' && new Date(invoice.due_date) < new Date());
 
@@ -227,6 +227,30 @@ export default function InvoiceDetailPage() {
                           </td>
                         </tr>
                       )}
+
+                      {/* Nợ cũ chuyển sang */}
+                      {Number(invoice.debt_amount) > 0 && (
+                        <tr className="bg-amber-50/50">
+                          <td className="py-3 px-3 font-semibold text-amber-900">Nợ cũ chuyển sang</td>
+                          <td className="py-3 px-3 text-amber-700 text-xs font-medium">Chuyển tiếp từ hóa đơn nợ tháng trước</td>
+                          <td className="py-3 px-3 text-right text-xs">—</td>
+                          <td className="py-3 px-3 text-right font-bold text-amber-950">
+                            {formatCurrency(invoice.debt_amount)}
+                          </td>
+                        </tr>
+                      )}
+
+                      {/* Khấu trừ ví dư */}
+                      {Number(invoice.credit_applied) > 0 && (
+                        <tr className="bg-indigo-50/50">
+                          <td className="py-3 px-3 font-semibold text-indigo-900">Ví dư đã khấu trừ (Credit)</td>
+                          <td className="py-3 px-3 text-indigo-700 text-xs font-medium">Khấu trừ tự động từ ví tiền dư</td>
+                          <td className="py-3 px-3 text-right text-xs">—</td>
+                          <td className="py-3 px-3 text-right font-bold text-indigo-900">
+                            -{formatCurrency(invoice.credit_applied)}
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -236,11 +260,23 @@ export default function InvoiceDetailPage() {
               <div className="border-t border-slate-100 pt-6 flex justify-end">
                 <div className="w-full sm:w-64 space-y-2 text-sm text-slate-600">
                   <div className="flex justify-between">
-                    <span>Tổng cộng:</span>
+                    <span>Tổng hóa đơn (gồm nợ):</span>
                     <span className="font-semibold text-slate-800">{formatCurrency(invoice.total_amount)}</span>
                   </div>
+                  {Number(invoice.credit_applied) > 0 && (
+                    <div className="flex justify-between text-indigo-600 font-medium">
+                      <span>Ví dư khấu trừ:</span>
+                      <span>-{formatCurrency(invoice.credit_applied)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t pt-1 border-slate-100 font-semibold text-slate-700">
+                    <span>Số tiền cần nộp:</span>
+                    <span>
+                      {formatCurrency(Number(invoice.total_amount) - Number(invoice.credit_applied))}
+                    </span>
+                  </div>
                   <div className="flex justify-between">
-                    <span>Đã thanh toán:</span>
+                    <span>Đã nộp (tiền mặt/ck):</span>
                     <span className="font-semibold text-emerald-600">{formatCurrency(totalPaid)}</span>
                   </div>
                   <div className="flex justify-between border-t pt-2 border-slate-100 text-base font-bold text-slate-800">
