@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { Modal } from '@/components/common/Modal.jsx';
 import { FormField } from '@/components/forms/FormField.jsx';
 import { ModalFooter } from '@/components/forms/ModalFooter.jsx';
-import { useRecordPayment } from '../hooks/useFinance.js';
+import { useRecordPayment, useContractCredits } from '../hooks/useFinance.js';
 
 const schema = z.object({
   invoice_id: z.coerce.number().min(1),
@@ -17,8 +17,6 @@ const schema = z.object({
   reference_number: z.string().optional(),
   note: z.string().optional(),
 });
-
-import { useContractCredits, useRecordPayment } from '../hooks/useFinance.js';
 
 const getTodayStr = () => {
   const d = new Date();
