@@ -56,7 +56,8 @@ export const updateStatus = async (req, res) => {
       Number(req.params.id),
       status,
       req.user.userId,
-      req.user.role
+      req.user.role,
+      req.body
     );
     res.json({ success: true, data });
   } catch (err) {

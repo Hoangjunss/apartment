@@ -331,6 +331,51 @@ Hệ thống cho phép khách thuê gửi báo hỏng, sửa chữa hoặc khi�
 
 ---
 
+### 11. ⚡ Nhập chỉ số Điện nước thông minh từ Excel (Mục 7)
+
+Tối ưu hóa quy trình ghi nhận chỉ số điện nước hàng loạt bằng file Excel mẫu động, kết hợp màn hình xem trước và chỉnh sửa dữ liệu trực tiếp:
+
+- **Sinh mẫu Excel động:** Backend tự động quét danh sách phòng đang có hợp đồng hoạt động (`ACTIVE`, `EXPIRING_SOON`) để điền sẵn: Mã căn hộ, Kỳ thanh toán hiện tại (`YYYY-MM`) và Chỉ số điện cũ (từ tháng trước hoặc chỉ số ban đầu hợp đồng) để đối chiếu. Người vận hành chỉ cần điền duy nhất cột Chỉ số điện mới.
+- **Bỏ chỉ số Nước cũ/mới:** Nhằm tối giản thao tác và bám sát nghiệp vụ (nước tính khoán theo đầu người `soNguoiO` quy định trên hợp đồng), các thông tin về chỉ số nước cũ/mới đã được loại bỏ hoàn toàn khỏi mẫu Excel cũng như giao diện.
+- **Bảng xem trước (Preview Grid) & Sửa trực tiếp:** Giao diện tải file Excel lên hiển thị bảng dữ liệu phân loại rõ ràng (Hợp lệ / Lỗi). Hỗ trợ người dùng chỉnh sửa trực tiếp các chỉ số bị sai ngay trên ô input của bảng và tự động kiểm tra logic tức thì ở client (`Điện mới >= Điện cũ`).
+- **Lưu dữ liệu an toàn:** Hệ thống chỉ lưu các dòng hợp lệ khi người dùng xác xác nhận và tự động bỏ qua các dòng lỗi. Lưu trữ `water_prev` và `water_curr` dưới dạng `null` trong DB.
+
+---
+
+### 12. 📊 Module Báo cáo Thống kê chuyên sâu (Mục 8)
+
+Hệ thống biểu đồ trực quan hóa dữ liệu hỗ trợ Ban quản lý theo dõi sát sao tình hình hoạt động của các tòa nhà:
+
+- **Backend Aggregation APIs (`/api/report`):**
+  - `/api/report/revenue`: Thống kê doanh thu dự kiến (hóa đơn) và thực thu (phiếu thu) gom nhóm theo tháng.
+  - `/api/report/occupancy`: Thống kê số lượng phòng và tỷ lệ lấp đầy theo thời gian thực.
+  - `/api/report/maintenance`: Thống kê số lượng sự cố phân bổ theo tình trạng xử lý.
+  - `/api/report/contracts`: Thống kê cơ cấu trạng thái của các hợp đồng thuê.
+- **Biểu đồ động (Recharts):** Thiết kế dashboard hiện đại với 4 Tabs báo cáo tương ứng vẽ biểu đồ miền (`AreaChart`), biểu đồ cột (`BarChart`) và biểu đồ tròn (`PieChart`) sang trọng.
+- **Phân quyền và Bộ lọc:** Hỗ trợ lọc số liệu theo Tòa nhà, Từ tháng, Đến tháng. Menu chỉ hiển thị cho vai trò `ADMIN` và `MANAGER`.
+
+---
+
+### 13. 📥 Module Xuất dữ liệu đa định dạng & In ấn (Mục 9)
+
+Hỗ trợ kết xuất báo cáo và danh sách dữ liệu ra các định dạng phổ biến phục vụ công tác lưu trữ ngoài:
+
+- **Xuất Excel/CSV từ Backend:** Sử dụng thư viện `xlsx` để kết xuất danh sách Khách thuê, Hợp đồng, Hóa đơn và Báo cáo doanh thu thành file `.xlsx` hoặc `.csv`.
+- **Hỗ trợ Unicode tiếng Việt:** Đính kèm ký tự BOM (`\uFEFF`) khi xuất file CSV giúp hiển thị ký tự có dấu trên MS Excel không bị lỗi font.
+- **In ấn PDF mượt mà:** Định dạng in ấn bằng CSS `@media print` giúp ẩn Sidebar, Navbar, bộ lọc và các nút bấm khi in trang, tối ưu hóa giao diện hiển thị 100% chiều rộng để xuất file PDF từ trình duyệt gọn gàng và đẹp mắt.
+
+---
+
+### 14. 🔍 Xem nhanh thông tin Căn hộ khi di chuột - Quick Preview (Mục 10)
+
+Nâng cao trải nghiệm người dùng, cho phép xem nhanh thông tin tổng quan của căn hộ mà không cần click mở trang chi tiết:
+
+- **API xem nhanh (`GET /building/apartments/:id/preview`):** Trả về thông tin căn hộ, trạng thái phòng, hợp đồng hiện tại kèm thông tin khách thuê (tên, SĐT, giá thuê) và danh sách hình ảnh phòng.
+- **React Portal Hover Tooltip:** Xây dựng component tooltip nổi sử dụng React Portal để mount trực tiếp vào `body`, tránh hoàn toàn hiện tượng bị che khuất (clip) bởi thuộc tính `overflow` của các bảng dữ liệu.
+- **Cơ chế Debounce:** Hỗ trợ độ trễ hover 350ms giúp giảm tải số lượng request gửi lên DB khi di chuột nhanh qua danh sách.
+
+---
+
 ## 🚀 Chạy dự án
 
 ### Khởi động với Docker

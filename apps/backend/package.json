@@ -9,9 +9,16 @@
     "@my/service-requests-backend": "workspace:*",
     "@my/tenant-backend": "workspace:*",
     "@my/public-backend": "workspace:*",
+    "@my/audit-log-backend": "workspace:*",
+    "@my/notifications-backend": "workspace:*",
+    "@my/comments-backend": "workspace:*",
+    "@my/attachments-backend": "workspace:*",
+    "@my/search-backend": "workspace:*",
+    "@my/report-backend": "workspace:*",
     "cors": "^2.8.6",
     "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "socket.io": "^4.7.5"
   },
   "scripts": {
     "start": "node server.js",

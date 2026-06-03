@@ -37,18 +37,21 @@ model Users {
   service_assignments ServiceRequests[]        @relation("AssignedTo")
   contract_renewals   ContractRenewals[]
   temp_registrations  TemporaryRegistrations[]
+  comments            ServiceRequestComments[] @relation("UserComments")
+  attachments         Attachments[]            @relation("UserAttachments")
 }
 
 // ─── BUILDING & APARTMENT ────────────────────────────────
 
 model Buildings {
-  id           Int      @id @default(autoincrement())
-  code         String   @unique @db.VarChar(20)
-  name         String   @db.VarChar(100)
-  address      String   @db.Text
+  id           Int       @id @default(autoincrement())
+  code         String    @unique @db.VarChar(20)
+  name         String    @db.VarChar(100)
+  address      String    @db.Text
   total_floors Int
-  description  String?  @db.Text
-  created_at   DateTime @default(now())
+  description  String?   @db.Text
+  created_at   DateTime  @default(now())
+  deleted_at   DateTime?
 
   floors Floors[]
 }
@@ -92,6 +95,7 @@ model Apartments {
   description    String?         @db.Text
   created_at     DateTime        @default(now())
   updated_at     DateTime        @updatedAt
+  deleted_at     DateTime?
 
   floor              Floors                   @relation(fields: [floor_id], references: [id])
   furniture          ApartmentFurniture[]
@@ -151,21 +155,22 @@ enum Gender {
 }
 
 model Tenants {
-  id                       Int      @id @default(autoincrement())
-  full_name                String   @db.VarChar(100)
-  national_id              String   @unique @db.VarChar(20)
-  national_id_issued_date  DateTime @db.Date
-  national_id_issued_place String   @db.VarChar(255)
-  date_of_birth            DateTime @db.Date
+  id                       Int       @id @default(autoincrement())
+  full_name                String    @db.VarChar(100)
+  national_id              String    @unique @db.VarChar(20)
+  national_id_issued_date  DateTime  @db.Date
+  national_id_issued_place String    @db.VarChar(255)
+  date_of_birth            DateTime  @db.Date
   gender                   Gender
-  phone                    String   @db.VarChar(20)
-  email                    String?  @db.VarChar(255)
-  permanent_address        String   @db.Text
-  nationality              String   @default("Việt Nam") @db.VarChar(100)
-  occupation               String?  @db.VarChar(100)
-  avatar_url               String?  @db.VarChar(512)
-  created_at               DateTime @default(now())
-  updated_at               DateTime @updatedAt
+  phone                    String    @db.VarChar(20)
+  email                    String?   @db.VarChar(255)
+  permanent_address        String    @db.Text
+  nationality              String    @default("Việt Nam") @db.VarChar(100)
+  occupation               String?   @db.VarChar(100)
+  avatar_url               String?   @db.VarChar(512)
+  created_at               DateTime  @default(now())
+  updated_at               DateTime  @updatedAt
+  deleted_at               DateTime?
 
   contracts               Contracts[]
   temporary_registrations TemporaryRegistrations[]
@@ -197,6 +202,7 @@ model Contracts {
   created_by         Int
   created_at         DateTime       @default(now())
   updated_at         DateTime       @updatedAt
+  deleted_at         DateTime?
 
   // Real-world fields
   occupants_count          Int            @default(1)
@@ -350,6 +356,7 @@ model Invoices {
   due_date           DateTime      @db.Date
   created_by         Int
   created_at         DateTime      @default(now())
+  deleted_at         DateTime?
 
   contract  Contracts  @relation(fields: [contract_id], references: [id])
   apartment Apartments @relation(fields: [apartment_id], references: [id])
@@ -403,6 +410,7 @@ enum ServiceRequestStatus {
   IN_PROGRESS
   RESOLVED
   CANCELLED
+  POSTPONED
 }
 
 enum RequestSource {
@@ -430,6 +438,8 @@ model ServiceRequests {
   apartment Apartments @relation(fields: [apartment_id], references: [id])
   contract  Contracts? @relation(fields: [contract_id], references: [id])
   assignee  Users?     @relation("AssignedTo", fields: [assigned_to], references: [id])
+  comments  ServiceRequestComments[]
+  expenses  ServiceRequestExpenses[]
 
   @@index([apartment_id])
   @@index([contract_id])
@@ -447,4 +457,87 @@ model ApartmentTokens {
   apartment Apartments @relation(fields: [apartment_id], references: [id])
 
   @@index([apartment_id])
+}
+
+// ─── AUDIT LOG ────────────────────────────────────────────
+
+model AuditLogs {
+  id            Int      @id @default(autoincrement())
+  actor_id      Int
+  actor_name    String   @db.VarChar(100)
+  action        String   @db.VarChar(50)   // CREATE, UPDATE, DELETE
+  resource_type String   @db.VarChar(50)   // Contract, Tenant, Invoice...
+  resource_id   Int?
+  old_data      Json?
+  new_data      Json?
+  ip_address    String?  @db.VarChar(45)
+  created_at    DateTime @default(now())
+
+  @@index([actor_id])
+  @@index([resource_type, resource_id])
+  @@index([created_at])
+}
+
+// ─── NOTIFICATIONS ────────────────────────────────────────
+
+model Notifications {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  title      String   @db.VarChar(200)
+  message    String   @db.Text
+  type       String   @db.VarChar(50)   // CONTRACT_EXPIRING, INVOICE_OVERDUE, MAINTENANCE_ASSIGNED, PAYMENT_RECEIVED
+  entity_type String? @db.VarChar(50)   // Contract, Invoice... (extensible)
+  entity_id   Int?                      // FK to the related entity (extensible)
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now())
+
+  @@index([user_id, is_read])
+  @@index([created_at])
+}
+
+// ─── COMMENTS ─────────────────────────────────────────────
+
+model ServiceRequestComments {
+  id                 Int      @id @default(autoincrement())
+  service_request_id Int
+  content            String   @db.Text
+  created_by         Int
+  created_at         DateTime @default(now())
+
+  service_request ServiceRequests @relation(fields: [service_request_id], references: [id], onDelete: Cascade)
+  creator         Users           @relation("UserComments", fields: [created_by], references: [id])
+
+  @@index([service_request_id])
+}
+
+// ─── ATTACHMENTS ──────────────────────────────────────────
+
+model Attachments {
+  id          Int      @id @default(autoincrement())
+  file_name   String   @db.VarChar(255)
+  file_url    String   @db.VarChar(512)
+  file_size   Int
+  mime_type   String   @db.VarChar(100)
+  entity_type String   @db.VarChar(50)   // e.g. ServiceRequest, Contract, Invoice, Tenant
+  entity_id   Int
+  uploaded_by Int
+  created_at  DateTime @default(now())
+
+  uploader    Users    @relation("UserAttachments", fields: [uploaded_by], references: [id])
+
+  @@index([entity_type, entity_id])
+}
+
+// ─── EXPENSES ─────────────────────────────────────────────
+
+model ServiceRequestExpenses {
+  id                 Int             @id @default(autoincrement())
+  service_request_id Int
+  description        String          @db.VarChar(255)
+  amount             Decimal         @db.Decimal(15, 2)
+  created_at         DateTime        @default(now())
+
+  service_request    ServiceRequests @relation(fields: [service_request_id], references: [id], onDelete: Cascade)
+
+  @@index([service_request_id])
 }

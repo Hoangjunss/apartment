@@ -1,4 +1,5 @@
 import { prisma } from '@my/prisma';
+import { createLog } from '@my/audit-log-backend';
 
 // ==========================================
 // BUILDINGS
@@ -150,12 +151,12 @@ export const getApartmentById = async (id) => {
   });
 };
 
-export const createApartment = async (data) => {
+export const createApartment = async (data, userId) => {
   const { building_id, floor_id, ...rest } = data;
   const existing = await prisma.apartments.findUnique({ where: { apartment_code: rest.apartment_code } });
   if (existing) throw new Error(`Mã căn hộ '${rest.apartment_code}' đã tồn tại`);
 
-  return prisma.apartments.create({
+  const newApartment = await prisma.apartments.create({
     data: {
       apartment_code: rest.apartment_code,
       room_type: rest.room_type,
@@ -167,15 +168,34 @@ export const createApartment = async (data) => {
       floor: { connect: { id: Number(floor_id) } }
     }
   });
+
+  if (userId) {
+    await createLog({
+      actorId: userId,
+      action: 'CREATE',
+      resourceType: 'Apartment',
+      resourceId: newApartment.id,
+      newData: {
+        apartment_code: newApartment.apartment_code,
+        room_type: newApartment.room_type,
+        base_price: newApartment.base_price,
+        deposit_amount: newApartment.deposit_amount,
+      },
+    });
+  }
+
+  return newApartment;
 };
 
-export const updateApartment = async (id, data) => {
+export const updateApartment = async (id, data, userId) => {
   const { status, building_id, floor_id, ...updateData } = data;
 
   if (updateData.apartment_code) {
     const existing = await prisma.apartments.findUnique({ where: { apartment_code: updateData.apartment_code } });
     if (existing && existing.id !== id) throw new Error(`Mã căn hộ '${updateData.apartment_code}' đã tồn tại`);
   }
+
+  const oldApartment = await prisma.apartments.findUnique({ where: { id } });
 
   const payload = {};
   if (updateData.apartment_code !== undefined) payload.apartment_code = updateData.apartment_code;
@@ -190,10 +210,36 @@ export const updateApartment = async (id, data) => {
     payload.floor = { connect: { id: Number(floor_id) } };
   }
 
-  return prisma.apartments.update({
+  const updated = await prisma.apartments.update({
     where: { id },
     data: payload,
   });
+
+  if (userId && oldApartment) {
+    const oldData = {};
+    const newData = {};
+    const checkKeys = ['apartment_code', 'room_type', 'area_sqm', 'max_occupants', 'base_price', 'deposit_amount', 'description'];
+    for (const key of checkKeys) {
+      if (updateData[key] !== undefined) {
+        oldData[key] = oldApartment[key];
+        newData[key] = updated[key];
+      }
+    }
+    if (floor_id !== undefined && floor_id !== null) {
+      oldData.floor_id = oldApartment.floor_id;
+      newData.floor_id = updated.floor_id;
+    }
+    await createLog({
+      actorId: userId,
+      action: 'UPDATE',
+      resourceType: 'Apartment',
+      resourceId: id,
+      oldData,
+      newData,
+    });
+  }
+
+  return updated;
 };
 
 export const updateApartmentStatus = async (id, newStatus, reason, changedBy) => {
@@ -233,6 +279,17 @@ export const updateApartmentStatus = async (id, newStatus, reason, changedBy) =>
       },
     }),
   ]);
+
+  if (changedBy) {
+    await createLog({
+      actorId: changedBy,
+      action: 'UPDATE',
+      resourceType: 'Apartment',
+      resourceId: id,
+      oldData: { status: current },
+      newData: { status: newStatus, reason: reason || `Đổi trạng thái từ ${current} sang ${newStatus}` },
+    });
+  }
 
   return updatedApartment;
 };
@@ -324,5 +381,64 @@ export const generateApartmentToken = async (apartmentId) => {
     },
   });
 };
+
+export const getApartmentPreview = async (id) => {
+  const apartment = await prisma.apartments.findUnique({
+    where: { id },
+    include: {
+      floor: {
+        include: { building: true }
+      },
+      contracts: {
+        where: { status: { in: ['ACTIVE', 'EXPIRING_SOON'] } },
+        include: {
+          tenant: true
+        }
+      }
+    }
+  });
+
+  if (!apartment) throw new Error('Không tìm thấy căn hộ');
+
+  const attachments = await prisma.attachments.findMany({
+    where: {
+      entity_type: 'Apartment',
+      entity_id: id,
+      mime_type: { startsWith: 'image/' }
+    },
+    select: {
+      id: true,
+      file_name: true,
+      file_url: true
+    }
+  });
+
+  const activeContract = apartment.contracts[0] || null;
+
+  return {
+    id: apartment.id,
+    apartment_code: apartment.apartment_code,
+    status: apartment.status,
+    room_type: apartment.room_type,
+    area_sqm: Number(apartment.area_sqm),
+    base_price: Number(apartment.base_price),
+    deposit_amount: Number(apartment.deposit_amount),
+    description: apartment.description,
+    location: {
+      floor_number: apartment.floor.floor_number,
+      building_name: apartment.floor.building.name,
+      building_code: apartment.floor.building.code,
+    },
+    tenant: activeContract ? {
+      id: activeContract.tenant.id,
+      full_name: activeContract.tenant.full_name,
+      phone: activeContract.tenant.phone,
+    } : null,
+    monthly_rent: activeContract ? Number(activeContract.monthly_rent) : null,
+    contract_code: activeContract ? activeContract.contract_code : null,
+    images: attachments.map(att => att.file_url),
+  };
+};
+
 
 

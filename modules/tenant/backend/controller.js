@@ -41,7 +41,7 @@ export const getTenantHistory = async (req, res) => {
 
 export const createTenant = async (req, res) => {
   try {
-    const data = await service.createTenant(req.body);
+    const data = await service.createTenant(req.body, req.user.userId);
     res.status(201).json({ success: true, data });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });
@@ -50,7 +50,7 @@ export const createTenant = async (req, res) => {
 
 export const updateTenant = async (req, res) => {
   try {
-    const data = await service.updateTenant(+req.params.id, req.body);
+    const data = await service.updateTenant(+req.params.id, req.body, req.user.userId);
     res.json({ success: true, data });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });

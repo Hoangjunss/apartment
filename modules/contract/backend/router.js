@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '@my/auth-backend';
 import * as ctrl from './controller.js';
+import { getAuditHistory } from '@my/audit-log-backend/service';
 
 const router = Router();
 
@@ -26,5 +27,16 @@ router.put('/:id', authenticate, requireRole(MGT_ROLES), ctrl.updateContract);
 router.patch('/:id/terminate', authenticate, requireRole(MGT_ROLES), ctrl.terminateContract);
 router.post('/:id/renew', authenticate, requireRole(MGT_ROLES), ctrl.renewContract);
 router.get('/:id/renewals', authenticate, requireRole(MGT_ROLES), ctrl.getRenewals);
+
+// Audit history — lịch sử thay đổi của 1 hợp đồng
+router.get('/:id/audit-history', authenticate, requireRole(ALL_ROLES), async (req, res) => {
+  try {
+    const { page = 1, limit = 20 } = req.query;
+    const data = await getAuditHistory('Contract', +req.params.id, { page: +page, limit: +limit });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
 
 export default router;

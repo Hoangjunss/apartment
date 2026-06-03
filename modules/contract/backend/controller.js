@@ -58,7 +58,8 @@ export const createContract = async (req, res) => {
 
 export const updateContract = async (req, res) => {
   try {
-    const data = await service.updateContract(+req.params.id, req.body);
+    const actor = { ...req.user, ipAddress: req.ip };
+    const data = await service.updateContract(+req.params.id, req.body, actor);
     res.json({ success: true, data });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });

@@ -1,4 +1,6 @@
 import { prisma } from '@my/prisma';
+import { createLog } from '@my/audit-log-backend/service';
+
 
 // Helper: Sinh mã hợp đồng
 const generateContractCode = async () => {
@@ -149,10 +151,20 @@ export const createContract = async (data, userId) => {
     }),
   ]);
 
+  await createLog({
+    actorId: userId,
+    actorName: '',
+    action: 'CREATE',
+    resourceType: 'Contract',
+    resourceId: newContract.id,
+    newData: { contract_code: contractCode, tenant_id: data.tenant_id, apartment_id: data.apartment_id },
+  });
+
   return newContract;
 };
 
-export const updateContract = async (id, data) => {
+export const updateContract = async (id, data, actor) => {
+
   // Không cho phép sửa status, apartment_id, tenant_id qua đây
   const { status, apartment_id, tenant_id, contract_code, ...updateData } = data;
   
@@ -163,10 +175,38 @@ export const updateContract = async (id, data) => {
     updateData.soNguoiO = Number(updateData.occupants_count);
   }
 
-  return prisma.contracts.update({
+  const oldContract = await prisma.contracts.findUnique({ where: { id } });
+
+  const updated = await prisma.contracts.update({
     where: { id },
     data: updateData,
   });
+
+  if (actor && oldContract) {
+    const oldData = {};
+    const newData = {};
+    for (const key of Object.keys(updateData)) {
+      if (key === 'start_date' || key === 'end_date') {
+        oldData[key] = oldContract[key] ? new Date(oldContract[key]).toISOString().split('T')[0] : null;
+        newData[key] = updated[key] ? new Date(updated[key]).toISOString().split('T')[0] : null;
+      } else {
+        oldData[key] = oldContract[key];
+        newData[key] = updated[key];
+      }
+    }
+    await createLog({
+      actorId: actor.userId,
+      actorName: actor.full_name,
+      action: 'UPDATE',
+      resourceType: 'Contract',
+      resourceId: id,
+      oldData,
+      newData,
+      ipAddress: actor.ipAddress,
+    });
+  }
+
+  return updated;
 };
 
 export const terminateContract = async (id, termination_reason, userId) => {
@@ -196,6 +236,16 @@ export const terminateContract = async (id, termination_reason, userId) => {
       },
     }),
   ]);
+
+  await createLog({
+    actorId: userId,
+    actorName: '',
+    action: 'DELETE',
+    resourceType: 'Contract',
+    resourceId: id,
+    oldData: { status: contract.status, contract_code: contract.contract_code },
+    newData: { status: 'TERMINATED', termination_reason },
+  });
 
   return terminatedContract;
 };
@@ -233,6 +283,25 @@ export const renewContract = async (id, data, userId) => {
       },
     }),
   ]);
+
+  await createLog({
+    actorId: userId,
+    actorName: '',
+    action: 'UPDATE',
+    resourceType: 'Contract',
+    resourceId: id,
+    oldData: {
+      end_date: contract.end_date ? new Date(contract.end_date).toISOString().split('T')[0] : null,
+      monthly_rent: contract.monthly_rent,
+      status: contract.status,
+    },
+    newData: {
+      end_date: newEndDate.toISOString().split('T')[0],
+      monthly_rent: data.new_monthly_rent ?? contract.monthly_rent,
+      status: 'ACTIVE',
+      reason: 'Gia hạn hợp đồng',
+    },
+  });
 
   return renewedContract;
 };

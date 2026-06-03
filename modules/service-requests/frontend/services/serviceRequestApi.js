@@ -6,5 +6,5 @@ export const serviceRequestApi = {
   getById: (id) => api.get(`/service-requests/${id}`),
   create: (data) => api.post('/service-requests', data),
   assign: (id, assigned_to) => api.patch(`/service-requests/${id}/assign`, { assigned_to }),
-  updateStatus: (id, status) => api.patch(`/service-requests/${id}/status`, { status }),
+  updateStatus: (id, status, extra = {}) => api.patch(`/service-requests/${id}/status`, { status, ...extra }),
 };

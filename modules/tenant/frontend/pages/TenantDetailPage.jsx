@@ -19,6 +19,8 @@ import {
 } from '../hooks/useTenant.js';
 import { TenantEditForm } from '../components/TenantEditForm.jsx';
 import { RegistrationForm } from '../components/RegistrationForm.jsx';
+import { AuditHistoryTab } from 'modules/audit-log/frontend/components/AuditHistoryTab.jsx';
+import { AttachmentsSection } from 'modules/attachments/frontend/components/AttachmentsSection.jsx';
 import { format, parseISO } from 'date-fns';
 
 // ── History Tab ────────────────────────────────────────────────────────────────
@@ -142,6 +144,7 @@ export default function TenantDetailPage() {
     { key: 'history', label: 'Lịch sử thuê phòng' },
     { key: 'registrations', label: 'Khai báo tạm trú/vắng' },
     { key: 'contract', label: 'Hợp đồng hiện tại' },
+    { key: 'audit', label: 'Lịch sử thay đổi' },
   ];
 
   return (
@@ -202,64 +205,77 @@ export default function TenantDetailPage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200 mb-5">
-        <div className="flex gap-0">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`tab-btn ${activeTab === tab.key ? 'tab-btn-active' : 'tab-btn-inactive'}`}
-              id={`tab-${tab.key}`}
-            >
-              {tab.label}
-            </button>
-          ))}
+      {/* Grid Layout for Tabs & Attachments */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Side: Tabs & Active Tab Content */}
+        <div className="lg:col-span-2 space-y-5">
+          {/* Tabs */}
+          <div className="border-b border-gray-200 mb-5">
+            <div className="flex gap-0">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`tab-btn ${activeTab === tab.key ? 'tab-btn-active' : 'tab-btn-inactive'}`}
+                  id={`tab-${tab.key}`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {activeTab === 'history' && <HistoryTab tenantId={tenantId} />}
+          {activeTab === 'registrations' && <RegistrationsTab tenantId={tenantId} />}
+          {activeTab === 'contract' && (
+            <div>
+              {activeContract ? (
+                <div className="card p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <ContractStatusBadge status={activeContract.status} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="info-label">Phòng</p>
+                      <Link to={`/apartments/${activeContract.apartment?.id}`} className="text-sm text-blue-600 hover:underline">
+                        {activeContract.apartment?.apartment_code}
+                      </Link>
+                    </div>
+                    <div>
+                      <p className="info-label">Giá thuê/tháng</p>
+                      <p className="info-value">
+                        {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(activeContract.monthly_rent))}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="info-label">Bắt đầu</p>
+                      <p className="info-value">{format(parseISO(activeContract.start_date), 'dd/MM/yyyy')}</p>
+                    </div>
+                    <div>
+                      <p className="info-label">Kết thúc</p>
+                      <p className="info-value">{format(parseISO(activeContract.end_date), 'dd/MM/yyyy')}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <Link to={`/contracts/${activeContract.id}`} className="btn-secondary">
+                      Xem hợp đồng đầy đủ →
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <EmptyState message="Không có hợp đồng đang hiệu lực" />
+              )}
+            </div>
+          )}
+
+          {activeTab === 'audit' && <AuditHistoryTab resourceType="Tenant" resourceId={tenantId} />}
+        </div>
+
+        {/* Right Side: Attachments */}
+        <div className="space-y-6">
+          <AttachmentsSection entityType="Tenant" entityId={tenantId} />
         </div>
       </div>
-
-      {activeTab === 'history' && <HistoryTab tenantId={tenantId} />}
-      {activeTab === 'registrations' && <RegistrationsTab tenantId={tenantId} />}
-      {activeTab === 'contract' && (
-        <div>
-          {activeContract ? (
-            <div className="card p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <ContractStatusBadge status={activeContract.status} />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="info-label">Phòng</p>
-                  <Link to={`/apartments/${activeContract.apartment?.id}`} className="text-sm text-blue-600 hover:underline">
-                    {activeContract.apartment?.apartment_code}
-                  </Link>
-                </div>
-                <div>
-                  <p className="info-label">Giá thuê/tháng</p>
-                  <p className="info-value">
-                    {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(activeContract.monthly_rent))}
-                  </p>
-                </div>
-                <div>
-                  <p className="info-label">Bắt đầu</p>
-                  <p className="info-value">{format(parseISO(activeContract.start_date), 'dd/MM/yyyy')}</p>
-                </div>
-                <div>
-                  <p className="info-label">Kết thúc</p>
-                  <p className="info-value">{format(parseISO(activeContract.end_date), 'dd/MM/yyyy')}</p>
-                </div>
-              </div>
-              <div className="mt-4">
-                <Link to={`/contracts/${activeContract.id}`} className="btn-secondary">
-                  Xem hợp đồng đầy đủ →
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <EmptyState message="Không có hợp đồng đang hiệu lực" />
-          )}
-        </div>
-      )}
 
       {isEditOpen && (
         <TenantEditForm onClose={() => setIsEditOpen(false)} tenant={tenant} />

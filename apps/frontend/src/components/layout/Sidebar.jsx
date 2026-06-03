@@ -10,6 +10,8 @@ import {
   Zap,
   Receipt,
   Wrench,
+  History,
+  BarChart3,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import {
@@ -71,10 +73,22 @@ const NAV_ITEMS = [
     roles: ALL_ROLES,                    // Tất cả đều thấy
   },
   {
+    to: '/reports',
+    label: 'Báo cáo thống kê',
+    icon: BarChart3,
+    roles: [ROLES.ADMIN, ROLES.MANAGER],
+  },
+  {
     to: '/users',
     label: 'Nhân viên',
     icon: UserCog,
     roles: [ROLES.ADMIN],
+  },
+  {
+    to: '/admin/audit-logs',
+    label: 'Nhật ký hoạt động',
+    icon: History,
+    roles: [ROLES.ADMIN, ROLES.MANAGER],
   },
 ];
 

@@ -1,4 +1,5 @@
 import { prisma } from '@my/prisma';
+import { createNotification } from '@my/notifications-backend/service';
 
 const INCLUDE_FULL = {
   assignee: { select: { id: true, full_name: true, role: true } },
@@ -15,7 +16,8 @@ const INCLUDE_FULL = {
       contract_code: true,
       tenant: { select: { id: true, full_name: true } }
     }
-  }
+  },
+  expenses: true
 };
 
 // GET / — Tất cả yêu cầu (ADMIN/MANAGER)
@@ -102,7 +104,7 @@ export const assign = async (id, assignedTo) => {
   const user = await prisma.users.findUnique({ where: { id: assignedTo } });
   if (!user) throw new Error('Nhân viên không tồn tại');
 
-  return prisma.serviceRequests.update({
+  const updated = await prisma.serviceRequests.update({
     where: { id },
     data: { 
       assigned_to: assignedTo,
@@ -110,11 +112,23 @@ export const assign = async (id, assignedTo) => {
     },
     include: INCLUDE_FULL,
   });
+
+  // Gửi thông báo real-time tới kỹ thuật viên
+  await createNotification({
+    userId: assignedTo,
+    title: 'Yêu cầu kỹ thuật mới',
+    message: `Bạn được phân công xử lý yêu cầu: "${updated.title}"`,
+    type: 'MAINTENANCE_ASSIGNED',
+    entityType: 'ServiceRequest',
+    entityId: updated.id,
+  });
+
+  return updated;
 };
 
 // PATCH /:id/status — Cập nhật trạng thái
 // TECHNICIAN chỉ được cập nhật việc được giao cho mình
-export const updateStatus = async (id, status, requesterId, requesterRole) => {
+export const updateStatus = async (id, status, requesterId, requesterRole, body = {}) => {
   const sr = await prisma.serviceRequests.findUnique({ where: { id } });
   if (!sr) throw new Error('Yêu cầu không tồn tại');
 
@@ -123,7 +137,7 @@ export const updateStatus = async (id, status, requesterId, requesterRole) => {
     throw new Error('Bạn chỉ có thể cập nhật yêu cầu được giao cho mình');
   }
 
-  const validStatuses = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED'];
+  const validStatuses = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED', 'POSTPONED'];
   if (!validStatuses.includes(status)) {
     throw new Error('Trạng thái không hợp lệ');
   }
@@ -135,9 +149,70 @@ export const updateStatus = async (id, status, requesterId, requesterRole) => {
     updateData.resolved_at = null;
   }
 
-  return prisma.serviceRequests.update({
-    where: { id },
-    data: updateData,
-    include: INCLUDE_FULL,
+  const updated = await prisma.$transaction(async (tx) => {
+    // Nếu truyền danh sách chi phí dạng mảng, thực hiện cập nhật ghi đè chi phí cho sự cố
+    if (Array.isArray(body.expenses)) {
+      // Xóa chi phí cũ trước
+      await tx.serviceRequestExpenses.deleteMany({
+        where: { service_request_id: id }
+      });
+
+      // Tạo chi phí mới nếu có
+      const expenseData = body.expenses
+        .filter(exp => exp.description && exp.description.trim() && exp.amount !== undefined)
+        .map(exp => ({
+          service_request_id: id,
+          description: exp.description.trim(),
+          amount: Number(exp.amount)
+        }));
+
+      if (expenseData.length > 0) {
+        await tx.serviceRequestExpenses.createMany({
+          data: expenseData
+        });
+      }
+    }
+
+    return tx.serviceRequests.update({
+      where: { id },
+      data: updateData,
+      include: INCLUDE_FULL,
+    });
   });
+
+  // Gửi thông báo real-time khi hoàn thành sự cố (Kỹ thuật viên -> ADMIN/MANAGER)
+  if (status === 'RESOLVED') {
+    (async () => {
+      try {
+        const managers = await prisma.users.findMany({
+          where: { role: { in: ['ADMIN', 'MANAGER'] }, is_active: true },
+          select: { id: true }
+        });
+
+        // Tính tổng chi phí
+        const totalCost = updated.expenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
+        const aptCode = updated.apartment?.apartment_code ?? '';
+
+        // Tên kỹ thuật viên xử lý
+        const techName = requesterRole === 'TECHNICIAN'
+          ? (await prisma.users.findUnique({ where: { id: requesterId }, select: { full_name: true } }))?.full_name
+          : 'Nhân viên';
+
+        for (const manager of managers) {
+          await createNotification({
+            userId: manager.id,
+            title: 'Sự cố kỹ thuật đã hoàn thành',
+            message: `Căn hộ ${aptCode}: Yêu cầu "${updated.title}" đã được hoàn thành bởi ${techName}. Tổng chi phí: ${totalCost.toLocaleString('vi-VN')} đ.`,
+            type: 'MAINTENANCE_RESOLVED',
+            entityType: 'ServiceRequest',
+            entityId: updated.id
+          });
+        }
+      } catch (err) {
+        console.error('[Notification] Failed to send maintenance resolved notification:', err.message);
+      }
+    })();
+  }
+
+  return updated;
 };

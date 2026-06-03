@@ -11,6 +11,7 @@ import { MANAGEMENT_ROLES } from '@/constants/roles.js';
 import { ROOM_TYPE_LABELS, APARTMENT_STATUS_CONFIG } from '@/constants/status.js';
 import { useApartments, useBuildings, useDistinctRoomTypes } from '../hooks/useBuilding.js';
 import { ApartmentForm } from '../components/ApartmentForm.jsx';
+import { ApartmentPreviewTooltip } from '../components/ApartmentPreviewTooltip.jsx';
 import { useFilterState } from '@/hooks/useFilterState.js';
 
 const formatCurrency = (v) =>
@@ -60,7 +61,11 @@ export default function ApartmentsPage() {
     {
       key: 'apartment_code',
       label: 'Mã phòng',
-      render: (row) => <span className="font-mono table-cell-primary">{row.apartment_code}</span>,
+      render: (row) => (
+        <ApartmentPreviewTooltip apartmentId={row.id}>
+          {row.apartment_code}
+        </ApartmentPreviewTooltip>
+      ),
     },
     {
       key: 'room_type',

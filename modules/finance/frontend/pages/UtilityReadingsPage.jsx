@@ -7,11 +7,13 @@ import { TENANT_ACCESS_ROLES } from '@/constants/roles.js';
 import { useUtilities } from '../hooks/useFinance.js';
 import { useApartments } from 'modules/building/frontend/hooks/useBuilding.js';
 import { UtilityReadingForm } from '../components/UtilityReadingForm.jsx';
+import { BulkUtilityReadingModal } from '../components/BulkUtilityReadingModal.jsx';
 import { useFilterState } from '@/hooks/useFilterState.js';
 
 export default function UtilityReadingsPage() {
   const [page, setPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const defaultFilters = {
     apartment_id: '',
@@ -137,14 +139,23 @@ export default function UtilityReadingsPage() {
         }
         action={
           <RoleGuard roles={TENANT_ACCESS_ROLES}>
-            <button
-              onClick={() => setIsFormOpen(true)}
-              className="btn-primary flex items-center gap-2"
-              id="record-utility-btn"
-            >
-              <Plus size={16} />
-              Ghi chỉ số mới
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsImportOpen(true)}
+                className="btn-secondary"
+                id="bulk-import-utility-btn"
+              >
+                Nhập từ Excel
+              </button>
+              <button
+                onClick={() => setIsFormOpen(true)}
+                className="btn-primary flex items-center gap-2"
+                id="record-utility-btn"
+              >
+                <Plus size={16} />
+                Ghi chỉ số mới
+              </button>
+            </div>
           </RoleGuard>
         }
       />
@@ -234,6 +245,10 @@ export default function UtilityReadingsPage() {
 
       {isFormOpen && (
         <UtilityReadingForm onClose={() => setIsFormOpen(false)} />
+      )}
+
+      {isImportOpen && (
+        <BulkUtilityReadingModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} />
       )}
     </div>
   );

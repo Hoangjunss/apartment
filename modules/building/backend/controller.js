@@ -108,7 +108,7 @@ export const getApartmentById = async (req, res) => {
 
 export const createApartment = async (req, res) => {
   try {
-    const data = await service.createApartment(req.body);
+    const data = await service.createApartment(req.body, req.user.userId);
     res.status(201).json({ success: true, data });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });
@@ -117,7 +117,7 @@ export const createApartment = async (req, res) => {
 
 export const updateApartment = async (req, res) => {
   try {
-    const data = await service.updateApartment(+req.params.id, req.body);
+    const data = await service.updateApartment(+req.params.id, req.body, req.user.userId);
     res.json({ success: true, data });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });
@@ -214,5 +214,15 @@ export const generateApartmentToken = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+export const getApartmentPreview = async (req, res) => {
+  try {
+    const data = await service.getApartmentPreview(+req.params.id);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });
+  }
+};
+
 
 

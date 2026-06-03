@@ -7,6 +7,7 @@ import { InvoiceStatusBadge } from '@/components/common/StatusBadge.jsx';
 import { TENANT_ACCESS_ROLES } from '@/constants/roles.js';
 import { useInvoiceById, useUtilities } from '../hooks/useFinance.js';
 import { PaymentForm } from '../components/PaymentForm.jsx';
+import { AttachmentsSection } from 'modules/attachments/frontend/components/AttachmentsSection.jsx';
 
 const formatCurrency = (v) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(v));
@@ -290,6 +291,8 @@ export default function InvoiceDetailPage() {
               </div>
             )}
           </div>
+
+          <AttachmentsSection entityType="Invoice" entityId={invoice.id} />
         </div>
       </div>
 

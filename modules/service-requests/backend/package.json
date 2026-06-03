@@ -6,6 +6,7 @@
   "dependencies": {
     "@my/auth-backend": "workspace:*",
     "@my/prisma": "workspace:*",
+    "@my/notifications-backend": "workspace:*",
     "express": "^4.19.2"
   }
 }

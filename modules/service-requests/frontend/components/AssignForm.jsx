@@ -9,9 +9,9 @@ export function AssignForm({ request, onClose, onSubmit }) {
 
   const { data: usersData } = useQuery({
     queryKey: ['users', 'technicians'],
-    queryFn: () => api.get('/auth/users').then(r => r.data.data ?? []),
+    queryFn: () => api.get('/auth/users', { params: { limit: 100 } }).then(r => r.data.data ?? {}),
   });
-  const technicians = (usersData ?? []).filter(u => u.role === 'TECHNICIAN' && u.is_active);
+  const technicians = (usersData?.items ?? []).filter(u => u.role === 'TECHNICIAN' && u.is_active);
 
   const handleSubmit = (e) => {
     e.preventDefault();
