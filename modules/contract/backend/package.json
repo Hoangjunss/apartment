@@ -11,6 +11,8 @@
     "express": "^4.19.2",
     "node-cron": "^3.0.3",
     "@my/auth-backend": "workspace:*",
+    "@my/audit-log-backend": "workspace:*",
+    "@my/notifications-backend": "workspace:*",
     "@my/prisma": "workspace:*"
   }
 }

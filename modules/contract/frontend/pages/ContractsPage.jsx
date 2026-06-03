@@ -1,7 +1,9 @@
 // modules/contract/frontend/pages/ContractsPage.jsx
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Eye, AlertTriangle, Search, RotateCcw } from 'lucide-react';
+import { Plus, Eye, AlertTriangle, Search, RotateCcw, Download } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { api } from '@/lib/axios.js';
 import { PageHeader } from '@/components/common/PageHeader.jsx';
 import { DataTable } from '@/components/common/DataTable.jsx';
 import { SearchBar } from '@/components/forms/SearchBar.jsx';
@@ -55,6 +57,31 @@ export default function ContractsPage() {
 
   const handlePageChange = useCallback((p) => setPage(p), []);
   const handleSearch = useCallback((v) => setFilter('search', v), [setFilter]);
+
+  const handleExport = async (format) => {
+    try {
+      toast.loading('Đang chuẩn bị file tải xuống...', { id: 'export-toast' });
+      const res = await api.get('/report/export/contracts', {
+        params: {
+          search: filters.search || undefined,
+          status: filters.status || undefined,
+          format
+        },
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `danh_sach_hop_dong.${format === 'csv' ? 'csv' : 'xlsx'}`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      toast.success('Đã tải xuống file thành công!', { id: 'export-toast' });
+    } catch (err) {
+      console.error(err);
+      toast.error('Có lỗi xảy ra khi xuất dữ liệu', { id: 'export-toast' });
+    }
+  };
 
   const columns = [
     {
@@ -123,16 +150,30 @@ export default function ContractsPage() {
         title="Hợp đồng"
         subtitle={`${total} hợp đồng`}
         action={
-          <RoleGuard roles={MANAGEMENT_ROLES}>
+          <div className="flex gap-2">
             <button
-              onClick={() => navigate('/contracts/new')}
-              className="btn-primary"
-              id="add-contract-btn"
+              onClick={() => handleExport('excel')}
+              className="btn-secondary flex items-center gap-1.5"
             >
-              <Plus size={16} />
-              Tạo hợp đồng
+              <Download size={14} /> Excel
             </button>
-          </RoleGuard>
+            <button
+              onClick={() => handleExport('csv')}
+              className="btn-secondary flex items-center gap-1.5"
+            >
+              <Download size={14} /> CSV
+            </button>
+            <RoleGuard roles={MANAGEMENT_ROLES}>
+              <button
+                onClick={() => navigate('/contracts/new')}
+                className="btn-primary"
+                id="add-contract-btn"
+              >
+                <Plus size={16} />
+                Tạo hợp đồng
+              </button>
+            </RoleGuard>
+          </div>
         }
       />
 

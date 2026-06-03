@@ -12,6 +12,8 @@ import { useContractById, useRenewals } from '../hooks/useContract.js';
 import { RenewForm } from '../components/RenewForm.jsx';
 import { TerminateForm } from '../components/TerminateForm.jsx';
 import { ContractEditForm } from '../components/ContractEditForm.jsx';
+import { AuditHistoryTab } from 'modules/audit-log/frontend/components/AuditHistoryTab.jsx';
+import { AttachmentsSection } from 'modules/attachments/frontend/components/AttachmentsSection.jsx';
 import { format, parseISO, differenceInDays } from 'date-fns';
 
 const formatCurrency = (v) =>
@@ -76,6 +78,7 @@ export default function ContractDetailPage() {
     { key: 'tenant', label: 'Thông tin khách thuê' },
     { key: 'apartment', label: 'Thông tin phòng' },
     { key: 'renewals', label: 'Lịch sử gia hạn' },
+    { key: 'audit', label: 'Lịch sử thay đổi' },
   ];
 
   return (
@@ -115,168 +118,180 @@ export default function ContractDetailPage() {
           }
         />
 
-        {/* Info Card */}
-        <div className="card p-5 mb-6">
-          <div className="flex items-center gap-3 mb-4 no-print">
-            <ContractStatusBadge status={contract.status} daysLeft={daysLeft} />
-            {contract.status === 'EXPIRING_SOON' && daysLeft <= 7 && (
-              <span className="text-xs text-red-600 font-medium bg-red-50 px-2 py-0.5 rounded">
-                ⚠ Còn {daysLeft} ngày!
-              </span>
-            )}
-          </div>
+        {/* Grid Layout for Contract Info & Attachments */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Side: Info Card & Tabs */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Info Card */}
+            <div className="card p-5">
+              <div className="flex items-center gap-3 mb-4 no-print">
+                <ContractStatusBadge status={contract.status} daysLeft={daysLeft} />
+                {contract.status === 'EXPIRING_SOON' && daysLeft <= 7 && (
+                  <span className="text-xs text-red-600 font-medium bg-red-50 px-2 py-0.5 rounded">
+                    ⚠ Còn {daysLeft} ngày!
+                  </span>
+                )}
+              </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            <div>
-              <p className="info-label">Mã hợp đồng</p>
-              <p className="info-value font-mono font-semibold text-indigo-600">{contract.contract_code}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div>
+                  <p className="info-label">Mã hợp đồng</p>
+                  <p className="info-value font-mono font-semibold text-indigo-600">{contract.contract_code}</p>
+                </div>
+                <div>
+                  <p className="info-label">Ngày bắt đầu</p>
+                  <p className="info-value">{format(parseISO(contract.start_date), 'dd/MM/yyyy')}</p>
+                </div>
+                <div>
+                  <p className="info-label">Ngày kết thúc</p>
+                  <p className="info-value">{format(parseISO(contract.end_date), 'dd/MM/yyyy')}</p>
+                </div>
+                <div>
+                  <p className="info-label">Giá thuê/tháng</p>
+                  <p className="info-value font-semibold text-gray-900">{formatCurrency(contract.monthly_rent)}</p>
+                </div>
+                <div>
+                  <p className="info-label">Tiền đặt cọc</p>
+                  <p className="info-value">{formatCurrency(contract.deposit_amount)}</p>
+                </div>
+                <div>
+                  <p className="info-label">Hạn đóng tiền</p>
+                  <p className="info-value">Ngày {contract.payment_due_day} hằng tháng</p>
+                </div>
+                <div>
+                  <p className="info-label">Số người ở</p>
+                  <p className="info-value font-semibold text-slate-800">{contract.soNguoiO || contract.occupants_count || 1} người</p>
+                </div>
+                <div>
+                  <p className="info-label">Đơn giá nước</p>
+                  <p className="info-value">100.000 đ/người/tháng</p>
+                </div>
+                <div>
+                  <p className="info-label">Đơn giá điện</p>
+                  <p className="info-value">{formatCurrency(contract.electricity_price)} /kWh</p>
+                </div>
+                <div>
+                  <p className="info-label">Điện ban đầu</p>
+                  <p className="info-value">{Number(contract.initial_electricity)} kWh</p>
+                </div>
+                <div>
+                  <p className="info-label">Nước ban đầu</p>
+                  <p className="info-value">{contract.initial_water !== null && contract.initial_water !== undefined ? `${Number(contract.initial_water)} m³` : '—'}</p>
+                </div>
+                <div>
+                  <p className="info-label">Báo trước khi chấm dứt</p>
+                  <p className="info-value">{contract.termination_notice_days || 30} ngày</p>
+                </div>
+                {contract.furniture_handover && (
+                  <div className="col-span-2">
+                    <p className="info-label">Bàn giao nội thất</p>
+                    <p className="info-value text-sm bg-slate-50 p-2 rounded border border-slate-100 mt-1">{contract.furniture_handover}</p>
+                  </div>
+                )}
+                {contract.notes && (
+                  <div className="col-span-2">
+                    <p className="info-label">Ghi chú</p>
+                    <p className="info-value text-sm">{contract.notes}</p>
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <p className="info-label">Ngày bắt đầu</p>
-              <p className="info-value">{format(parseISO(contract.start_date), 'dd/MM/yyyy')}</p>
+
+            {/* Tabs */}
+            <div className="border-b border-gray-200 mb-5">
+              <div className="flex gap-0">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`tab-btn ${activeTab === tab.key ? 'tab-btn-active' : 'tab-btn-inactive'}`}
+                    id={`tab-${tab.key}`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div>
-              <p className="info-label">Ngày kết thúc</p>
-              <p className="info-value">{format(parseISO(contract.end_date), 'dd/MM/yyyy')}</p>
-            </div>
-            <div>
-              <p className="info-label">Giá thuê/tháng</p>
-              <p className="info-value font-semibold text-gray-900">{formatCurrency(contract.monthly_rent)}</p>
-            </div>
-            <div>
-              <p className="info-label">Tiền đặt cọc</p>
-              <p className="info-value">{formatCurrency(contract.deposit_amount)}</p>
-            </div>
-            <div>
-              <p className="info-label">Hạn đóng tiền</p>
-              <p className="info-value">Ngày {contract.payment_due_day} hằng tháng</p>
-            </div>
-            <div>
-              <p className="info-label">Số người ở</p>
-              <p className="info-value font-semibold text-slate-800">{contract.soNguoiO || contract.occupants_count || 1} người</p>
-            </div>
-            <div>
-              <p className="info-label">Đơn giá nước</p>
-              <p className="info-value">100.000 đ/người/tháng</p>
-            </div>
-            <div>
-              <p className="info-label">Đơn giá điện</p>
-              <p className="info-value">{formatCurrency(contract.electricity_price)} /kWh</p>
-            </div>
-            <div>
-              <p className="info-label">Điện ban đầu</p>
-              <p className="info-value">{Number(contract.initial_electricity)} kWh</p>
-            </div>
-            <div>
-              <p className="info-label">Nước ban đầu</p>
-              <p className="info-value">{contract.initial_water !== null && contract.initial_water !== undefined ? `${Number(contract.initial_water)} m³` : '—'}</p>
-            </div>
-            <div>
-              <p className="info-label">Báo trước khi chấm dứt</p>
-              <p className="info-value">{contract.termination_notice_days || 30} ngày</p>
-            </div>
-            {contract.furniture_handover && (
-              <div className="col-span-2">
-                <p className="info-label">Bàn giao nội thất</p>
-                <p className="info-value text-sm bg-slate-50 p-2 rounded border border-slate-100 mt-1">{contract.furniture_handover}</p>
+
+            {activeTab === 'tenant' && (
+              <div className="card p-5">
+                {contract.tenant ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="info-label">Họ tên</p>
+                        <Link to={`/tenants/${contract.tenant.id}`} className="text-sm text-blue-600 hover:underline font-medium">
+                          {contract.tenant.full_name}
+                        </Link>
+                      </div>
+                      <div>
+                        <p className="info-label">Số CCCD</p>
+                        <p className="info-value font-mono">{contract.tenant.national_id}</p>
+                      </div>
+                      <div>
+                        <p className="info-label">Số điện thoại</p>
+                        <p className="info-value">{contract.tenant.phone}</p>
+                      </div>
+                      <div>
+                        <p className="info-label">Email</p>
+                        <p className="info-value">{contract.tenant.email || '—'}</p>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <Link to={`/tenants/${contract.tenant.id}`} className="btn-secondary">
+                        Xem hồ sơ đầy đủ →
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <EmptyState message="Không có thông tin khách thuê" />
+                )}
               </div>
             )}
-            {contract.notes && (
-              <div className="col-span-2">
-                <p className="info-label">Ghi chú</p>
-                <p className="info-value text-sm">{contract.notes}</p>
+
+            {activeTab === 'apartment' && (
+              <div className="card p-5">
+                {contract.apartment ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="info-label">Mã phòng</p>
+                        <Link to={`/apartments/${contract.apartment.id}`} className="text-sm text-blue-600 hover:underline font-mono">
+                          {contract.apartment.apartment_code}
+                        </Link>
+                      </div>
+                      <div>
+                        <p className="info-label">Tòa nhà / Tầng</p>
+                        <p className="info-value">
+                          {contract.apartment.floor?.building?.name} / Tầng {contract.apartment.floor?.floor_number}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="info-label">Diện tích</p>
+                        <p className="info-value">{contract.apartment.area_sqm} m²</p>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <Link to={`/apartments/${contract.apartment.id}`} className="btn-secondary">
+                        Xem chi tiết phòng →
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <EmptyState message="Không có thông tin căn hộ" />
+                )}
               </div>
             )}
+
+            {activeTab === 'renewals' && <RenewalsTab contractId={contractId} />}
+            {activeTab === 'audit' && <AuditHistoryTab resourceType="Contract" resourceId={contractId} />}
+          </div>
+
+          {/* Right Side: Attachments */}
+          <div className="space-y-6">
+            <AttachmentsSection entityType="Contract" entityId={contractId} />
           </div>
         </div>
-
-        {/* Tabs */}
-        <div className="border-b border-gray-200 mb-5">
-          <div className="flex gap-0">
-            {tabs.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={`tab-btn ${activeTab === tab.key ? 'tab-btn-active' : 'tab-btn-inactive'}`}
-                id={`tab-${tab.key}`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {activeTab === 'tenant' && (
-          <div className="card p-5">
-            {contract.tenant ? (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="info-label">Họ tên</p>
-                    <Link to={`/tenants/${contract.tenant.id}`} className="text-sm text-blue-600 hover:underline font-medium">
-                      {contract.tenant.full_name}
-                    </Link>
-                  </div>
-                  <div>
-                    <p className="info-label">Số CCCD</p>
-                    <p className="info-value font-mono">{contract.tenant.national_id}</p>
-                  </div>
-                  <div>
-                    <p className="info-label">Số điện thoại</p>
-                    <p className="info-value">{contract.tenant.phone}</p>
-                  </div>
-                  <div>
-                    <p className="info-label">Email</p>
-                    <p className="info-value">{contract.tenant.email || '—'}</p>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <Link to={`/tenants/${contract.tenant.id}`} className="btn-secondary">
-                    Xem hồ sơ đầy đủ →
-                  </Link>
-                </div>
-              </>
-            ) : (
-              <EmptyState message="Không có thông tin khách thuê" />
-            )}
-          </div>
-        )}
-
-        {activeTab === 'apartment' && (
-          <div className="card p-5">
-            {contract.apartment ? (
-              <>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="info-label">Mã phòng</p>
-                    <Link to={`/apartments/${contract.apartment.id}`} className="text-sm text-blue-600 hover:underline font-mono">
-                      {contract.apartment.apartment_code}
-                    </Link>
-                  </div>
-                  <div>
-                    <p className="info-label">Tòa nhà / Tầng</p>
-                    <p className="info-value">
-                      {contract.apartment.floor?.building?.name} / Tầng {contract.apartment.floor?.floor_number}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="info-label">Diện tích</p>
-                    <p className="info-value">{contract.apartment.area_sqm} m²</p>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <Link to={`/apartments/${contract.apartment.id}`} className="btn-secondary">
-                    Xem chi tiết phòng →
-                  </Link>
-                </div>
-              </>
-            ) : (
-              <EmptyState message="Không có thông tin căn hộ" />
-            )}
-          </div>
-        )}
-
-        {activeTab === 'renewals' && <RenewalsTab contractId={contractId} />}
       </div>
 
       {/* PDF Legal Document Print View */}
