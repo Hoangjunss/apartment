@@ -14,7 +14,7 @@ router.get('/me', authenticate, ctrl.getMe);
 router.put('/change-password', authenticate, ctrl.changePassword);
 
 // --- Nhóm ADMIN ---
-router.get('/users', authenticate, requireRole(['ADMIN']), ctrl.getUsers);
+router.get('/users', authenticate, requireRole(['ADMIN', 'MANAGER']), ctrl.getUsers);
 router.post('/users', authenticate, requireRole(['ADMIN']), ctrl.createUser);
 router.put('/users/:id', authenticate, requireRole(['ADMIN']), ctrl.updateUser);
 router.patch('/users/:id/toggle-active', authenticate, requireRole(['ADMIN']), ctrl.toggleActive);

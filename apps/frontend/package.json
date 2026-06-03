@@ -13,6 +13,7 @@
     "@my/contract-frontend": "workspace:*",
     "@my/finance-frontend": "workspace:*",
     "@my/tenant-frontend": "workspace:*",
+    "@my/report-frontend": "workspace:*",
     "@tanstack/react-query": "^5.17.0",
     "axios": "^1.6.0",
     "date-fns": "^3.3.0",
@@ -24,6 +25,7 @@
     "react-hot-toast": "^2.4.1",
     "react-router-dom": "^6.22.0",
     "recharts": "^3.8.1",
+    "socket.io-client": "^4.7.5",
     "zod": "^3.22.0"
   },
   "devDependencies": {

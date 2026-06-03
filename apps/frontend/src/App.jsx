@@ -39,16 +39,22 @@ import ContractDetailPage from 'modules/contract/frontend/pages/ContractDetailPa
 import UtilityReadingsPage from 'modules/finance/frontend/pages/UtilityReadingsPage.jsx';
 import InvoicesPage from 'modules/finance/frontend/pages/InvoicesPage.jsx';
 import InvoiceDetailPage from 'modules/finance/frontend/pages/InvoiceDetailPage.jsx';
+import ReportsPage from 'modules/report/frontend/pages/ReportsPage.jsx';
 
 // ── Service Requests Module Pages ───────────────────────────────────────────────────────
 import ServiceRequestsPage from 'modules/service-requests/frontend/pages/ServiceRequestsPage.jsx';
 import ServiceRequestDetailPage from 'modules/service-requests/frontend/pages/ServiceRequestDetailPage.jsx';
 import PublicRequestPage from '@/pages/PublicRequestPage.jsx';
 
+// ── Notification + Audit ───────────────────────────────────────────────────────────────
+import { NotificationProvider } from '@/contexts/NotificationContext.jsx';
+import AuditLogsPage from 'modules/audit-log/frontend/pages/AuditLogsPage.jsx';
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <NotificationProvider>
         <BrowserRouter>
           <Routes>
             {/* ── Public ──────────────────────────────────────── */}
@@ -164,6 +170,14 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/reports"
+                element={
+                  <ProtectedRoute roles={MANAGEMENT_ROLES}>
+                    <ReportsPage />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Service Requests — tất cả role */}
               <Route path="/service-requests" element={<ProtectedRoute><ServiceRequestsPage /></ProtectedRoute>} />
@@ -178,12 +192,23 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+
+              {/* Admin — Audit Logs */}
+              <Route
+                path="/admin/audit-logs"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
+                    <AuditLogsPage />
+                  </ProtectedRoute>
+                }
+              />
             </Route>
 
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </BrowserRouter>
+        </NotificationProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
