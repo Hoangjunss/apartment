@@ -34,6 +34,16 @@ export function AttachmentsSection({ entityType, entityId }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Check file type/extension
+    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.webp'];
+    const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    const fileExt = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    
+    if (!allowedMimeTypes.includes(file.type) && !allowedExtensions.includes(fileExt)) {
+      toast.error('Chỉ chấp nhận file PDF, JPG, JPEG, PNG, WEBP');
+      return;
+    }
+
     // Check size limit: 10MB
     if (file.size > 10 * 1024 * 1024) {
       toast.error('Kích thước file không được vượt quá 10MB');

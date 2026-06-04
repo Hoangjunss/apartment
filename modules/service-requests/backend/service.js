@@ -1,5 +1,7 @@
 import { prisma } from '@my/prisma';
-import { createNotification } from '@my/notifications-backend/service';
+import eventHub from '@my/events';
+import { validateTransition } from '@my/workflow-backend';
+import { applyBuildingScope, getAssignedBuildingIds } from '@my/policy-backend';
 
 const INCLUDE_FULL = {
   assignee: { select: { id: true, full_name: true, role: true } },
@@ -21,11 +23,13 @@ const INCLUDE_FULL = {
 };
 
 // GET / — Tất cả yêu cầu (ADMIN/MANAGER)
-export const getAll = async (filters = {}) => {
-  const where = {};
+export const getAll = async (filters = {}, currentUser) => {
+  let where = {};
   if (filters.status) where.status = filters.status;
   if (filters.assigned_to) where.assigned_to = Number(filters.assigned_to);
   if (filters.apartment_id) where.apartment_id = Number(filters.apartment_id);
+
+  where = await applyBuildingScope(currentUser, where, 'ServiceRequest');
 
   return prisma.serviceRequests.findMany({
     where,
@@ -35,10 +39,12 @@ export const getAll = async (filters = {}) => {
 };
 
 // GET /my — Yêu cầu của user hiện tại (TECHNICIAN xem việc được giao + RECEPTIONIST xem việc do mình tạo)
-export const getMy = async (userId, role) => {
-  const where = role === 'TECHNICIAN'
+export const getMy = async (userId, role, currentUser) => {
+  let where = role === 'TECHNICIAN'
     ? { assigned_to: userId }
     : {};
+
+  where = await applyBuildingScope(currentUser, where, 'ServiceRequest');
 
   return prisma.serviceRequests.findMany({
     where,
@@ -56,7 +62,7 @@ export const getById = async (id) => {
 };
 
 // POST / — Tạo mới
-export const create = async (data, requestedByUserId) => {
+export const create = async (data, requestedByUserId, currentUser) => {
   let requesterName = data.requester_name;
   let requesterPhone = data.requester_phone;
   if (!requesterName && requestedByUserId) {
@@ -64,6 +70,20 @@ export const create = async (data, requestedByUserId) => {
     if (user) {
       requesterName = user.full_name;
       requesterPhone = user.phone;
+    }
+  }
+
+  // Check policy gán tòa nhà đối với role MANAGER/TECHNICIAN/RECEPTIONIST
+  const apartment = await prisma.apartments.findUnique({
+    where: { id: Number(data.apartment_id) },
+    include: { floor: true }
+  });
+  if (!apartment) throw new Error('Không tìm thấy căn hộ');
+
+  if (currentUser && currentUser.role !== 'ADMIN') {
+    const assignedIds = await getAssignedBuildingIds(currentUser.userId);
+    if (!assignedIds.includes(apartment.floor.building_id)) {
+      throw new Error(`Bạn không có quyền gửi yêu cầu cho căn hộ thuộc tòa nhà này (Tòa nhà #${apartment.floor.building_id})`);
     }
   }
 
@@ -80,7 +100,7 @@ export const create = async (data, requestedByUserId) => {
     }
   }
 
-  return prisma.serviceRequests.create({
+  const newRequest = await prisma.serviceRequests.create({
     data: {
       title: data.title,
       description: data.description,
@@ -93,16 +113,27 @@ export const create = async (data, requestedByUserId) => {
       requester_name: requesterName,
       requester_phone: requesterPhone,
       assigned_to: data.assigned_to ? Number(data.assigned_to) : null,
+      scheduled_start_date: data.scheduled_start_date ? new Date(data.scheduled_start_date) : new Date(),
     },
     include: INCLUDE_FULL,
   });
+
+  eventHub.emit('maintenance.created', {
+    actorId: requestedByUserId,
+    entityId: newRequest.id,
+    data: { title: newRequest.title, priority: newRequest.priority, status: newRequest.status }
+  });
+
+  return newRequest;
 };
 
 // PATCH /:id/assign — Assign cho kỹ thuật viên
-export const assign = async (id, assignedTo) => {
+export const assign = async (id, assignedTo, actorId) => {
   // Validate assignee
   const user = await prisma.users.findUnique({ where: { id: assignedTo } });
   if (!user) throw new Error('Nhân viên không tồn tại');
+
+  const oldRequest = await prisma.serviceRequests.findUnique({ where: { id } });
 
   const updated = await prisma.serviceRequests.update({
     where: { id },
@@ -113,14 +144,15 @@ export const assign = async (id, assignedTo) => {
     include: INCLUDE_FULL,
   });
 
-  // Gửi thông báo real-time tới kỹ thuật viên
-  await createNotification({
-    userId: assignedTo,
-    title: 'Yêu cầu kỹ thuật mới',
-    message: `Bạn được phân công xử lý yêu cầu: "${updated.title}"`,
-    type: 'MAINTENANCE_ASSIGNED',
-    entityType: 'ServiceRequest',
+  eventHub.emit('maintenance.assigned', {
+    actorId,
     entityId: updated.id,
+    data: {
+      oldData: { status: oldRequest?.status, assigned_to: oldRequest?.assigned_to },
+      newData: { status: updated.status, assigned_to: updated.assigned_to },
+      assignedTo,
+      title: updated.title
+    }
   });
 
   return updated;
@@ -137,10 +169,8 @@ export const updateStatus = async (id, status, requesterId, requesterRole, body 
     throw new Error('Bạn chỉ có thể cập nhật yêu cầu được giao cho mình');
   }
 
-  const validStatuses = ['PENDING', 'ASSIGNED', 'IN_PROGRESS', 'RESOLVED', 'CANCELLED', 'POSTPONED'];
-  if (!validStatuses.includes(status)) {
-    throw new Error('Trạng thái không hợp lệ');
-  }
+  // Xác thực transition trạng thái qua Workflow Engine
+  await validateTransition('ServiceRequestWorkflow', sr.status, status, requesterRole);
 
   const updateData = { status };
   if (status === 'RESOLVED') {
@@ -180,38 +210,18 @@ export const updateStatus = async (id, status, requesterId, requesterRole, body 
     });
   });
 
-  // Gửi thông báo real-time khi hoàn thành sự cố (Kỹ thuật viên -> ADMIN/MANAGER)
+  // Gửi thông báo và log timeline bằng cách phát sự kiện qua EventHub
   if (status === 'RESOLVED') {
-    (async () => {
-      try {
-        const managers = await prisma.users.findMany({
-          where: { role: { in: ['ADMIN', 'MANAGER'] }, is_active: true },
-          select: { id: true }
-        });
-
-        // Tính tổng chi phí
-        const totalCost = updated.expenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
-        const aptCode = updated.apartment?.apartment_code ?? '';
-
-        // Tên kỹ thuật viên xử lý
-        const techName = requesterRole === 'TECHNICIAN'
-          ? (await prisma.users.findUnique({ where: { id: requesterId }, select: { full_name: true } }))?.full_name
-          : 'Nhân viên';
-
-        for (const manager of managers) {
-          await createNotification({
-            userId: manager.id,
-            title: 'Sự cố kỹ thuật đã hoàn thành',
-            message: `Căn hộ ${aptCode}: Yêu cầu "${updated.title}" đã được hoàn thành bởi ${techName}. Tổng chi phí: ${totalCost.toLocaleString('vi-VN')} đ.`,
-            type: 'MAINTENANCE_RESOLVED',
-            entityType: 'ServiceRequest',
-            entityId: updated.id
-          });
-        }
-      } catch (err) {
-        console.error('[Notification] Failed to send maintenance resolved notification:', err.message);
+    eventHub.emit('maintenance.completed', {
+      actorId: requesterId,
+      entityId: updated.id,
+      data: {
+        title: updated.title,
+        oldData: { status: sr.status },
+        newData: { status: updated.status },
+        expenses: updated.expenses
       }
-    })();
+    });
   }
 
   return updated;

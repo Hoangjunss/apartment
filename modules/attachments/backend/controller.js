@@ -67,6 +67,12 @@ export const uploadAttachment = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Không có file được chọn' });
     }
 
+    // Validate file type
+    const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      return res.status(400).json({ success: false, message: 'Chỉ chấp nhận các loại file PDF, JPG, JPEG, PNG, WEBP' });
+    }
+
     // 1. Upload file lên Cloudinary thông qua stream
     const cloudinaryResult = await uploadToCloudinary(file.buffer, file.originalname, file.mimetype);
 
