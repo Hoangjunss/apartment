@@ -1,11 +1,83 @@
 # 🏢 QLCHDC — Hệ thống Quản lý Căn hộ Dịch vụ
 
 > Hệ thống quản lý nội bộ dành cho nhân viên vận hành tòa nhà (Admin, Manager, Receptionist, Technician).  
-> Được xây dựng theo kiến trúc **Monorepo** với **pnpm workspaces**.
+> Kiến trúc **Monorepo** + **Event-Driven** + **Real-time Socket.io**.
 
 ---
 
-## 🛠️ Công nghệ sử dụng
+## 📐 Module Overview
+
+Hệ thống giải quyết toàn bộ vòng đời nghiệp vụ quản lý căn hộ dịch vụ:
+
+| Bài toán | Module giải quyết |
+|----------|------------------|
+| Xác thực & phân quyền nhân viên | `auth` |
+| Quản lý tài sản bất động sản | `building` |
+| Hồ sơ & cư trú khách thuê | `tenant` |
+| Vòng đời hợp đồng thuê | `contract` |
+| Tài chính hàng tháng (điện/nước/hóa đơn) | `finance` |
+| Tiếp nhận & xử lý sự cố kỹ thuật | `service-requests` |
+| Chi phí vận hành tòa nhà | `expense` |
+| Thông báo real-time | `notifications` |
+| Lịch sử kiểm tra toàn hệ thống | `audit-log` |
+| Tìm kiếm toàn cầu | `search` |
+| Lịch vận hành | `calendar` |
+| Phân quyền theo tòa nhà (RBAC+) | `policy` |
+| Quy trình nghiệp vụ linh hoạt | `workflow` |
+| Quy tắc nghiệp vụ động | `rules` |
+| Đính kèm tài liệu | `attachments` |
+| Bình luận nội bộ | `comments` |
+| Báo cáo thống kê | `report` |
+| Form công khai qua QR | `public` |
+
+---
+
+## 🏛️ System Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│             Frontend (React + Vite + TailwindCSS)   │
+│  30 Pages · Axios + TanStack Query · Socket.io-client│
+└────────────────────┬────────────────────────────────┘
+                     │ HTTP/WebSocket
+┌────────────────────▼────────────────────────────────┐
+│              Backend (Express.js · ESM · Port 3001)  │
+│                                                      │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │
+│  │   Auth   │  │ Building │  │ Contract / Finance│  │
+│  └──────────┘  └──────────┘  └──────────────────┘  │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │
+│  │ Expense  │  │ Service  │  │ Policy / Workflow │  │
+│  └──────────┘  │ Requests │  │ Rules / Search   │  │
+│                └──────────┘  └──────────────────┘  │
+│                                                      │
+│  ┌──────────────────────────────────────────────┐   │
+│  │              Event Hub (in-process)           │   │
+│  │  contract.* · invoice.* · maintenance.*       │   │
+│  └────────┬───────────┬─────────────────────────┘   │
+│           │           │                              │
+│  ┌────────▼──┐  ┌─────▼──────┐  ┌───────────────┐  │
+│  │AuditLog   │  │ Timeline   │  │ Notification  │  │
+│  │ Listener  │  │ Listener   │  │ Listener      │  │
+│  └───────────┘  └────────────┘  └───────┬───────┘  │
+└──────────────────────────────────────────┼──────────┘
+                     │                     │ Socket.io emit
+┌────────────────────▼─────────────────┐   │
+│         Prisma ORM (ESM)             │   │
+│  30 Models · Decimal · Soft Delete   │   │
+└────────────────────┬─────────────────┘   │
+                     │                     │
+┌────────────────────▼─────────────────┐   │
+│            MySQL Database            │   │
+└──────────────────────────────────────┘   │
+                                           ▼
+                                  ┌─────────────────┐
+                                  │  Browser Client  │
+                                  │  (Real-time Notif│
+                                  └─────────────────┘
+```
+
+**Công nghệ sử dụng:**
 
 | Lớp | Công nghệ |
 |-----|-----------|
@@ -13,11 +85,64 @@
 | **Frontend** | React.js + Vite + TailwindCSS |
 | **Database** | MySQL + Prisma ORM |
 | **Monorepo** | pnpm workspaces |
+| **Real-time** | Socket.io |
+| **File Storage** | Cloudinary (upload_stream · resource_type: auto) |
 | **Containerization** | Docker + docker-compose |
-| **Biểu đồ UI** | Recharts |
-| **Icon** | Lucide React |
-| **HTTP Client** | Axios |
-| **State/Cache** | TanStack React Query |
+| **Auth** | JWT (Access 8h + Refresh 7d) · bcryptjs |
+| **Charts** | Recharts |
+| **HTTP Client** | Axios + Interceptors |
+| **Server Cache** | TanStack React Query |
+
+---
+
+## 🔄 Business Architecture
+
+```
+Nhân viên tạo tòa nhà & căn hộ
+         │
+         ▼
+Tạo hồ sơ Khách thuê (Tenants)
+         │
+         ▼
+Ký Hợp đồng thuê (Contracts)
+  ├── Đăng ký Dịch vụ (ServiceSubscriptions)
+  ├── Căn hộ → OCCUPIED
+  └── Phát sự kiện contract.created
+         │
+         ▼ (hàng tháng)
+Ghi Chỉ số Điện nước (UtilityReadings)
+         │
+         ▼
+Lập Hóa đơn (Invoices)  ←── Cộng dồn nợ + Khấu trừ ví dư
+  ├── Tiền thuê + Điện + Nước (khoán theo đầu người) + Dịch vụ
+  └── Phát sự kiện invoice.created
+         │
+         ▼
+Khách đóng tiền → Ghi Phiếu thu (Payments)
+  ├── PAID / PARTIALLY_PAID / OVERDUE
+  ├── Dư → vào ContractCredits (CREDIT_IN)
+  └── Phát sự kiện invoice.paid
+         │
+         ▼
+Gia hạn / Chấm dứt Hợp đồng
+  ├── Gia hạn → cập nhật end_date, giá thuê mới
+  ├── Chấm dứt → TERMINATED + lý do
+  └── Hết hạn (Cron 00:00) → EXPIRED + căn hộ → AVAILABLE
+         │
+         ▼ (song song)
+Chi phí Tòa nhà (BuildingExpenses)
+  └── PENDING → PAID + Đính kèm chứng từ
+
+Yêu cầu Kỹ thuật (ServiceRequests)
+  ├── Nguồn: INTERNAL / PUBLIC_FORM (QR)
+  ├── PENDING → ASSIGNED → IN_PROGRESS → RESOLVED
+  └── Phát sự kiện maintenance.*
+
+         │ (tất cả hành động phát Event)
+         ▼
+EventHub → AuditLog · Timeline · Notification
+              └── Socket.io → Browser real-time
+```
 
 ---
 
@@ -26,375 +151,1067 @@
 ```
 apartment/
 ├── apps/
-│   ├── backend/          ← Express server (entry point, mount tất cả router)
-│   └── frontend/         ← React + Vite (entry point, routing, layout)
+│   ├── backend/          ← Express server (server.js · 18 routers · Socket.io)
+│   └── frontend/         ← React + Vite (App.jsx · routing · layout)
 ├── modules/
-│   ├── auth/             ← Xác thực, phân quyền, quản lý người dùng
-│   ├── building/         ← Tòa nhà, tầng, căn hộ, nội thất
-│   ├── tenant/           ← Hồ sơ khách thuê, khai báo tạm trú
-│   ├── contract/         ← Hợp đồng thuê, gia hạn, chấm dứt
-│   └── finance/          ← Chỉ số điện nước, hóa đơn, thu tiền, dashboard
+│   ├── auth/             ← JWT · bcrypt · RBAC middleware
+│   ├── building/         ← Tòa nhà · Tầng · Căn hộ · QR Token
+│   ├── tenant/           ← Hồ sơ khách thuê · Tạm trú/vắng
+│   ├── contract/         ← Vòng đời HĐ · Gia hạn · Chấm dứt · Cron
+│   ├── finance/          ← Điện nước · Hóa đơn · Thanh toán · Credit
+│   ├── service-requests/ ← Sự cố kỹ thuật · QR Public Form
+│   ├── expense/          ← Chi phí tòa nhà · Attachment integration
+│   ├── attachments/      ← Cloudinary upload/delete · in-memory multer
+│   ├── audit-log/        ← AuditLog listener · Timeline listener
+│   ├── notifications/    ← Notification listener · Cron reminder
+│   ├── comments/         ← Bình luận theo ServiceRequest
+│   ├── search/           ← Global search (5 entities)
+│   ├── report/           ← 4 báo cáo aggregation
+│   ├── calendar/         ← Calendar events (Contract/Invoice/Maintenance)
+│   ├── policy/           ← checkPolicy middleware · applyBuildingScope
+│   ├── workflow/         ← State machine · validateTransition
+│   ├── rules/            ← Business Rules Engine · CRON scan
+│   └── public/           ← Public API không cần auth (QR form)
 └── packages/
-    └── prisma/           ← Schema DB dùng chung, migration, seed data
+    └── prisma/           ← Schema 30 models · migrations · seed.js
 ```
 
-Mỗi module backend là một **pnpm workspace độc lập** với cấu trúc `router.js → controller.js → service.js`.
+---
+
+## ✅ Business Features
+
+### 🔐 Module Auth
+
+#### Login (Đăng nhập)
+- **Purpose**: Xác thực nhân viên và cấp token phiên làm việc
+- **Actor**: Tất cả nhân viên
+- **Input**: `email`, `password`
+- **Output**: `accessToken` (JWT 8h), `refreshToken` (JWT 7d), thông tin user
+- **Business Rules**:
+  - Email phải tồn tại trong hệ thống
+  - `is_active = false` → từ chối đăng nhập
+  - Password so sánh với `bcryptjs` (10 salt rounds)
+  - Cập nhật `last_login_at` sau mỗi lần đăng nhập thành công
+  - Password hash không bao giờ trả về trong response
+
+#### Refresh Token
+- **Purpose**: Làm mới Access Token mà không cần đăng nhập lại
+- **Business Rules**: Refresh token hợp lệ + user vẫn active → cấp access token mới 8h
+
+#### Change Password (Đổi mật khẩu)
+- **Business Rules**: Xác minh mật khẩu cũ trước khi cho phép đổi
+
+#### User Management (ADMIN only)
+- Tạo tài khoản: mật khẩu mặc định `password123`, không trùng email
+- Cập nhật: **không cho phép đổi email** để tránh conflict
+- Toggle Active: khoá/mở tài khoản mà không xóa dữ liệu
 
 ---
 
-## ✅ Những gì đã hoàn thành
+### 🏗️ Module Building
 
-### 1. 🗄️ Cơ sở dữ liệu (packages/prisma)
+#### Quản lý Tòa nhà / Tầng / Căn hộ
+- **Actor**: ADMIN tạo/xoá · MANAGER cập nhật · tất cả xem
+- **Loại phòng**: `STUDIO` / `ONE_BR` / `TWO_BR` / `THREE_BR`
+- **Trạng thái căn hộ**: `AVAILABLE` / `OCCUPIED` / `MAINTENANCE` / `RESERVED`
+- **Business Rules**:
+  - Mỗi thay đổi trạng thái tạo record `ApartmentStatusLogs`
+  - Nội thất (`ApartmentFurniture`): condition = `NEW` / `GOOD` / `WORN`
+  - Căn hộ có soft delete (`deleted_at`)
+  - Tòa nhà có soft delete (`deleted_at`)
 
-**Schema đầy đủ** với 14 model:
+#### QR Token
+- Token 16 ký tự ngẫu nhiên, thời hạn 90 ngày
+- Chỉ 1 token tồn tại/căn hộ (unique constraint)
+- Dùng để khách thuê truy cập form báo hỏng không cần đăng nhập
 
-| Model | Mô tả |
-|-------|-------|
-| `Users` | Tài khoản nhân viên — 4 role: ADMIN, MANAGER, RECEPTIONIST, TECHNICIAN |
-| `Buildings` | Tòa nhà (mã, tên, địa chỉ, số tầng) |
-| `Floors` | Tầng thuộc tòa nhà |
-| `Apartments` | Căn hộ — 4 loại (Studio, 1PN, 2PN, 3PN), 4 trạng thái (Available/Occupied/Maintenance/Reserved) |
-| `ApartmentFurniture` | Danh mục nội thất theo căn hộ |
-| `ApartmentStatusLogs` | Lịch sử thay đổi trạng thái căn hộ |
-| `Tenants` | Hồ sơ khách thuê (CCCD, ngày sinh, địa chỉ) |
-| `Contracts` | Hợp đồng thuê (tiền thuê, đặt cọc, điện nước, nội thất bàn giao) |
-| `ContractRenewals` | Lịch sử gia hạn hợp đồng |
-| `TemporaryRegistrations` | Khai báo tạm trú / tạm vắng |
-| `Services` | Dịch vụ đi kèm (vệ sinh, giặt ủi, internet, cáp TV) |
-| `ServiceSubscriptions` | Đăng ký dịch vụ theo hợp đồng |
-| `UtilityReadings` | Chỉ số điện nước hàng tháng |
-| `Invoices` | Hóa đơn hàng tháng (tiền phòng + điện + nước + dịch vụ) |
-| `Payments` | Phiếu thu tiền (Cash / Bank Transfer) |
-| `ServiceRequests` | Yêu cầu dịch vụ kỹ thuật |
-
-**Dữ liệu mẫu (seed.js):**
-- 3 tài khoản hệ thống (admin, manager, technician)
-- 2 tòa nhà × 4 tầng × 3 căn hộ = **24 căn hộ**
-- **16 khách thuê** với tên tiếng Việt ngẫu nhiên
-- **16 hợp đồng** đang active (trong đó 3 hợp đồng sắp hết hạn trong tháng 6/2026)
-- 4 dịch vụ + đăng ký dịch vụ theo hợp đồng
-- Lịch sử tài chính **5 tháng** (Jan–May 2026): chỉ số điện, hóa đơn, thanh toán
+#### Quick Preview
+- API `GET /apartments/:id/preview` trả thông tin tóm tắt kèm hợp đồng hiện tại, không lộ thông tin nhạy cảm
 
 ---
 
-### 2. 🔐 Module Auth
+### 👤 Module Tenant
 
-**Backend API** (`/api/auth`):
+#### Quản lý Hồ sơ Khách thuê
+- **Actor**: ADMIN, MANAGER, RECEPTIONIST
+- **Thông tin lưu trữ**: CCCD (unique), ngày sinh, giới tính, địa chỉ thường trú, quốc tịch, nghề nghiệp, avatar
+- **Soft delete**: `deleted_at`
+- **Tìm kiếm**: theo tên, CCCD, SĐT, email
 
-| Method | Route | Mô tả | Quyền |
-|--------|-------|-------|-------|
-| POST | `/login` | Đăng nhập, trả JWT | Public |
+#### Khai báo Tạm trú / Tạm vắng
+- **Loại**: `TEMPORARY_RESIDENCE` / `TEMPORARY_ABSENCE`
+- Lưu `destination` (nơi đến) và `reason` (lý do)
+
+---
+
+### 📄 Module Contract
+
+#### Tạo Hợp đồng
+- **Actor**: ADMIN, MANAGER
+- **Input**: tenant_id, apartment_id, start_date, end_date, monthly_rent, deposit_amount, electricity_price, initial_electricity, soNguoiO, water_price_per_month, payment_due_day, furniture_handover
+- **Business Rules**:
+  - Căn hộ phải ở trạng thái `AVAILABLE`
+  - Sau khi tạo → căn hộ chuyển sang `OCCUPIED`
+  - Phát sự kiện `contract.created`
+  - Mặc định: `electricity_price = 3500 VNĐ/kWh`, `water_price_per_month = 100.000 VNĐ/người/tháng`
+  - `termination_notice_days` mặc định 30 ngày
+
+#### Vòng đời Hợp đồng (Tự động bởi Cron)
+```
+ACTIVE ──[≤ 30 ngày]──▶ EXPIRING_SOON ──[quá end_date]──▶ EXPIRED
+                                                              │
+                                                    Căn hộ → AVAILABLE
+ACTIVE / EXPIRING_SOON ──[nhân viên]──▶ TERMINATED (kèm lý do)
+EXPIRED / TERMINATED ──[nhân viên]──▶ gia hạn → ACTIVE (ContractRenewals)
+```
+
+#### Gia hạn (ContractRenewals)
+- Cập nhật `end_date`, `monthly_rent` mới (có thể khác)
+- Lưu lịch sử gia hạn
+- Phát sự kiện `contract.renewed`
+
+#### Chấm dứt
+- Phải cung cấp `termination_reason`
+- Phát sự kiện `contract.terminated`
+- Căn hộ → `AVAILABLE`
+
+---
+
+### 💰 Module Finance
+
+#### Ghi Chỉ số Điện nước (UtilityReadings)
+- **Unique constraint**: `(apartment_id, billing_month)`
+- **Business Rules**:
+  - `electricity_curr >= electricity_prev` (validate phía frontend khi import Excel)
+  - `water_prev`, `water_curr` lưu `null` (nước tính khoán theo `soNguoiO`)
+  - Hỗ trợ bulk import qua Excel (.xlsx) với preview + chỉnh sửa trực tiếp
+
+#### Lập Hóa đơn (Invoices)
+- **Business Rules**:
+  - Unique: `(contract_id, billing_month)` — không tạo trùng
+  - Công thức: `total = rent + electricity + water + service + other_amount - credit_applied + debt_amount`
+  - `electricity = (curr - prev) × electricity_unit_price`
+  - `water = water_price_per_month` (từ Hợp đồng, không tính theo m³)
+  - `due_date` = ngày `payment_due_day` của tháng KẾ TIẾP sau `billing_month`
+  - Trước khi tạo: kiểm tra ví dư (`credit`) → khấu trừ tự động (`CREDIT_APPLY`)
+  - Trước khi tạo: kiểm tra hóa đơn cũ chưa thanh toán → cộng `debt_amount`
+  - Phát sự kiện `invoice.created`
+
+#### Ghi nhận Thanh toán (Payments)
+- **Phương thức**: `CASH` / `BANK_TRANSFER`
+- **Business Rules**:
+  - Thanh toán đủ hoặc thừa → `PAID` + phần thừa vào `ContractCredits` (`CREDIT_IN`)
+  - Thanh toán một phần → `PARTIALLY_PAID`
+  - Phát sự kiện `invoice.paid`
+
+#### Ví dư & Công nợ (ContractCredits)
+- `CREDIT_IN`: tiền thừa vào ví
+- `CREDIT_APPLY`: khấu trừ khi lập hóa đơn mới
+- `CREDIT_REFUND`: hoàn tiền thủ công (ADMIN/MANAGER)
+
+#### Hóa đơn Quá hạn (OVERDUE)
+- Tự động bởi Cron 00:00: `UNPAID/PARTIALLY_PAID` + `due_date < today` → `OVERDUE`
+- Gửi notification cho toàn bộ ADMIN/MANAGER
+
+---
+
+### 🔧 Module Service Requests
+
+#### Tạo Yêu cầu
+- **Nguồn INTERNAL**: nhân viên tạo trong hệ thống
+- **Nguồn PUBLIC_FORM**: khách thuê quét QR → form công khai → tự liên kết với hợp đồng đang active của căn hộ đó
+- **Loại**: `MAINTENANCE` / `CLEANING` / `COMPLAINT` / `OTHER`
+- **Độ ưu tiên**: `LOW` / `NORMAL` / `HIGH` / `URGENT`
+
+#### Vòng đời
+```
+PENDING ──[Assign]──▶ ASSIGNED ──[Start]──▶ IN_PROGRESS ──[Done]──▶ RESOLVED
+   │                                                                    │
+   └──[Cancel]──▶ CANCELLED                                   resolved_at = now()
+```
+- Phát sự kiện: `maintenance.created`, `maintenance.assigned`, `maintenance.completed`
+- `scheduled_start_date`: lên lịch bảo trì định kỳ
+
+#### Chi phí Sửa chữa (ServiceRequestExpenses)
+- Ghi nhận chi phí vật tư/nhân công kèm theo yêu cầu
+- `onDelete: Cascade` khi xóa ServiceRequest
+
+---
+
+### 💸 Module Expense (Chi phí Tòa nhà)
+
+#### CRUD Chi phí
+- **Category**: `OPERATIONS` (vận hành) / `MAINTENANCE` (bảo trì)
+- **Status**: `PENDING` → `PAID`
+- **Actor**:
+  - Create / Update / Update Status: ADMIN, MANAGER, RECEPTIONIST
+  - Delete (soft): ADMIN only
+- **Business Rules**:
+  - `amount > 0` (validate trong service)
+  - Soft delete: `deleted_at`
+  - Không cho phép tạo với `amount ≤ 0`
+  - Đính kèm file chứng từ qua Attachments module (`entity_type = 'BuildingExpense'`)
+
+#### Thống kê
+- API `GET /expense/summary`: tổng chi phí PAID theo category, lọc theo building_id, year, month
+- Tích hợp vào Dashboard: "Chi phí tháng này", "Lợi nhuận gộp" (Thực thu - Chi phí PAID)
+
+---
+
+### 📎 Module Attachments
+
+#### Upload File
+- **Lưu trữ**: Cloudinary (upload qua stream, `resource_type: 'auto'`)
+- **Cho phép**: PDF, JPEG, PNG, WEBP
+- **Giới hạn**: 10 MB/file
+- **Entity hỗ trợ**: `ServiceRequest`, `Contract`, `Invoice`, `Tenant`, `BuildingExpense`
+
+#### Xóa File
+- Xóa trên Cloudinary trước (detect resource_type: `image` vs `raw`)
+- Xóa record trong DB sau
+- **Quyền xóa**: người upload **hoặc** ADMIN/MANAGER
+- Nếu Cloudinary báo lỗi → vẫn xóa DB (graceful degradation)
+
+---
+
+### 🔔 Module Notifications
+
+#### Loại Notification
+
+| Type | Trigger | Receiver |
+|------|---------|---------|
+| `CONTRACT_CREATED` | Event `contract.created` | All ADMIN, MANAGER |
+| `PAYMENT_RECEIVED` | Event `invoice.paid` | All ADMIN, MANAGER |
+| `MAINTENANCE_ASSIGNED` | Event `maintenance.assigned` | Technician được giao |
+| `MAINTENANCE_RESOLVED` | Event `maintenance.completed` | All ADMIN, MANAGER |
+| `MAINTENANCE_REMINDER` | Cron 00:00 (scheduled_start_date ≤ 2 ngày) | Technician (nếu đã giao) hoặc ADMIN/MANAGER |
+| `CONTRACT_EXPIRING` | Cron 00:00 (end_date ≤ 30 ngày) | All ADMIN, MANAGER |
+| `INVOICE_OVERDUE` | Cron 00:00 (due_date < today) | All ADMIN, MANAGER |
+| `CONTRACT_EXPIRING_RULE` | Business Rules Engine scan | Người tạo hợp đồng |
+| `INVOICE_OVERDUE_RULE` | Business Rules Engine scan | ADMIN, MANAGER + người tạo |
+| `MAINTENANCE_REMINDER_RULE` | Business Rules Engine scan | Technician hoặc ADMIN/MANAGER |
+
+- **Real-time**: Socket.io emit to room `user:{userId}` ngay khi notification được tạo
+- **Duplicate prevention**: Cron check `findFirst` trước khi tạo để không spam
+
+---
+
+### 📋 Module Audit Log
+
+Ghi nhận tất cả hành động nghiệp vụ quan trọng thông qua Event:
+
+| Event lắng nghe | Action | ResourceType |
+|----------------|--------|-------------|
+| `contract.created` | CREATE | Contract |
+| `contract.updated` | UPDATE | Contract |
+| `contract.terminated` | DELETE | Contract |
+| `contract.renewed` | UPDATE | Contract |
+| `invoice.created` | CREATE | Invoice |
+| `invoice.paid` | UPDATE | Invoice |
+| `maintenance.created` | CREATE | ServiceRequest |
+| `maintenance.assigned` | UPDATE | ServiceRequest |
+| `maintenance.completed` | UPDATE | ServiceRequest |
+
+- Lỗi audit log **không làm fail** request chính (try/catch riêng biệt)
+- `actorId = 0` + `actorName = 'Hệ thống'` cho các action từ Cron
+- API lọc: theo `userId`, `action`, `resourceType`, `from`, `to`, `keyword`
+
+---
+
+### 📅 Module Calendar
+
+Tổng hợp 3 loại sự kiện trong khoảng thời gian [start, end]:
+
+| Type | Color | Nguồn dữ liệu |
+|------|-------|--------------|
+| `CONTRACT_EXPIRY` | 🟠 orange | Contracts với status ACTIVE/EXPIRING_SOON |
+| `PAYMENT_DUE` | 🔴 red | Invoices chưa thanh toán (chỉ khi remaining > 0) |
+| `MAINTENANCE` | 🔵 blue | ServiceRequests type=MAINTENANCE có scheduled_start_date |
+
+---
+
+### 🔍 Module Search
+
+Global search tối thiểu 2 ký tự, truy vấn song song 5 entity:
+
+| Entity | Fields tìm kiếm |
+|--------|----------------|
+| Tenants | full_name, phone, national_id, email |
+| Apartments | apartment_code |
+| Buildings | name, code |
+| Contracts | contract_code |
+| Invoices | invoice_code |
+
+Mỗi entity trả tối đa **5 kết quả**.
+
+---
+
+### ⚙️ Module Workflow Engine
+
+Quản lý state machine linh hoạt không hard-code:
+- CRUD `Workflows` → `WorkflowSteps` → `WorkflowTransitions`
+- `validateTransition(workflowName, fromStep, toStep, userRole)` — throw error nếu transition không hợp lệ
+- `role_allowed` trên mỗi Transition: ADMIN bypass, role khác phải khớp
+- Chỉ ADMIN được cấu hình Workflow
+
+---
+
+### 📐 Module Business Rules Engine
+
+Đánh giá quy tắc nghiệp vụ từ database, không hard-code:
+
+| Entity | Field | Operators hỗ trợ |
+|--------|-------|-----------------|
+| Contract | `days_remaining` | `<=` |
+| Invoice | `days_overdue` | `>=` |
+| ServiceRequest | `days_to_start` | `<=` |
+
+- Trigger: CRON hàng ngày + API thủ công `POST /rules/trigger-scan`
+- Duplicate prevention: check notification cùng ngày trước khi tạo
+- Chỉ ADMIN được CRUD rules
+
+---
+
+### 🛡️ Module Policy (RBAC+)
+
+Nâng cấp RBAC cơ bản thành Resource-level permission theo tòa nhà:
+
+| Chức năng | Mô tả |
+|-----------|-------|
+| `assignBuilding(userId, buildingId)` | Phân công tòa nhà cho MANAGER/TECHNICIAN/RECEPTIONIST |
+| `revokeAssignment(assignmentId)` | Thu hồi phân công (soft: `revoked_at`) |
+| `checkPolicy(resourceType, action)` | Middleware xác thực quyền truy cập resource cụ thể |
+| `applyBuildingScope(user, where)` | Lọc Prisma query theo tòa nhà được gán |
+
+Resource types hỗ trợ: `Building`, `BuildingExpense`, `Apartment`, `Contract`, `Invoice`, `ServiceRequest`
+
+---
+
+## 🗄️ Database Model
+
+### Core Domain Models
+
+#### `Users` — Tài khoản nhân viên
+| Field | Type | Mô tả |
+|-------|------|-------|
+| id | Int PK | Auto increment |
+| email | String UNIQUE | Tài khoản đăng nhập |
+| password_hash | String | bcrypt 10 rounds |
+| full_name | String | Tên hiển thị |
+| phone | String? | SĐT |
+| role | Enum | ADMIN / MANAGER / TECHNICIAN / RECEPTIONIST |
+| is_active | Boolean | Soft lock (default: true) |
+| last_login_at | DateTime? | Cập nhật sau mỗi login |
+
+#### `Buildings` — Tòa nhà
+| Field | Type | Mô tả |
+|-------|------|-------|
+| id | Int PK | |
+| code | String UNIQUE | Mã tòa nhà |
+| name | String | Tên tòa nhà |
+| address | Text | Địa chỉ |
+| total_floors | Int | Số tầng |
+| deleted_at | DateTime? | Soft delete |
+
+**Relations**: → Floors → BuildingExpenses → BuildingAssignments
+
+#### `Floors` — Tầng
+| Field | Type | Mô tả |
+|-------|------|-------|
+| building_id | Int FK | → Buildings |
+| floor_number | Int | Số tầng |
+
+**Index**: `building_id`
+
+#### `Apartments` — Căn hộ
+| Field | Type | Mô tả |
+|-------|------|-------|
+| floor_id | Int FK | → Floors |
+| apartment_code | String UNIQUE | Mã căn hộ |
+| room_type | Enum | STUDIO / ONE_BR / TWO_BR / THREE_BR |
+| area_sqm | Decimal(6,2) | Diện tích m² |
+| max_occupants | Int | Số người tối đa |
+| base_price | Decimal(15,2) | Giá thuê cơ bản |
+| deposit_amount | Decimal(15,2) | Tiền đặt cọc |
+| status | Enum | AVAILABLE / OCCUPIED / MAINTENANCE / RESERVED |
+| deleted_at | DateTime? | Soft delete |
+
+**Indexes**: `floor_id`, `status`
+
+#### `Tenants` — Khách thuê
+| Field | Type | Mô tả |
+|-------|------|-------|
+| national_id | String UNIQUE | Số CCCD |
+| national_id_issued_date | Date | Ngày cấp CCCD |
+| national_id_issued_place | String | Nơi cấp CCCD |
+| date_of_birth | Date | Ngày sinh |
+| gender | Enum | MALE / FEMALE / OTHER |
+| nationality | String | Mặc định: "Việt Nam" |
+| permanent_address | Text | Địa chỉ thường trú |
+| occupation | String? | Nghề nghiệp |
+| avatar_url | String? | URL ảnh đại diện |
+| deleted_at | DateTime? | Soft delete |
+
+**Indexes**: `national_id`, `phone`
+
+#### `Contracts` — Hợp đồng thuê
+| Field | Type | Mô tả |
+|-------|------|-------|
+| contract_code | String UNIQUE | Mã hợp đồng |
+| tenant_id | Int FK | → Tenants |
+| apartment_id | Int FK | → Apartments |
+| start_date / end_date | Date | Kỳ hiệu lực |
+| monthly_rent | Decimal(15,2) | Giá thuê tháng |
+| deposit_amount | Decimal(15,2) | Tiền đặt cọc |
+| payment_due_day | Int | Ngày đến hạn trong tháng |
+| status | Enum | ACTIVE / EXPIRING_SOON / EXPIRED / TERMINATED |
+| soNguoiO | Int | Số người ở (dùng tính nước) |
+| water_price_per_month | Decimal(15,2) | Tiền nước khoán/tháng |
+| electricity_price | Decimal(10,2) | Đơn giá điện (VNĐ/kWh) |
+| initial_electricity | Decimal(10,2) | Chỉ số điện đầu hợp đồng |
+| termination_notice_days | Int | Mặc định: 30 ngày |
+| furniture_handover | Text? | Biên bản bàn giao nội thất |
+| termination_reason | Text? | Lý do chấm dứt |
+| deleted_at | DateTime? | Soft delete |
+
+**Indexes**: `tenant_id`, `apartment_id`, `status`, `end_date`, `(status, end_date)`, `(apartment_id, status)`, `(tenant_id, status)`
+
+#### `Invoices` — Hóa đơn
+| Field | Type | Mô tả |
+|-------|------|-------|
+| invoice_code | String UNIQUE | Mã hóa đơn |
+| contract_id | Int FK | → Contracts |
+| apartment_id | Int FK | → Apartments |
+| billing_month | String | Kỳ tháng (YYYY-MM) |
+| rent_amount | Decimal(15,2) | Tiền thuê |
+| electricity_amount | Decimal(15,2) | Tiền điện |
+| water_amount | Decimal(15,2) | Tiền nước |
+| service_amount | Decimal(15,2) | Tiền dịch vụ |
+| other_amount | Decimal(15,2) | Phụ thu (mặc định 0) |
+| credit_applied | Decimal(15,2) | Ví dư đã khấu trừ |
+| debt_amount | Decimal(15,2) | Nợ cộng dồn từ tháng trước |
+| total_amount | Decimal(15,2) | Tổng phải thu |
+| status | Enum | UNPAID / PARTIALLY_PAID / PAID / OVERDUE |
+| due_date | Date | Hạn thanh toán |
+| deleted_at | DateTime? | Soft delete |
+
+**Unique**: `(contract_id, billing_month)` — không tạo trùng kỳ  
+**Indexes**: `status`, `due_date`, `(status, due_date)`
+
+#### `Payments` — Phiếu thu
+| Field | Type | Mô tả |
+|-------|------|-------|
+| invoice_id | Int FK | → Invoices |
+| amount | Decimal(15,2) | Số tiền thu |
+| payment_method | Enum | CASH / BANK_TRANSFER |
+| payment_date | Date | Ngày thu |
+| reference_number | String? | Số tham chiếu chuyển khoản |
+
+**Index**: `invoice_id`
+
+#### `UtilityReadings` — Chỉ số điện nước
+| Field | Type | Mô tả |
+|-------|------|-------|
+| apartment_id | Int FK | → Apartments |
+| billing_month | String | YYYY-MM |
+| electricity_prev / curr | Decimal(10,2) | Chỉ số điện cũ/mới |
+| water_prev / curr | Decimal? | NULL (nước tính khoán) |
+| electricity_unit_price | Decimal(10,2) | Đơn giá điện tại thời điểm ghi |
+| soNguoiO | Int | Số người ở tại thời điểm ghi |
+
+**Unique**: `(apartment_id, billing_month)`
+
+#### `ServiceRequests` — Yêu cầu kỹ thuật
+| Field | Type | Mô tả |
+|-------|------|-------|
+| apartment_id | Int FK | → Apartments |
+| contract_id | Int? FK | → Contracts (nếu có) |
+| type | Enum | MAINTENANCE / CLEANING / COMPLAINT / OTHER |
+| priority | Enum | LOW / NORMAL / HIGH / URGENT |
+| status | Enum | PENDING / ASSIGNED / IN_PROGRESS / RESOLVED / CANCELLED / POSTPONED |
+| source | Enum | INTERNAL / PUBLIC_FORM |
+| requester_name / phone | String? | Thông tin người báo (khi PUBLIC_FORM) |
+| assigned_to | Int? FK | → Users (Technician) |
+| resolved_at | DateTime? | Thời điểm hoàn thành |
+| scheduled_start_date | Date? | Lịch bảo trì dự kiến |
+
+**Indexes**: `apartment_id`, `contract_id`, `assigned_to`, `status`
+
+#### `BuildingExpenses` — Chi phí tòa nhà
+| Field | Type | Mô tả |
+|-------|------|-------|
+| building_id | Int FK | → Buildings |
+| category | Enum | OPERATIONS / MAINTENANCE |
+| title | String | Tên khoản chi |
+| amount | Decimal(15,2) | Số tiền (phải > 0) |
+| expense_date | Date | Ngày phát sinh |
+| status | Enum | PENDING / PAID |
+| deleted_at | DateTime? | Soft delete |
+
+**Indexes**: `building_id`, `status`, `expense_date`
+
+---
+
+### Supporting Models
+
+#### `AuditLogs` — Nhật ký kiểm tra
+| Field | Type | Mô tả |
+|-------|------|-------|
+| actor_id | Int | ID người thực hiện (0 = hệ thống) |
+| actor_name | String | Snapshot tên tại thời điểm action |
+| action | String | CREATE / UPDATE / DELETE |
+| resource_type | String | Contract / Invoice / ServiceRequest... |
+| resource_id | Int? | ID bản ghi bị tác động |
+| old_data / new_data | Json? | Snapshot dữ liệu trước/sau |
+| ip_address | String? | IP client |
+
+**Indexes**: `actor_id`, `(resource_type, resource_id)`, `created_at`
+
+#### `Notifications` — Thông báo
+| Field | Type | Mô tả |
+|-------|------|-------|
+| user_id | Int | Người nhận |
+| title / message | String | Nội dung |
+| type | String | Loại: CONTRACT_EXPIRING, INVOICE_OVERDUE... |
+| entity_type / entity_id | String?/Int? | Liên kết tới entity (extensible) |
+| is_read | Boolean | Mặc định false |
+
+**Indexes**: `(user_id, is_read)`, `created_at`
+
+#### `Timeline` — Dòng thời gian sự kiện
+| Field | Type | Mô tả |
+|-------|------|-------|
+| entity_type / entity_id | String/Int | Entity liên quan |
+| title / description | String | Mô tả sự kiện |
+| actor_id / actor_name | Int?/String? | Người thực hiện |
+
+**Index**: `(entity_type, entity_id)`
+
+#### `Attachments` — File đính kèm
+| Field | Type | Mô tả |
+|-------|------|-------|
+| file_name / file_url | String | Tên file và URL Cloudinary |
+| file_size | Int | Bytes |
+| mime_type | String | application/pdf, image/jpeg... |
+| entity_type / entity_id | String/Int | Liên kết polymorphic |
+| uploaded_by | Int FK | → Users |
+
+**Index**: `(entity_type, entity_id)`
+
+#### `BuildingAssignments` — Phân công tòa nhà
+| Field | Type | Mô tả |
+|-------|------|-------|
+| user_id | Int FK | → Users |
+| building_id | Int FK | → Buildings |
+| assigned_by | Int FK | → Users (ADMIN) |
+| revoked_at | DateTime? | Soft revoke |
+
+**Unique**: `(user_id, building_id)`
+
+#### `BusinessRules` — Quy tắc nghiệp vụ động
+| Field | Type | Mô tả |
+|-------|------|-------|
+| name | String UNIQUE | Tên rule |
+| entity | String | Contract / Invoice / ServiceRequest |
+| condition | Json | `{ field, operator, value }` |
+| action | String | SEND_NOTIFICATION... |
+| action_data | Json? | Template message |
+| is_active | Boolean | Bật/tắt rule |
+
+#### `Workflows` / `WorkflowSteps` / `WorkflowTransitions` — State Machine
+- `WorkflowSteps`: `is_initial`, `is_final`, `order_number`
+- `WorkflowTransitions`: `from_step_id → to_step_id`, `role_allowed` (CSV)
+- `onDelete: Cascade` theo chuỗi Workflow → Steps → Transitions
+
+#### `ContractCredits` / `CreditTransactions` — Ví dư
+- `ContractCredits`: balance mỗi hợp đồng
+- `CreditTransactions`: type = `CREDIT_IN` / `CREDIT_APPLY` / `CREDIT_REFUND`
+- `onDelete: Cascade` khi xóa Contract
+
+#### Các model khác
+- `ApartmentFurniture`: danh mục nội thất, condition = NEW/GOOD/WORN
+- `ApartmentStatusLogs`: lịch sử thay đổi trạng thái căn hộ
+- `ApartmentTokens`: QR token 16 ký tự, expires_at 90 ngày
+- `ContractRenewals`: lịch sử gia hạn
+- `TemporaryRegistrations`: khai báo tạm trú/vắng
+- `Services` + `ServiceSubscriptions`: dịch vụ đi kèm hợp đồng
+- `ServiceRequestComments`: bình luận nội bộ (`onDelete: Cascade`)
+- `ServiceRequestExpenses`: chi phí sửa chữa (`onDelete: Cascade`)
+
+---
+
+## 🔌 API Documentation
+
+### Auth — `/api/auth`
+
+| Method | Route | Mô tả | Permission |
+|--------|-------|-------|-----------|
+| POST | `/login` | Đăng nhập | Public |
 | POST | `/refresh` | Làm mới Access Token | Public |
 | POST | `/logout` | Đăng xuất | Auth |
-| GET | `/me` | Lấy thông tin user hiện tại | Auth |
+| GET | `/me` | Thông tin user hiện tại | Auth |
 | PUT | `/change-password` | Đổi mật khẩu | Auth |
-| GET | `/users` | Danh sách người dùng | ADMIN |
-| POST | `/users` | Tạo tài khoản mới | ADMIN |
-| PUT | `/users/:id` | Cập nhật thông tin | ADMIN |
-| PATCH | `/users/:id/toggle-active` | Khoá / mở tài khoản | ADMIN |
+| GET | `/users` | Danh sách nhân viên | ADMIN |
+| POST | `/users` | Tạo tài khoản | ADMIN |
+| PUT | `/users/:id` | Cập nhật nhân viên | ADMIN |
+| PATCH | `/users/:id/toggle-active` | Khoá/mở tài khoản | ADMIN |
 
-**Frontend Pages:**
-- **LoginPage** — Form đăng nhập, xử lý JWT, redirect sau login
-- **ProfilePage** — Xem & cập nhật thông tin cá nhân, đổi mật khẩu
-- **UsersPage** — Danh sách nhân viên, tạo mới, khoá tài khoản (ADMIN only)
-- **DashboardPage** — Trang tổng quan chính (xem chi tiết ở mục 7)
+**Possible Errors (Login)**:
+- `401` — Sai thông tin đăng nhập
+- `401` — Tài khoản đã bị khóa
 
-**Hạ tầng xác thực:**
-- `useAuth` hook + `AuthContext` quản lý session toàn app
-- `ProtectedRoute` + `RoleGuard` kiểm soát quyền truy cập route
-- Axios instance có interceptor tự động đính kèm Bearer token
+### Building — `/api/building`
 
----
+| Method | Route | Permission |
+|--------|-------|-----------|
+| GET | `/buildings` | Auth |
+| GET | `/buildings/:id` | Auth |
+| POST | `/buildings` | ADMIN |
+| PUT | `/buildings/:id` | ADMIN, MANAGER |
+| GET | `/buildings/:id/floors` | Auth |
+| POST | `/buildings/:id/floors` | ADMIN, MANAGER |
+| GET | `/apartments` | Auth |
+| GET | `/apartments/:id` | Auth |
+| GET | `/apartments/:id/preview` | Auth |
+| POST | `/apartments` | ADMIN, MANAGER |
+| PUT | `/apartments/:id` | ADMIN, MANAGER |
+| PATCH | `/apartments/:id/status` | Auth |
+| GET | `/apartments/:id/status-logs` | Auth |
+| GET | `/apartments/:id/furniture` | Auth |
+| POST | `/apartments/:id/furniture` | Auth |
+| PUT | `/furniture/:id` | Auth |
+| DELETE | `/furniture/:id` | ADMIN |
+| POST | `/apartments/:id/generate-token` | ADMIN, MANAGER |
 
-### 3. 🏗️ Module Building (Tòa nhà & Căn hộ)
+### Contract — `/api/contract`
 
-**Backend API** (`/api/building`):
+| Method | Route | Permission | Policy |
+|--------|-------|-----------|--------|
+| GET | `/` | ADMIN, MANAGER | — |
+| GET | `/expiring-soon` | ADMIN, MANAGER | — |
+| GET | `/:id` | ADMIN, MANAGER, RECEPTIONIST | checkPolicy(Contract, read) |
+| POST | `/` | ADMIN, MANAGER | — |
+| PUT | `/:id` | ADMIN, MANAGER | checkPolicy(Contract, update) |
+| PATCH | `/:id/terminate` | ADMIN, MANAGER | checkPolicy(Contract, delete) |
+| POST | `/:id/renew` | ADMIN, MANAGER | checkPolicy(Contract, update) |
+| GET | `/:id/renewals` | ADMIN, MANAGER | checkPolicy(Contract, read) |
+| GET | `/:id/audit-history` | ADMIN, MANAGER, RECEPTIONIST | checkPolicy(Contract, read) |
 
-| Nhóm | Route | Mô tả |
-|------|-------|-------|
-| Buildings | `GET /buildings` | Danh sách tòa nhà |
-| | `GET /buildings/:id` | Chi tiết tòa nhà |
-| | `POST /buildings` | Tạo tòa nhà mới (ADMIN) |
-| | `PUT /buildings/:id` | Cập nhật (ADMIN/MANAGER) |
-| Floors | `GET /buildings/:id/floors` | Danh sách tầng |
-| | `POST /buildings/:id/floors` | Thêm nhiều tầng một lúc |
-| Apartments | `GET /apartments` | Danh sách căn hộ (filter trạng thái, loại phòng) |
-| | `GET /apartments/:id` | Chi tiết căn hộ |
-| | `POST /apartments` | Thêm căn hộ mới |
-| | `PUT /apartments/:id` | Cập nhật thông tin căn hộ |
-| | `PATCH /apartments/:id/status` | Thay đổi trạng thái |
-| | `GET /apartments/:id/status-logs` | Lịch sử thay đổi trạng thái |
-| Furniture | `GET /apartments/:id/furniture` | Danh sách nội thất |
-| | `POST /apartments/:id/furniture` | Thêm đồ nội thất |
-| | `PUT /furniture/:id` | Cập nhật nội thất |
-| | `DELETE /furniture/:id` | Xóa nội thất (ADMIN) |
+### Finance — `/api/finance`
 
-**Frontend Pages & Components:**
-- **BuildingsPage** — Danh sách tòa nhà dạng card
-- **BuildingDetailPage** — Chi tiết tòa nhà, danh sách tầng + căn hộ theo tầng
-- **ApartmentsPage** — Bảng căn hộ toàn hệ thống, filter theo trạng thái & loại phòng
-- **ApartmentDetailPage** — Chi tiết căn hộ, danh mục nội thất, lịch sử trạng thái
-- **Form components:** `BuildingForm`, `ApartmentForm`, `FurnitureForm`, `StatusChangeForm`
+| Method | Route | Permission | Policy |
+|--------|-------|-----------|--------|
+| GET | `/utilities` | ADMIN, MANAGER, RECEPTIONIST | — |
+| POST | `/utilities` | ADMIN, MANAGER, RECEPTIONIST | — |
+| POST | `/utilities/bulk-import` | ADMIN, MANAGER, RECEPTIONIST | — |
+| POST | `/utilities/import-preview` | ADMIN, MANAGER, RECEPTIONIST | — |
+| POST | `/utilities/bulk-save` | ADMIN, MANAGER, RECEPTIONIST | — |
+| GET | `/utilities/template` | ADMIN, MANAGER, RECEPTIONIST | — |
+| GET | `/invoices` | ADMIN, MANAGER, RECEPTIONIST | — |
+| GET | `/invoices/:id` | ADMIN, MANAGER, RECEPTIONIST | checkPolicy(Invoice, read) |
+| POST | `/invoices/generate` | ADMIN, MANAGER | — |
+| PATCH | `/invoices/:id/status` | ADMIN, MANAGER | checkPolicy(Invoice, update) |
+| POST | `/payments` | ADMIN, MANAGER, RECEPTIONIST | — |
+| GET | `/contracts/:id/credits` | ADMIN, MANAGER, RECEPTIONIST | checkPolicy(Contract, read) |
+| POST | `/contracts/:id/credits/refund` | ADMIN, MANAGER | checkPolicy(Contract, update) |
 
----
+### Expense — `/api/expense`
 
-### 4. 👤 Module Tenant (Khách thuê)
+| Method | Route | Permission |
+|--------|-------|-----------|
+| GET | `/` | ADMIN, MANAGER, RECEPTIONIST |
+| GET | `/summary` | ADMIN, MANAGER, RECEPTIONIST |
+| POST | `/` | ADMIN, MANAGER, RECEPTIONIST |
+| PUT | `/:id` | ADMIN, MANAGER, RECEPTIONIST |
+| PATCH | `/:id/status` | ADMIN, MANAGER, RECEPTIONIST |
+| DELETE | `/:id` | **ADMIN only** |
 
-**Backend API** (`/api/tenant`):
+### Attachments — `/api/attachments`
 
-| Route | Mô tả | Quyền |
-|-------|-------|-------|
-| `GET /tenants` | Danh sách khách thuê | ADMIN/MANAGER/RECEPTIONIST |
-| `POST /tenants` | Tạo hồ sơ khách thuê mới | ADMIN/MANAGER/RECEPTIONIST |
-| `GET /tenants/:id` | Chi tiết khách thuê | ADMIN/MANAGER/RECEPTIONIST |
-| `PUT /tenants/:id` | Cập nhật hồ sơ | ADMIN/MANAGER/RECEPTIONIST |
-| `GET /tenants/:id/history` | Lịch sử hợp đồng | ADMIN/MANAGER |
-| `GET /tenants/:id/registrations` | Khai báo tạm trú/vắng | Tất cả |
-| `POST /tenants/:id/registrations` | Tạo khai báo mới | Tất cả |
-| `GET /registrations` | Tất cả khai báo hệ thống | ADMIN/MANAGER |
+| Method | Route | Permission |
+|--------|-------|-----------|
+| GET | `/?entity_type=X&entity_id=Y` | Auth |
+| POST | `/upload` | Auth |
+| DELETE | `/:id` | Auth (owner hoặc ADMIN/MANAGER) |
 
-**Frontend Pages & Components:**
-- **TenantsPage** — Bảng danh sách khách thuê, tìm kiếm theo tên/CCCD/SĐT
-- **TenantFormPage** — Form nhập hồ sơ khách thuê mới (thông tin cá nhân đầy đủ)
-- **TenantDetailPage** — Hồ sơ chi tiết, lịch sử hợp đồng, khai báo tạm trú
-- **Form components:** `TenantEditForm`, `RegistrationForm`
+### Notifications — `/api/notifications`
 
----
+| Method | Route |
+|--------|-------|
+| GET | `/` |
+| PATCH | `/:id/read` |
+| PATCH | `/read-all` |
 
-### 5. 📄 Module Contract (Hợp đồng)
+### Audit Logs — `/api/audit-logs`
 
-**Backend API** (`/api/contract`):
+| Method | Route | Permission |
+|--------|-------|-----------|
+| GET | `/` | ADMIN |
+| GET | `/:id` | ADMIN |
 
-| Route | Mô tả | Quyền |
-|-------|-------|-------|
-| `GET /` | Danh sách hợp đồng (filter theo trạng thái) | ADMIN/MANAGER |
-| `GET /expiring-soon` | Hợp đồng sắp hết hạn (≤ 30 ngày) | ADMIN/MANAGER |
-| `GET /:id` | Chi tiết hợp đồng | ADMIN/MANAGER/RECEPTIONIST |
-| `POST /` | Tạo hợp đồng mới | ADMIN/MANAGER |
-| `PUT /:id` | Cập nhật điều khoản | ADMIN/MANAGER |
-| `PATCH /:id/terminate` | Chấm dứt hợp đồng (có lý do) | ADMIN/MANAGER |
-| `POST /:id/renew` | Gia hạn hợp đồng | ADMIN/MANAGER |
-| `GET /:id/renewals` | Lịch sử gia hạn | ADMIN/MANAGER |
+### Policy — `/api/policy`
 
-**Cron Job tự động** (chạy hàng ngày lúc 00:00):
-- Chuyển hợp đồng `ACTIVE` → `EXPIRING_SOON` khi còn ≤ 30 ngày
-- Chuyển hợp đồng sang `EXPIRED` khi quá ngày kết thúc
-- Tự động giải phóng căn hộ về `AVAILABLE` khi hợp đồng hết hạn
+| Method | Route | Permission |
+|--------|-------|-----------|
+| GET | `/assignments` | ADMIN |
+| POST | `/assignments` | ADMIN |
+| PATCH | `/assignments/:id/revoke` | ADMIN |
 
-**Frontend Pages & Components:**
-- **ContractsPage** — Bảng hợp đồng, filter theo trạng thái (Active, Expiring Soon, Expired, Terminated)
-- **ContractFormPage** — Form tạo hợp đồng mới (chọn khách + căn hộ, điền điều khoản, đăng ký dịch vụ)
-- **ContractDetailPage** — Chi tiết hợp đồng, timeline gia hạn, thao tác chấm dứt/gia hạn
-- **Form components:** `ContractEditForm`, `RenewForm`, `TerminateForm`
+### Workflow — `/api/workflows`
 
----
+| Method | Route | Permission |
+|--------|-------|-----------|
+| GET | `/` | ADMIN |
+| GET | `/:name` | Auth |
+| GET | `/available-transitions` | Auth |
+| POST | `/:workflowId/steps` | ADMIN |
+| POST | `/:workflowId/transitions` | ADMIN |
 
-### 6. 💰 Module Finance (Tài chính)
+### Rules — `/api/rules`
 
-**Backend API** (`/api/finance` + `/api/dashboard`):
+| Method | Route | Permission |
+|--------|-------|-----------|
+| GET | `/` | ADMIN |
+| POST | `/` | ADMIN |
+| PUT | `/:id` | ADMIN |
+| DELETE | `/:id` | ADMIN |
+| POST | `/trigger-scan` | ADMIN |
 
-| Route | Mô tả | Quyền |
-|-------|-------|-------|
-| `GET /utilities` | Danh sách chỉ số điện nước | Auth |
-| `POST /utilities` | Ghi chỉ số điện nước tháng mới | ADMIN/MANAGER/RECEPTIONIST |
-| `GET /invoices` | Danh sách hóa đơn (filter theo tháng, trạng thái) | Auth |
-| `GET /invoices/:id` | Chi tiết hóa đơn + lịch sử thanh toán | Auth |
-| `POST /invoices/generate` | Tạo hóa đơn tháng theo hợp đồng | ADMIN/MANAGER |
-| `PATCH /invoices/:id/status` | Cập nhật trạng thái hóa đơn | ADMIN/MANAGER |
-| `POST /payments` | Ghi nhận phiếu thu tiền | ADMIN/MANAGER/RECEPTIONIST |
-| `GET /dashboard/stats` | KPI tổng quan | Auth |
-| `GET /dashboard/revenue` | Doanh thu N tháng gần nhất | Auth |
-| `GET /dashboard/apartment-types` | Phân bố loại phòng | Auth |
-| `GET /dashboard/unpaid-invoices` | Hóa đơn chưa thanh toán | Auth |
-| `GET /dashboard/recent-activities` | Hoạt động gần đây | Auth |
+### Các API khác
 
-**Frontend Pages & Components:**
-- **UtilityReadingsPage** — Ghi/xem chỉ số điện nước theo tháng, theo căn hộ
-- **InvoicesPage** — Danh sách hóa đơn, filter, tạo hóa đơn, badge trạng thái
-- **InvoiceDetailPage** — Chi tiết hóa đơn: breakdown từng khoản, lịch sử thanh toán, form thu tiền
-- **Form components:** `UtilityReadingForm`, `PaymentForm`
-
----
-
-### 7. 📊 Dashboard Tổng quan
-
-Trang chính của hệ thống với **8 KPI card** chia 2 nhóm:
-
-**Nhóm Bất động sản:**
-- Căn hộ còn trống / tổng số
-- Số hợp đồng đang active
-- Số khách thuê hiện tại
-- Hợp đồng sắp hết hạn (trong 30 ngày)
-
-**Nhóm Tài chính & Hiệu suất:**
-- Doanh thu tháng này
-- Số tiền còn cần thu
-- Số hóa đơn chưa thanh toán
-- Tỉ lệ lấp đầy (với progress bar)
-
-**Biểu đồ (Recharts):**
-- Bar chart doanh thu 6 tháng gần nhất (Đã thu vs Chưa thu)
-- Donut chart phân bố loại phòng (Studio, 1PN, 2PN, 3PN)
-
-**Bảng thông tin nhanh:**
-- Danh sách hợp đồng sắp hết hạn (click → gia hạn ngay)
-- Danh sách hóa đơn chưa thanh toán (badge: Quá hạn / Sắp đến hạn / Trong hạn)
-- Feed hoạt động gần đây (tạo hợp đồng, ghi điện nước, tạo hóa đơn)
+| Base | Module |
+|------|--------|
+| `/api/search` | Global search |
+| `/api/calendar` | Calendar events |
+| `/api/report` | 4 báo cáo (revenue, occupancy, maintenance, contracts) |
+| `/api/service-requests` | CRUD + phân công |
+| `/api/comments` | CRUD bình luận ServiceRequest |
+| `/api/dashboard` | Stats, revenue, apartment-types, unpaid-invoices, recent-activities |
+| `/api/public` | Room info + submit ServiceRequest (không cần auth) |
 
 ---
 
-### 8. 🎨 Giao diện & UX
+## 📊 Workflow
 
-**Layout:** Sidebar cố định (trái) + Navbar trên + content area có scroll
+### Contract Lifecycle
 
-**Shared component library:**
-- `DataTable` — bảng dữ liệu tái sử dụng
-- `Modal` — overlay dùng chung
-- `ConfirmDialog` — xác nhận hành động nguy hiểm
-- `StatusBadge` — badge trạng thái hợp đồng/hóa đơn
-- `PageHeader` — tiêu đề trang thống nhất
-- `EmptyState` — màn hình trống
-- `LoadingSpinner` + Skeleton animation — trải nghiệm loading mượt mà
+```mermaid
+flowchart TD
+    A[Chọn Tenant + Apartment] --> B{Apartment AVAILABLE?}
+    B -->|Không| ERR1[❌ 400: Căn hộ không trống]
+    B -->|Có| C[Tạo Contract ACTIVE]
+    C --> D[Apartment → OCCUPIED]
+    D --> E[Emit contract.created]
+    E --> F1[AuditLog: CREATE Contract]
+    E --> F2[Timeline: Hợp đồng được ký kết]
+    E --> F3[Notification → ADMIN/MANAGER]
 
-**Phân quyền UI:**
-- Route-level: `ProtectedRoute` chặn truy cập theo role
-- Component-level: `RoleGuard` ẩn/hiện nút action
+    C --> G{Cron 00:00 hàng ngày}
+    G -->|end_date ≤ 30 ngày| H[EXPIRING_SOON]
+    H --> H1[Notification CONTRACT_EXPIRING]
+    G -->|end_date < today| I[EXPIRED]
+    I --> J[Apartment → AVAILABLE]
+    I --> K[ApartmentStatusLog tự động]
 
-**Cải tiến độ tương phản & Đồng bộ giao diện (Mới cập nhật):**
-- **Nâng cao tương phản bảng dữ liệu:** Tăng độ đậm màu cho chữ trong các bảng dữ liệu chính (Căn hộ, Khách thuê, Hợp đồng, Điện nước, Hóa đơn) theo 3 phân cấp rõ ràng: Primary (`text-gray-900` - `#111827`), Secondary (`text-gray-700` - `#374151`), và Muted (`text-gray-500` - `#6b7280`).
-- **Khắc phục lỗi Dark Mode tự động:** Cấu hình `darkMode: 'class'` trong `tailwind.config.js` nhằm tắt việc trình duyệt tự động kích hoạt các lớp `dark:` dựa trên cài đặt của hệ điều hành/trình duyệt, qua đó triệt tiêu hoàn toàn hiện tượng chữ bị chuyển thành màu trắng/xám mờ trên nền sáng.
-- **Sửa nền tối ở filter bar và modal footer:** Loại bỏ hoàn toàn các lớp nền tối (`bg-gray-800`, `bg-gray-900`) ở khu vực bộ lọc (filter bar) của các trang và phần chân trang của các Modal (`ModalFooter`), trả lại nền sáng đồng nhất (`bg-white` / `bg-gray-50`) cho hệ thống.
+    C --> L[Nhân viên: TERMINATED]
+    L --> M[Apartment → AVAILABLE]
+    L --> N[Emit contract.terminated]
 
----
+    C --> O[Nhân viên: Renew]
+    O --> P[ContractRenewals record]
+    P --> Q[Contract → ACTIVE mới]
+    Q --> R[Emit contract.renewed]
+```
 
-### 9. 🔄 Vòng đời Dữ liệu (Data Lifecycle)
+### Invoice Payment Flow
 
-Hệ thống quản lý căn hộ dịch vụ vận hành thông tin theo các luồng dữ liệu khép kín dưới đây:
+```mermaid
+flowchart TD
+    A[Ghi UtilityReading tháng mới] --> B[POST /invoices/generate]
+    B --> C{Đã có Invoice tháng này?}
+    C -->|Có| ERR[❌ 409: Trùng kỳ billing]
+    C -->|Không| D{Hợp đồng có ví dư?}
+    D -->|Có| E[credit_applied = min balance, balance]
+    D -->|Không| F[credit_applied = 0]
+    E --> G{Có nợ tháng trước?}
+    F --> G
+    G -->|Có| H[debt_amount = remaining cũ]
+    G -->|Không| I[debt_amount = 0]
+    H --> J[Tạo Invoice UNPAID]
+    I --> J
+    J --> K[Emit invoice.created]
+    K --> L[Timeline: Hóa đơn phát hành]
+    K --> M[AuditLog: CREATE Invoice]
 
-1. **Khởi tạo tài nguyên:**
-   - **Tòa nhà (`Buildings`)** và **Tầng (`Floors`)** được tạo bởi vận hành viên.
-   - **Căn hộ (`Apartments`)** được thêm vào với trạng thái ban đầu là `AVAILABLE` (Sẵn sàng cho thuê).
-   - Danh mục **Nội thất (`ApartmentFurniture`)** được khai báo cho từng căn hộ để quản lý hiện trạng tài sản.
+    J --> N[POST /payments]
+    N --> O{amount >= remaining?}
+    O -->|Có| P[Invoice → PAID]
+    O -->|Không| Q[Invoice → PARTIALLY_PAID]
+    P --> R{Tiền thừa > 0?}
+    R -->|Có| S[ContractCredits += excess → CREDIT_IN]
+    R -->|Không| T[Emit invoice.paid]
+    S --> T
+    T --> U[Timeline + Notification PAYMENT_RECEIVED]
+```
 
-2. **Ký kết Hợp đồng & Check-in:**
-   - **Hồ sơ khách thuê (`Tenants`)** được nhập vào hệ thống khi khách chọn phòng. Khách thuê có thể thực hiện **Khai báo tạm trú (`TemporaryRegistrations`)**.
-   - **Hợp đồng (`Contracts`)** được lập để liên kết Khách thuê và Căn hộ đang trống. Trạng thái căn hộ tự động chuyển sang `OCCUPIED` (Đang thuê).
-   - Trong hợp đồng, các thông tin quan trọng được ghi nhận: giá thuê phòng, tiền đặt cọc, số người ở (`soNguoiO`), tiền nước cố định hàng tháng (`water_price_per_month` mặc định 100.000đ/người/tháng), chỉ số điện ban đầu (`initial_electricity`) và các **Dịch vụ đăng ký (`ServiceSubscriptions`)** đi kèm (Internet, Vệ sinh, v.v.).
+### Service Request Flow
 
-3. **Vận hành hàng tháng (Chốt số & Lập hóa đơn):**
-   - Hàng tháng, nhân viên vận hành chốt **Chỉ số Điện nước (`UtilityReadings`)** mới cho căn hộ. Tiền nước không tính bằng m³ mà được tính cố định dựa trên số người ở đã cấu hình.
-   - Hệ thống tiến hành **Lập hóa đơn (`Invoices`)** cho kỳ thanh toán của căn hộ. Chi phí hóa đơn được tính toán như sau:
-     $$\text{Tổng tiền} = \text{Tiền thuê căn hộ} + \text{Tiền điện thực tế} + \text{Tiền nước (từ HĐ)} + \text{Tiền dịch vụ}$$
-     - *Tiền điện thực tế* = (Chỉ số mới - Chỉ số cũ) × Đơn giá điện.
-     - *Tiền nước* = Lấy trực tiếp từ trường `water_price_per_month` của Hợp đồng.
-   - Trạng thái hóa đơn ban đầu là `UNPAID` (Chưa thanh toán) với ngày đến hạn xác định (mặc định là ngày 5 hàng tháng).
+```mermaid
+flowchart TD
+    A1[Nhân viên tạo INTERNAL] --> C
+    A2[Khách quét QR → PUBLIC_FORM] --> B
+    B[Verify token + link contract] --> C
+    C[ServiceRequest PENDING]
+    C --> D[Emit maintenance.created]
+    D --> D1[AuditLog + Timeline]
 
-4. **Thanh toán & Thu nợ:**
-   - Khách thuê đóng tiền (mặt hoặc chuyển khoản), nhân viên ghi nhận **Phiếu thu (`Payments`)** tương ứng.
-   - Trạng thái hóa đơn tự động cập nhật:
-     - `PAID` (Đã thanh toán) nếu số tiền đã đóng bằng hoặc lớn hơn tổng hóa đơn.
-     - `PARTIALLY_PAID` (Thanh toán một phần) nếu số tiền đóng lớn hơn 0 nhưng chưa đủ.
-     - `OVERDUE` (Quá hạn) nếu quá hạn đóng tiền mà chưa thanh toán đủ.
+    C --> E[ADMIN/MANAGER phân công Technician]
+    E --> F[ASSIGNED]
+    F --> G[Emit maintenance.assigned]
+    G --> G1[Notification → Technician]
+    G --> G2[AuditLog + Timeline]
 
-5. **Kết thúc / Thay đổi Hợp đồng:**
-    - **Gia hạn (`ContractRenewals`):** Hợp đồng được kéo dài thời gian kết thúc, cập nhật giá thuê mới nếu có, và chuyển trạng thái về `ACTIVE`.
-    - **Chấm dứt sớm (`TERMINATED`) / Hết hạn (`EXPIRED`):** Hợp đồng kết thúc, trạng thái căn hộ tự động hoàn về `AVAILABLE` để sẵn sàng cho chu kỳ thuê mới. Toàn bộ lịch sử liên quan đến căn hộ, khách thuê, hóa đơn và thanh toán đều được lưu trữ phục vụ thống kê báo cáo doanh thu.
+    F --> H[Technician bắt đầu]
+    H --> I[IN_PROGRESS]
 
-  6. **Tiếp nhận & Xử lý Yêu cầu Kỹ thuật / Khiếu nại (Service Requests):**
-     - **Gửi yêu cầu:**
-       - *Nội bộ (`INTERNAL`):* Nhân viên (Lễ tân, Quản lý) tạo yêu cầu trực tiếp trong hệ thống khi phát hiện sự cố.
-       - *Khách thuê (`PUBLIC_FORM`):* Khách thuê quét mã QR tại căn hộ (với mã token xác thực phòng trong 90 ngày) để truy cập form gửi yêu cầu trực tuyến mà không cần đăng nhập.
-     - **Phân công & Xử lý:**
-       - Admin/Manager xem danh sách và tiến hành **Phân công (`ASSIGNED`)** cho kỹ thuật viên (`Technician`).
-       - Trạng thái yêu cầu chuyển qua `IN_PROGRESS` khi kỹ thuật viên bắt đầu xử lý, và `RESOLVED` kèm thời gian hoàn thành `resolved_at` khi sự cố được khắc phục xong.
-
----
-
-### 10. 📱 Hệ thống Tiếp nhận Yêu cầu Kỹ thuật qua QR (Public Service Requests)
-
-Hệ thống cho phép khách thuê gửi báo hỏng, sửa chữa hoặc khiếu nại cực kỳ tiện lợi bằng cách quét mã QR dán tại phòng mà không cần tài khoản đăng nhập.
-
-- **Cơ sở dữ liệu:**
-  - Nâng cấp bảng `ServiceRequests` bổ sung thông tin loại yêu cầu (`type`), độ ưu tiên (`priority`), nguồn gốc (`source`: Nội bộ / Khách thuê), thông tin người báo (`requester_name`, `requester_phone`), và thời gian hoàn thành (`resolved_at`).
-  - Thêm bảng `ApartmentTokens` quản lý mã token ngẫu nhiên thời hạn 90 ngày của từng phòng.
-- **Backend API:**
-  - `/api/public/room-info?t=xxx`: Trả về thông tin căn hộ (Block, Tầng, Số phòng) dạng công khai, không lộ thông tin nhạy cảm của khách thuê.
-  - `/api/public/service-requests`: Tiếp nhận form gửi từ khách thuê, tự động liên kết với hợp đồng đang có hiệu lực của phòng đó.
-  - `/api/building/apartments/:id/generate-token`: API tạo/làm mới mã QR cho phòng (ADMIN/MANAGER).
-- **Giao diện quản lý nội bộ:**
-  - Thêm thẻ **"QR Code Yêu Cầu Hỗ Trợ"** trên trang chi tiết căn hộ, hiển thị mã QR động, hỗ trợ sao chép liên kết hoặc in poster QR khổ lớn dán ở cửa phòng.
-  - Tích hợp cột **"Nguồn"** và badges phân biệt **"Nội bộ"** (nhân viên tạo) vs **"Khách thuê"** (gửi qua QR) trong bảng quản lý yêu cầu kỹ thuật.
-- **Form gửi công khai (`/submit?t=xxx`):**
-  - Giao diện cao cấp tối ưu cho thiết bị di động, tự động nhận diện thông tin phòng.
-  - Hỗ trợ đầy đủ các trường thông tin, phân loại sự cố (Sửa điện, nước, vệ sinh, khóa cửa...) và xác thực dữ liệu chặt chẽ (họ tên, số điện thoại Việt Nam).
-  - Tự động hiển thị màn hình báo thành công kèm mã số yêu cầu để khách dễ theo dõi.
-
----
-
-### 11. ⚡ Nhập chỉ số Điện nước thông minh từ Excel (Mục 7)
-
-Tối ưu hóa quy trình ghi nhận chỉ số điện nước hàng loạt bằng file Excel mẫu động, kết hợp màn hình xem trước và chỉnh sửa dữ liệu trực tiếp:
-
-- **Sinh mẫu Excel động:** Backend tự động quét danh sách phòng đang có hợp đồng hoạt động (`ACTIVE`, `EXPIRING_SOON`) để điền sẵn: Mã căn hộ, Kỳ thanh toán hiện tại (`YYYY-MM`) và Chỉ số điện cũ (từ tháng trước hoặc chỉ số ban đầu hợp đồng) để đối chiếu. Người vận hành chỉ cần điền duy nhất cột Chỉ số điện mới.
-- **Bỏ chỉ số Nước cũ/mới:** Nhằm tối giản thao tác và bám sát nghiệp vụ (nước tính khoán theo đầu người `soNguoiO` quy định trên hợp đồng), các thông tin về chỉ số nước cũ/mới đã được loại bỏ hoàn toàn khỏi mẫu Excel cũng như giao diện.
-- **Bảng xem trước (Preview Grid) & Sửa trực tiếp:** Giao diện tải file Excel lên hiển thị bảng dữ liệu phân loại rõ ràng (Hợp lệ / Lỗi). Hỗ trợ người dùng chỉnh sửa trực tiếp các chỉ số bị sai ngay trên ô input của bảng và tự động kiểm tra logic tức thì ở client (`Điện mới >= Điện cũ`).
-- **Lưu dữ liệu an toàn:** Hệ thống chỉ lưu các dòng hợp lệ khi người dùng xác xác nhận và tự động bỏ qua các dòng lỗi. Lưu trữ `water_prev` và `water_curr` dưới dạng `null` trong DB.
+    I --> J[Technician hoàn thành]
+    J --> K[RESOLVED · resolved_at = now]
+    K --> L[Emit maintenance.completed]
+    L --> L1[Notification → ADMIN/MANAGER]
+    L --> L2[AuditLog + Timeline]
+```
 
 ---
 
-### 12. 📊 Module Báo cáo Thống kê chuyên sâu (Mục 8)
+## 🔐 Permission Matrix
 
-Hệ thống biểu đồ trực quan hóa dữ liệu hỗ trợ Ban quản lý theo dõi sát sao tình hình hoạt động của các tòa nhà:
+### Role Scope
 
-- **Backend Aggregation APIs (`/api/report`):**
-  - `/api/report/revenue`: Thống kê doanh thu dự kiến (hóa đơn) và thực thu (phiếu thu) gom nhóm theo tháng.
-  - `/api/report/occupancy`: Thống kê số lượng phòng và tỷ lệ lấp đầy theo thời gian thực.
-  - `/api/report/maintenance`: Thống kê số lượng sự cố phân bổ theo tình trạng xử lý.
-  - `/api/report/contracts`: Thống kê cơ cấu trạng thái của các hợp đồng thuê.
-- **Biểu đồ động (Recharts):** Thiết kế dashboard hiện đại với 4 Tabs báo cáo tương ứng vẽ biểu đồ miền (`AreaChart`), biểu đồ cột (`BarChart`) và biểu đồ tròn (`PieChart`) sang trọng.
-- **Phân quyền và Bộ lọc:** Hỗ trợ lọc số liệu theo Tòa nhà, Từ tháng, Đến tháng. Menu chỉ hiển thị cho vai trò `ADMIN` và `MANAGER`.
+| Role | Scope dữ liệu | Ghi chú |
+|------|--------------|---------|
+| **ADMIN** | **Toàn bộ tòa nhà** | Bypass tất cả policy check |
+| **MANAGER** | **Tòa nhà được phân công** | `BuildingAssignments.revoked_at IS NULL` |
+| **RECEPTIONIST** | **Tòa nhà được phân công** | Không xem được Technician routes |
+| **TECHNICIAN** | **Tòa nhà được phân công** | Chỉ xem Service Requests được giao |
+
+### Permission Matrix chi tiết
+
+| Action | ADMIN | MANAGER | RECEPTIONIST | TECHNICIAN |
+|--------|-------|---------|-------------|-----------|
+| **Auth** | | | | |
+| Login / Refresh | ✓ | ✓ | ✓ | ✓ |
+| Manage Users | ✓ | ✗ | ✗ | ✗ |
+| **Building** | | | | |
+| View Building/Apt | ✓ | ✓ (scope) | ✓ (scope) | ✓ (scope) |
+| Create Building | ✓ | ✗ | ✗ | ✗ |
+| Create Apartment | ✓ | ✓ | ✗ | ✗ |
+| Delete Furniture | ✓ | ✗ | ✗ | ✗ |
+| **Contract** | | | | |
+| View Contracts | ✓ | ✓ (scope) | ✓ (scope, detail only) | ✗ |
+| Create/Terminate/Renew | ✓ | ✓ (scope) | ✗ | ✗ |
+| **Finance** | | | | |
+| View Invoices | ✓ | ✓ (scope) | ✓ (scope) | ✗ |
+| Generate Invoice | ✓ | ✓ | ✗ | ✗ |
+| Record Payment | ✓ | ✓ | ✓ | ✗ |
+| Refund Credit | ✓ | ✓ | ✗ | ✗ |
+| **Expense** | | | | |
+| View/Create/Edit Expense | ✓ | ✓ (scope) | ✓ (scope) | ✗ |
+| Delete Expense | ✓ | ✗ | ✗ | ✗ |
+| **Service Requests** | | | | |
+| Create (Internal) | ✓ | ✓ | ✓ | ✗ |
+| Assign Technician | ✓ | ✓ | ✗ | ✗ |
+| Update Status | ✓ | ✓ | ✗ | ✓ (assigned only) |
+| **Workflow/Rules/Policy** | | | | |
+| Configure | ✓ | ✗ | ✗ | ✗ |
+| **Report** | | | | |
+| View Reports | ✓ | ✓ | ✗ | ✗ |
+| **Audit Logs** | | | | |
+| View All Logs | ✓ | ✗ | ✗ | ✗ |
 
 ---
 
-### 13. 📥 Module Xuất dữ liệu đa định dạng & In ấn (Mục 9)
+## ⏰ Cron Jobs
 
-Hỗ trợ kết xuất báo cáo và danh sách dữ liệu ra các định dạng phổ biến phục vụ công tác lưu trữ ngoài:
+### Contract Cron (`0 0 * * *` — nửa đêm hàng ngày)
 
-- **Xuất Excel/CSV từ Backend:** Sử dụng thư viện `xlsx` để kết xuất danh sách Khách thuê, Hợp đồng, Hóa đơn và Báo cáo doanh thu thành file `.xlsx` hoặc `.csv`.
-- **Hỗ trợ Unicode tiếng Việt:** Đính kèm ký tự BOM (`\uFEFF`) khi xuất file CSV giúp hiển thị ký tự có dấu trên MS Excel không bị lỗi font.
-- **In ấn PDF mượt mà:** Định dạng in ấn bằng CSS `@media print` giúp ẩn Sidebar, Navbar, bộ lọc và các nút bấm khi in trang, tối ưu hóa giao diện hiển thị 100% chiều rộng để xuất file PDF từ trình duyệt gọn gàng và đẹp mắt.
+**File**: `modules/contract/backend/cron.js`
 
----
+| Bước | Hành động |
+|------|----------|
+| 1 | Contracts ACTIVE + `end_date ≤ today+30` → `EXPIRING_SOON` + gửi `CONTRACT_EXPIRING` notification |
+| 2 | Contracts ACTIVE/EXPIRING_SOON + `end_date < today` → `EXPIRED` |
+| 3 | Apartments của contracts vừa EXPIRED → `AVAILABLE` + tạo `ApartmentStatusLog` |
+| 4 | Invoices UNPAID/PARTIALLY_PAID + `due_date < today` → `OVERDUE` + gửi `INVOICE_OVERDUE` notification |
 
-### 14. 🔍 Xem nhanh thông tin Căn hộ khi di chuột - Quick Preview (Mục 10)
+### Notifications Cron (`0 0 * * *` — nửa đêm hàng ngày)
 
-Nâng cao trải nghiệm người dùng, cho phép xem nhanh thông tin tổng quan của căn hộ mà không cần click mở trang chi tiết:
+**File**: `modules/notifications/backend/cron.js`
 
-- **API xem nhanh (`GET /building/apartments/:id/preview`):** Trả về thông tin căn hộ, trạng thái phòng, hợp đồng hiện tại kèm thông tin khách thuê (tên, SĐT, giá thuê) và danh sách hình ảnh phòng.
-- **React Portal Hover Tooltip:** Xây dựng component tooltip nổi sử dụng React Portal để mount trực tiếp vào `body`, tránh hoàn toàn hiện tượng bị che khuất (clip) bởi thuộc tính `overflow` của các bảng dữ liệu.
-- **Cơ chế Debounce:** Hỗ trợ độ trễ hover 350ms giúp giảm tải số lượng request gửi lên DB khi di chuột nhanh qua danh sách.
-
----
-
-### 15. 💳 Hệ thống Ví dư (Credit) & Cộng dồn nợ (Debt Rollover)
-
-Tự động hóa xử lý các khoản thanh toán thừa/thiếu của khách thuê một cách minh bạch và chính xác:
-
-- **Ví dư Credit (`ContractCredits` & `CreditTransactions`):** Khi ghi nhận thanh toán vượt quá số tiền còn lại của hóa đơn, phần tiền dư sẽ tự động chuyển vào ví dư của Hợp đồng (`CREDIT_IN`).
-- **Khấu trừ tự động (Credit Apply):** Khi lập hóa đơn tháng mới, nếu ví dư của hợp đồng có số dư khả dụng, hệ thống sẽ tự động trừ ví dư và áp dụng trực tiếp làm giảm số tiền cần nộp của hóa đơn mới (`CREDIT_APPLY`).
-- **Cộng dồn nợ cũ (Debt Rollover):** Khi khách trả thiếu (hóa đơn ở trạng thái `PARTIALLY_PAID` hoặc `OVERDUE`), khi tạo hóa đơn tháng tiếp theo, số tiền nợ còn lại sẽ tự động được cộng dồn sang hóa đơn mới dưới dạng trường `debt_amount`, đồng thời hóa đơn cũ tự động chuyển trạng thái thành `PAID` kèm ghi chú cụ thể để tránh tính trùng.
-- **Giao diện quản lý ví dư:** Bổ sung tab "Ví dư & Công nợ" trong chi tiết Hợp đồng để theo dõi số dư và lịch sử giao dịch. Hỗ trợ Quản lý/Admin thực hiện hoàn tiền ví dư thủ công (`CREDIT_REFUND`).
+| Điều kiện | Hành động |
+|-----------|----------|
+| ServiceRequest PENDING/ASSIGNED/IN_PROGRESS + `scheduled_start_date ∈ [today, today+2]` | Gửi `MAINTENANCE_REMINDER` cho Technician được giao (nếu có) hoặc toàn bộ ADMIN/MANAGER |
+| Duplicate check | `findFirst` trước khi tạo để tránh spam cùng ngày |
 
 ---
 
-### 16. 💸 Quản lý Chi phí Tòa nhà (Building Expenses)
+## 📡 Events Produced
 
-Theo dõi và ghi nhận các khoản chi phí vận hành chung của toàn tòa nhà:
+| Event | Phát từ | Payload chính |
+|-------|---------|--------------|
+| `contract.created` | Contract service | `contract_code`, `start_date`, `apartment_id` |
+| `contract.updated` | Contract service | `oldData`, `newData` |
+| `contract.terminated` | Contract service | `termination_reason`, `oldData`, `newData` |
+| `contract.renewed` | Contract service | `new_end_date`, `new_monthly_rent` |
+| `invoice.created` | Finance service | `invoice_code`, `billing_month`, `total_amount` |
+| `invoice.paid` | Finance service | `invoiceCode`, `billingMonth`, `paymentAmount`, `paymentMethod`, `newStatus`, `contractId` |
+| `maintenance.created` | Service Requests | `title`, `priority` |
+| `maintenance.assigned` | Service Requests | `assignedTo`, `title` |
+| `maintenance.completed` | Service Requests | `title` |
 
-- **Quản lý CRUD Chi phí:** Hỗ trợ tạo mới, chỉnh sửa thông tin, cập nhật trạng thái thanh toán (Chờ thanh toán / Đã thanh toán) và xóa mềm (ADMIN only) các khoản chi phí tòa nhà.
-- **Tích hợp Attachment Module:** Hỗ trợ đính kèm nhiều file, hóa đơn chứng từ (PDF, Excel, hình ảnh) trực tiếp cho chứng từ chi phí qua giao diện `AttachmentsSection`.
-- **Thống kê Dashboard:** Tích hợp số liệu "Chi phí tháng này" và "Lợi nhuận gộp" (bằng Thực thu - Chi phí đã thanh toán) vào Dashboard, đồng thời vẽ biểu đồ cột so sánh tương quan Doanh thu vs Chi phí trong 6 tháng qua.
-- **Phân quyền Lễ tân:** Cấp quyền cho Lễ tân (`RECEPTIONIST`) được tạo, xem và chỉnh sửa trạng thái chi phí tòa nhà nhằm giảm tải cho ban quản lý.
+**Event Payload chuẩn:**
+```json
+{
+  "eventId": "uuid",
+  "eventType": "contract.created",
+  "actorId": 1,
+  "entityId": 100,
+  "data": { ... }
+}
+```
+
+---
+
+## 🔒 Validation Rules
+
+### Contract
+- `apartment_id` phải là căn hộ `AVAILABLE`
+- `start_date < end_date`
+- `monthly_rent > 0`, `deposit_amount >= 0`
+- `payment_due_day`: 1–31
+- `electricity_price > 0`
+- `soNguoiO >= 1`
+
+### Invoice
+- Unique `(contract_id, billing_month)`
+- Hợp đồng phải đang `ACTIVE` hoặc `EXPIRING_SOON`
+- Phải có UtilityReading cho tháng đó
+
+### Expense
+- `amount > 0` — validate trong service (throw: "Số tiền chi phí phải lớn hơn 0")
+- `building_id`, `category`, `title`, `amount`, `expense_date` là bắt buộc
+- Status chỉ nhận `PENDING` hoặc `PAID`
+
+### Attachments
+- Chỉ nhận: `application/pdf`, `image/jpeg`, `image/png`, `image/webp`
+- Giới hạn: 10 MB
+- `entity_type` và `entity_id` bắt buộc
+
+### Auth
+- Email không được trùng khi tạo user
+- Không cho phép đổi email qua `PUT /users/:id`
+
+### Search
+- Tối thiểu 2 ký tự
+
+---
+
+## ⚠️ Exception Catalog
+
+| Error Code | HTTP | Điều kiện |
+|------------|------|----------|
+| `INVALID_CREDENTIALS` | 401 | Email không tồn tại hoặc sai mật khẩu |
+| `ACCOUNT_LOCKED` | 401 | `is_active = false` |
+| `TOKEN_EXPIRED` | 401 | Access token hết hạn (8h) |
+| `TOKEN_INVALID` | 401 | Token bị giả mạo hoặc sai format |
+| `MISSING_TOKEN` | 401 | Không có header Authorization |
+| `FORBIDDEN` | 403 | Role không được phép (requireRole) |
+| `BUILDING_SCOPE_VIOLATION` | 403 | Entity thuộc tòa nhà không được gán |
+| `ATTACHMENT_FORBIDDEN` | 403 | Không phải owner và không phải ADMIN/MANAGER |
+| `USER_NOT_FOUND` | 404 | Không tìm thấy người dùng |
+| `CONTRACT_NOT_FOUND` | 404 | Không tìm thấy hợp đồng |
+| `EXPENSE_NOT_FOUND` | 404 | Không tìm thấy chi phí |
+| `ATTACHMENT_NOT_FOUND` | 404 | Không tìm thấy file đính kèm |
+| `ASSIGNMENT_NOT_FOUND` | 404 | Không tìm thấy bản ghi phân công |
+| `EMAIL_DUPLICATE` | 409 | Email đã tồn tại khi tạo user |
+| `INVOICE_DUPLICATE` | 409 | Đã có hóa đơn cho `(contract, billing_month)` |
+| `ASSIGNMENT_DUPLICATE` | 409 | User đã được phân công tòa nhà này |
+| `INVALID_AMOUNT` | 400 | `amount <= 0` |
+| `MISSING_REQUIRED_FIELDS` | 400 | Thiếu field bắt buộc |
+| `INVALID_EXPENSE_STATUS` | 400 | Status không phải PENDING hoặc PAID |
+| `INVALID_FILE_TYPE` | 400 | MIME type không được hỗ trợ |
+| `FILE_TOO_LARGE` | 400 | File > 10MB |
+| `MISSING_ENTITY_INFO` | 400 | Thiếu entity_type hoặc entity_id |
+| `INVALID_TRANSITION` | 400 | Workflow transition không hợp lệ |
+| `APARTMENT_NOT_AVAILABLE` | 400 | Căn hộ không ở trạng thái AVAILABLE |
+| `WRONG_OLD_PASSWORD` | 400 | Mật khẩu cũ không khớp khi đổi |
+
+---
+
+## 🧩 Edge Cases
+
+| Tình huống | Xử lý |
+|-----------|-------|
+| Thanh toán thừa hóa đơn | Phần dư → `ContractCredits` (CREDIT_IN), không trả lại ngay |
+| Tạo hóa đơn khi có ví dư | Tự động khấu trừ (`CREDIT_APPLY`) trước khi tạo |
+| Khách nợ tháng trước | `debt_amount` cộng vào hóa đơn mới, hóa đơn cũ → PAID với ghi chú |
+| Contract EXPIRING_SOON bị Cron chạy lại | Chỉ update `ACTIVE → EXPIRING_SOON`, không chạy lại với EXPIRING_SOON |
+| Cron giải phóng căn hộ | Chỉ xử lý contracts có `end_date ∈ [yesterday-2, today)` để tránh chạy lại |
+| Cloudinary xóa thất bại | Vẫn xóa record DB (graceful degradation) |
+| Notification trùng lặp | `findFirst` check trước khi `createNotification` trong mọi Cron |
+| Token QR hết hạn | Trả thông báo lỗi, không lộ thông tin phòng |
+| MANAGER không được phân công tòa nhà nào | `applyBuildingScope` inject `building_id: { in: [-1] }` → query trả rỗng |
+| Xóa ServiceRequest có Attachment | `ServiceRequestComments` + `ServiceRequestExpenses` cascade delete, Attachments cần xóa riêng |
+| Audit log lỗi | Không làm fail request chính — chỉ log error |
+| Timeline lỗi | Không làm fail request chính — chỉ log error |
+
+---
+
+## 🔧 Technical Debt
+
+### 🔴 High Priority
+
+| Issue | Vị trí | Rủi ro |
+|-------|--------|--------|
+| **Thiếu Prisma Transaction** khi generate invoice: tạo Invoice + CREDIT_APPLY + debt rollover không được wrap trong `$transaction` | `finance/backend/service.js` | Race condition khi nhiều request đồng thời |
+| **Hard-coded `changed_by: 1`** khi Cron tự động giải phóng căn hộ EXPIRED | `contract/backend/cron.js` L94 | Audit log gán sai người thực hiện (luôn là user ID=1) |
+| **Thiếu refresh token revocation**: logout không invalidate refresh token | `auth/backend/service.js` | Refresh token bị đánh cắp vẫn dùng được trong 7 ngày |
+
+### 🟡 Medium Priority
+
+| Issue | Vị trí | Rủi ro |
+|-------|--------|--------|
+| **N+1 Query risk** trong `getExpenses`: lấy attachment count bằng `groupBy` sau khi lấy danh sách — nếu limit lớn có thể ảnh hưởng hiệu năng | `expense/backend/service.js` | Chậm khi có nhiều record |
+| **N+1 trong Business Rules scan**: vòng lặp `for...of` với `createNotification` và `findFirst` bên trong — không batch | `rules/backend/service.js` | Timeout khi nhiều hợp đồng/hóa đơn |
+| **Không có DB transaction** khi Cron update contract status + gửi notification — nếu notification fail thì status đã update | `contract/backend/cron.js` | Dữ liệu không nhất quán |
+
+### 🟢 Low Priority
+
+| Issue | Vị trí | Ghi chú |
+|-------|--------|---------|
+| **Validation logic trùng lặp** giữa controller và service: cả 2 đều check required fields | `expense/backend/controller.js` + `service.js` | Refactor về single layer validation |
+| **JWT_SECRET fallback** `'fallback_secret_key'` trong middleware | `auth/backend/middleware.js` | Nên enforce `process.env.JWT_SECRET` required |
+| **`resource_type: 'auto'`** khi upload nhưng dùng `'raw'` khi delete | `attachments/backend/` | Cần test kỹ với PDF files |
+
+---
+
+## 💡 Improvement Suggestions
+
+### Must Have
+- Wrap invoice generation trong Prisma `$transaction`
+- Thêm refresh token blacklist (Redis hoặc DB table)
+- Fix hard-coded `changed_by: 1` → nhận system user ID từ config/env
+
+### Should Have
+- Batch insert notifications thay vì loop trong Cron
+- Rate limiting cho `/api/auth/login` và `/api/public`
+- Thêm index `(billing_month, status)` cho `Invoices`
+- Middleware tập trung xử lý lỗi (global error handler)
+
+### Nice To Have
+- WebSocket room authentication (hiện tại client tự join `user:{userId}` không có verify)
+- Background job queue (Bull/BullMQ) thay cho Cron in-process
+- API versioning (`/api/v1/`)
+- OpenAPI/Swagger documentation tự động
 
 ---
 
@@ -421,125 +1238,51 @@ cd apps/backend && pnpm dev
 cd apps/frontend && pnpm dev
 ```
 
+### Biến môi trường yêu cầu (`.env`)
+```env
+DATABASE_URL=mysql://...
+JWT_SECRET=...
+JWT_REFRESH_SECRET=...
+CLOUDINARY_CLOUD_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
+CLOUDINARY_FOLDER=qlchdv
+FRONTEND_URL=http://localhost:5173
+PORT=3001
+```
+
 ### Tài khoản demo
 | Email | Mật khẩu | Vai trò |
-|-------|----------|---------|
+|-------|----------|---------| 
 | `admin@qlchdc.com` | `password123` | Admin |
 | `manager@qlchdc.com` | `password123` | Manager |
 | `tech@qlchdc.com` | `password123` | Technician |
 
 ---
 
-## 📊 Thống kê dự án
+## 📊 System Statistics
 
-| Hạng mục | Con số |
-|----------|--------|
-| Modules hoàn chỉnh | **5** (auth, building, tenant, contract, finance) |
-| API Endpoints | **~35** endpoints |
-| React Pages | **13** trang |
-| React Components | **20+** components |
-| DB Models (Prisma) | **14** models |
-| Dữ liệu seed | 24 căn hộ · 16 khách thuê · 16 HĐ · ~80 hóa đơn |
-
----
-
-## 📽️ Tài liệu phục vụ Slide PPTX (Presentation Outline - 15 Slides)
-
-Dưới đây là dàn bài chi tiết **15 Slide** và các điểm nhấn (Key Takeaways) được biên soạn chuyên sâu, giúp làm Prompt cho AI tạo file thuyết trình PowerPoint (PPTX) ấn tượng về hệ thống **QLCHDC**.
-
-### 💡 Gợi ý Prompt để sinh 15 Slide nhanh (Dùng cho Gamma.app, Tome, hoặc ChatGPT Marp):
-> *"Tạo một slide thuyết trình chi tiết gồm đúng 15 slide về dự án Hệ thống Quản lý Căn hộ Dịch vụ (QLCHDC). Cấu trúc slide phải đi từ bối cảnh, công nghệ, thiết kế cơ sở dữ liệu, cho đến chi tiết từng module (Tòa nhà, Khách thuê, Hợp đồng, Hóa đơn điện nước, Cơ chế xử lý quá hạn, Hỗ trợ qua QR Code không cần đăng nhập, Dashboard thống kê và kết luận). Thiết kế theo phong cách tối giản, hiện đại, màu sắc chủ đạo xanh dương phối xám cao cấp. Nội dung cụ thể như sau..."*
+| Metric | Giá trị |
+|--------|---------|
+| Backend Modules | **18** |
+| Frontend Pages | **30** (29 internal + 1 public) |
+| API Endpoints | **70+** |
+| Database Models | **30** |
+| Event Types | **9** |
+| Notification Types | **10** |
+| Cron Jobs | **2** |
+| Supported Roles | **4** |
+| Attachment-enabled Modules | **5** (Expense, ServiceRequest, Contract, Invoice, Tenant) |
+| Workflow-enabled Modules | **1** (ServiceRequest — configurable, extensible) |
+| Seed Data | 24 căn hộ · 16 khách thuê · 16 HĐ · ~80 hóa đơn |
 
 ---
 
-### 🗂️ Phác thảo cấu trúc chi tiết 15 Slide:
+## 🎯 Product Level Assessment
 
-#### Slide 1: Tiêu đề & Giới thiệu chung
-* **Tiêu đề:** Hệ thống Quản lý Nội bộ Căn hộ Dịch vụ (QLCHDC)
-* **Phụ đề:** Giải pháp Chuyển đổi số toàn diện trong Vận hành, Tài chính và Dịch vụ hỗ trợ
-* **Nội dung:** Giới thiệu ngắn gọn về hệ thống quản lý nội bộ dành riêng cho Ban quản lý tòa nhà, giúp tối ưu hóa công việc của Admin, Manager, Receptionist và Technician.
-
-#### Slide 2: Bối cảnh & Thách thức trong Quản lý Truyền thống
-* **Khó khăn thực tế:** 
-  * Sai sót khi ghi chép chỉ số điện nước thủ công bằng giấy/excel.
-  * Thất thoát doanh thu do quên hạn nợ hóa đơn hoặc không theo dõi sát sao tiến độ trả tiền của khách.
-  * Quy trình tiếp nhận báo hỏng cồng kềnh, kéo dài thời gian chờ đợi của khách thuê.
-  * Khó tổng hợp báo cáo tài chính và hiệu suất lấp đầy phòng theo thời gian thực.
-
-#### Slide 3: Mục tiêu Dự án & Giải pháp Tổng quan
-* **Mục tiêu chính:** Số hóa 100% hồ sơ, tự động hóa tính toán tài chính và đơn giản hóa tương tác kỹ thuật.
-* **Giải pháp:** Xây dựng hệ thống web nội bộ đa nhiệm, kết hợp các tiến trình tự động hóa (Cron job), báo cáo trực quan qua biểu đồ và cổng tiếp nhận báo hỏng qua QR Code công khai không cần tài khoản.
-
-#### Slide 4: Kiến trúc Hệ thống & Công nghệ Cốt lõi
-* **Mô hình Monorepo:** Tổ chức với `pnpm workspaces` giúp tách biệt các module nhưng chia sẻ tài nguyên linh hoạt.
-* **Tech Stack lựa chọn:**
-  * **Backend:** Node.js + Express.js (ES Modules) đảm bảo hiệu năng cao.
-  * **Frontend:** React.js + Vite + TailwindCSS tối ưu tốc độ tải trang và UX.
-  * **Database:** MySQL + Prisma ORM quản lý giao dịch an toàn và đồng bộ schema nhanh chóng.
-  * **Deploy:** Đóng gói Docker & Docker-Compose chạy độc lập, nhất quán múi giờ.
-
-#### Slide 5: Thiết kế Cơ sở Dữ liệu (Database Schema)
-* **Quy mô DB:** 14 bảng quan hệ chặt chẽ.
-* **Quy ước chuẩn hóa:**
-  * Tất cả các trường tiền tệ dùng kiểu `Decimal` để tránh sai lệch số nổi (Float).
-  * Mọi bảng có dấu vết thời gian (`created_at`, `updated_at`) và soft delete.
-  * Quản lý phân quyền chặt chẽ thông qua 4 vai trò chính: ADMIN, MANAGER, RECEPTIONIST, TECHNICIAN.
-
-#### Slide 6: Module Quản lý Tòa nhà & Căn hộ
-* **Tính năng cốt lõi:**
-  * Quản lý phân cấp: Tòa nhà -> Tầng -> Căn hộ.
-  * Thiết lập thuộc tính chi tiết cho từng căn hộ (Loại phòng: Studio, 1PN, 2PN, 3PN; Danh mục nội thất đi kèm).
-  * Quy trình chuyển trạng thái căn hộ tự động hoặc thủ công dựa trên vòng đời hợp đồng (`AVAILABLE`, `OCCUPIED`, `MAINTENANCE`, `RESERVED`).
-
-#### Slide 7: Quản lý Khách thuê & Thủ tục Hành chính
-* **Hồ sơ số hóa:** Lưu trữ đầy đủ lý lịch khách thuê đại diện (CCCD, SĐT, Thông tin liên lạc).
-* **Quản lý cư trú:**
-  * Tích hợp tính năng Khai báo Tạm trú / Tạm vắng trực tiếp trên hồ sơ khách.
-  * Lưu trữ lịch sử tất cả các hợp đồng khách đã ký trong quá khứ để phân tích hành vi tiêu dùng.
-
-#### Slide 8: Thiết lập & Vòng đời Hợp đồng thuê
-* **Quy trình ký hợp đồng:** Chọn khách đại diện, áp phòng trống, cấu hình đơn giá điện nước, cấu hình ngày đến hạn thanh toán (`payment_due_day`), và đính kèm dịch vụ.
-* **Vòng đời hợp đồng tự động:**
-  * **ACTIVE** (Đang hoạt động).
-  * **EXPIRING_SOON** (Tự động chuyển qua Cron khi còn ≤ 30 ngày).
-  * **EXPIRED** (Hết hạn và tự giải phóng trạng thái phòng về trống).
-  * **TERMINATED** (Chấm dứt trước hạn kèm lý do cụ thể).
-
-#### Slide 9: Ghi nhận Chỉ số Điện nước & Dịch vụ đi kèm
-* **Chốt số thông minh:** Giao diện chốt số điện nước hàng tháng tự động gợi ý chỉ số cũ (lấy từ số điện nước tháng trước hoặc chỉ số ban đầu của hợp đồng), giảm thiểu lỗi nhập liệu của nhân viên.
-* **Quản lý dịch vụ đăng ký:** Đăng ký dịch vụ (vệ sinh, xe cộ, internet...) theo số lượng và đơn giá quy định trên từng hợp đồng, tự động cộng dồn vào hóa đơn cuối tháng.
-
-#### Slide 10: Quy trình Tính toán & Lập Hóa đơn hàng loạt
-* **Tự động hóa lập hóa đơn:** Nhân viên chỉ cần chọn tháng lập hóa đơn, hệ thống tự động quét và tính toán hàng loạt cho tất cả căn hộ có hợp đồng hoạt động:
-  $$\text{Tổng tiền} = \text{Tiền phòng} + (\text{Điện mới} - \text{Điện cũ}) \times \text{Đơn giá} + (\text{Số người} \times 100k) + \text{Tổng tiền dịch vụ} + \text{Phụ thu}$$
-* **Hạn đóng tiền hợp lệ:** Hạn thanh toán (`due_date`) được tính tự động vào tháng kế tiếp của kỳ hóa đơn (Ví dụ: hóa đơn kỳ 2026-05 có hạn nộp là ngày quy định trong hợp đồng của tháng 2026-06).
-
-#### Slide 11: Quản lý Quá hạn hóa đơn & Tối ưu hóa UI mới
-* **Trạng thái Quá hạn:** Tự động phát hiện hóa đơn quá hạn qua Cron Job hàng ngày (`due_date < today` và chưa hoàn tất thanh toán) hoặc cập nhật động ngay trên UI.
-* **Cải tiến thiết kế UI tối giản:**
-  * Di chuyển toàn bộ cảnh báo quá hạn từ cột "Hạn thanh toán" sang cột "Trạng thái". Cột Hạn thanh toán chỉ hiển thị ngày sạch sẽ.
-  * Tận dụng badge đỏ đậm đặc trưng (`bg-red-200 text-red-800 font-semibold`) cho trạng thái `Quá hạn` trên Invoices Page và Invoice Detail Page để gây chú ý mạnh với nhân viên thu ngân.
-
-#### Slide 12: Báo hỏng qua QR Code — Trải nghiệm "Zero-Login"
-* **Đột phá tiện ích cho Khách thuê:**
-  * Mỗi phòng có một mã QR động độc lập chứa token mã hóa thời hạn 90 ngày dán trực tiếp ở cửa.
-  * Khách chỉ cần quét mã bằng điện thoại để mở form gửi yêu cầu kỹ thuật trực tiếp mà không cần tài khoản đăng nhập hay cài đặt ứng dụng.
-  * Tự động ẩn thông tin nhạy cảm của khách thuê trên giao diện công cộng nhưng tự liên kết chính xác sự cố vào phòng tương ứng ở hệ thống quản lý.
-
-#### Slide 13: Tiếp nhận & Phân công Yêu cầu Kỹ thuật
-* **Phân cấp xử lý:**
-  * Tự động nhận diện nguồn gửi sự cố (Gửi từ Khách thuê qua QR code vs Gửi nội bộ do Lễ tân tạo).
-  * Quản lý tiến độ sửa chữa qua các trạng thái: `RECEIVED` -> `ASSIGNED` (Phân công kỹ thuật viên cụ thể) -> `IN_PROGRESS` -> `RESOLVED` (Kèm nhật ký thời gian hoàn thành cụ thể).
-
-#### Slide 14: Dashboard Phân tích Tài chính & Vận hành
-* **Trực quan hóa dữ liệu chỉ huy:**
-  * **8 chỉ số KPI cốt lõi:** Thống kê doanh thu, tỷ lệ lấp đầy phòng, số lượng khách thuê và tình trạng hóa đơn nợ nần.
-  * **Điều hướng đồng bộ:** Nhấn vào các chỉ số nợ/quá hạn trên Dashboard sẽ mở danh sách hóa đơn tương ứng với bộ lọc chính xác (`?status=OVERDUE`), loại bỏ lỗi rỗng trang.
-  * Biểu đồ doanh thu 6 tháng gần nhất (Đã thu vs Chưa thu) để hỗ trợ dòng tiền quản lý.
-
-#### Slide 15: Kết luận & Giá trị thực tiễn mang lại
-* **Giá trị cốt lõi:**
-  * Đạt tỷ lệ chính xác 100% trong tính toán công nợ và hạn chế thất thoát tài chính.
-  * Rút ngắn thời gian tiếp nhận sự cố kỹ thuật từ khách hàng lên tới 80%.
-  * Hệ thống đóng gói Docker nhẹ, ổn định, giao diện có độ tương phản cao, chống lóa và phân cấp thông tin rõ ràng.
-  * Sẵn sàng demo ngay lập tức với dữ liệu mẫu phong phú.
+| Level | Tính năng yêu cầu | Trạng thái |
+|-------|------------------|-----------|
+| **Mid-Level** | CRUD cơ bản, Auth, DB schema | ✅ |
+| **Strong Mid-Level** | Audit Log, Notification, Attachment, Comment, Timeline, Payment Workflow, Search, Reporting, Export | ✅ |
+| **Senior-Level** | + Event Driven Architecture, Workflow Engine, Business Rules Engine, Policy Based Permission | ✅ |
+| **Enterprise-Level** | + Dynamic Custom Fields, Saved Views, Advanced Filter Builder, Bulk Actions | 🔲 Planned |
