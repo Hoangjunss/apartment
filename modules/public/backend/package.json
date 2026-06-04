@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "express": "^4.19.2",
-    "@my/prisma": "workspace:*"
+    "@my/prisma": "workspace:*",
+    "express-rate-limit": "^7.2.0"
   }
 }

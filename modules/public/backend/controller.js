@@ -6,6 +6,9 @@ export const getRoomInfo = async (req, res) => {
     if (!t) {
       return res.status(400).json({ success: false, message: 'Thiếu mã token xác thực phòng' });
     }
+    if (typeof t !== 'string' || !/^[a-zA-Z0-9]{8}$/.test(t)) {
+      return res.status(400).json({ success: false, message: 'Định dạng token xác thực phòng không hợp lệ' });
+    }
     const data = await service.getRoomInfoByToken(t);
     if (!data) {
       return res.status(404).json({ success: false, message: 'Token không tồn tại hoặc đã hết hạn' });
@@ -21,6 +24,9 @@ export const createPublicRequest = async (req, res) => {
     const { token, title, description, type, priority, requester_name, requester_phone } = req.body;
     if (!token) {
       return res.status(400).json({ success: false, message: 'Thiếu mã token xác thực phòng' });
+    }
+    if (typeof token !== 'string' || !/^[a-zA-Z0-9]{8}$/.test(token)) {
+      return res.status(400).json({ success: false, message: 'Định dạng token xác thực phòng không hợp lệ' });
     }
     if (!title || !description || !requester_name || !requester_phone) {
       return res.status(400).json({ success: false, message: 'Vui lòng điền đầy đủ thông tin bắt buộc' });

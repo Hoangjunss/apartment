@@ -1,4 +1,4 @@
-import { prisma } from '@my/prisma';
+import { prisma, Prisma } from '@my/prisma';
 import eventHub from '@my/events';
 import { WATER_PRICE_PER_PERSON } from './constants.js';
 import { calculateWaterCost } from './utils.js';
@@ -219,76 +219,76 @@ export const generateInvoice = async (data, userId) => {
     throw new Error('Định dạng tháng thanh toán không hợp lệ (yêu cầu YYYY-MM)');
   }
 
-  // Check unique contract_id + billing_month
-  const existing = await prisma.invoices.findUnique({
-    where: {
-      contract_id_billing_month: {
-        contract_id,
-        billing_month
-      }
-    }
-  });
-
-  if (existing) {
-    throw new Error(`Hóa đơn cho hợp đồng này trong tháng ${billing_month} đã tồn tại`);
-  }
-
-  // Fetch contract
-  const contract = await prisma.contracts.findUnique({
-    where: { id: contract_id },
-    include: {
-      apartment: true,
-      service_subscriptions: {
-        where: { status: 'ACTIVE' },
-        include: {
-          service: true
+  return prisma.$transaction(async (tx) => {
+    // Check unique contract_id + billing_month
+    const existing = await tx.invoices.findUnique({
+      where: {
+        contract_id_billing_month: {
+          contract_id,
+          billing_month
         }
       }
+    });
+
+    if (existing) {
+      throw new Error(`Hóa đơn cho hợp đồng này trong tháng ${billing_month} đã tồn tại`);
     }
-  });
 
-  if (!contract) {
-    throw new Error('Không tìm thấy hợp đồng');
-  }
-
-  if (!['ACTIVE', 'EXPIRING_SOON'].includes(contract.status)) {
-    throw new Error('Chỉ có thể tạo hóa đơn cho hợp đồng đang hoạt động');
-  }
-
-  // Get utility reading
-  const utilityReading = await prisma.utilityReadings.findUnique({
-    where: {
-      apartment_id_billing_month: {
-        apartment_id: contract.apartment_id,
-        billing_month
+    // Fetch contract
+    const contract = await tx.contracts.findUnique({
+      where: { id: contract_id },
+      include: {
+        apartment: true,
+        service_subscriptions: {
+          where: { status: 'ACTIVE' },
+          include: {
+            service: true
+          }
+        }
       }
+    });
+
+    if (!contract) {
+      throw new Error('Không tìm thấy hợp đồng');
     }
-  });
 
-  if (!utilityReading) {
-    throw new Error(`Chưa có chỉ số điện nước cho căn hộ ${contract.apartment.apartment_code} trong tháng ${billing_month}. Vui lòng ghi nhận chỉ số điện nước trước.`);
-  }
+    if (!['ACTIVE', 'EXPIRING_SOON'].includes(contract.status)) {
+      throw new Error('Chỉ có thể tạo hóa đơn cho hợp đồng đang hoạt động');
+    }
 
-  // Calculate costs
-  const rent_amount = Number(contract.monthly_rent);
+    // Get utility reading
+    const utilityReading = await tx.utilityReadings.findUnique({
+      where: {
+        apartment_id_billing_month: {
+          apartment_id: contract.apartment_id,
+          billing_month
+        }
+      }
+    });
 
-  const electricity_usage = Number(utilityReading.electricity_curr) - Number(utilityReading.electricity_prev);
-  const electricity_amount = electricity_usage * Number(utilityReading.electricity_unit_price);
+    if (!utilityReading) {
+      throw new Error(`Chưa có chỉ số điện nước cho căn hộ ${contract.apartment.apartment_code} trong tháng ${billing_month}. Vui lòng ghi nhận chỉ số điện nước trước.`);
+    }
 
-  if (!contract.soNguoiO || contract.soNguoiO <= 0) {
-    throw new Error(`Hợp đồng ${contract.contract_code} chưa cấu hình Số người ở hoặc bằng 0. Không thể tạo hóa đơn.`);
-  }
+    // Calculate costs
+    const rent_amount = Number(contract.monthly_rent);
 
-  const water_amount = contract.water_price_per_month ? Number(contract.water_price_per_month) : calculateWaterCost(contract.soNguoiO);
+    const electricity_usage = Number(utilityReading.electricity_curr) - Number(utilityReading.electricity_prev);
+    const electricity_amount = electricity_usage * Number(utilityReading.electricity_unit_price);
 
-  let service_amount = 0;
-  for (const sub of contract.service_subscriptions) {
-    service_amount += Number(sub.quantity) * Number(sub.service.unit_price);
-  }
+    if (!contract.soNguoiO || contract.soNguoiO <= 0) {
+      throw new Error(`Hợp đồng ${contract.contract_code} chưa cấu hình Số người ở hoặc bằng 0. Không thể tạo hóa đơn.`);
+    }
 
-  const other = Number(other_amount);
+    const water_amount = contract.water_price_per_month ? Number(contract.water_price_per_month) : calculateWaterCost(contract.soNguoiO);
 
-  const newInvoice = await prisma.$transaction(async (tx) => {
+    let service_amount = 0;
+    for (const sub of contract.service_subscriptions) {
+      service_amount += Number(sub.quantity) * Number(sub.service.unit_price);
+    }
+
+    const other = Number(other_amount);
+
     // 1. Quét nợ cũ (Debt Rollover)
     const unpaidInvoices = await tx.invoices.findMany({
       where: {
@@ -402,6 +402,8 @@ export const generateInvoice = async (data, userId) => {
     }
 
     return newInvoiceRecord;
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable
   });
 
   eventHub.emit('invoice.created', {
@@ -539,6 +541,8 @@ export const recordPayment = async (data, userId) => {
     });
 
     return { paymentRecord, creditSurplus };
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable
   });
 
   // Phát sự kiện invoice.paid qua EventHub
@@ -621,6 +625,8 @@ export const refundContractCredit = async (data, userId) => {
     });
 
     return { credit: updatedCredit, transaction: txLog };
+  }, {
+    isolationLevel: Prisma.TransactionIsolationLevel.Serializable
   });
 };
 
