@@ -14,6 +14,9 @@ importers:
 
   apps/backend:
     dependencies:
+      '@my/assets-backend':
+        specifier: workspace:*
+        version: link:../../modules/assets/backend
       '@my/attachments-backend':
         specifier: workspace:*
         version: link:../../modules/attachments/backend
@@ -41,6 +44,9 @@ importers:
       '@my/finance-backend':
         specifier: workspace:*
         version: link:../../modules/finance/backend
+      '@my/inventory-backend':
+        specifier: workspace:*
+        version: link:../../modules/inventory/backend
       '@my/notifications-backend':
         specifier: workspace:*
         version: link:../../modules/notifications/backend
@@ -165,6 +171,24 @@ importers:
       vite:
         specifier: ^5.0.0
         version: 5.4.21(@types/node@25.7.0)
+
+  modules/assets/backend:
+    dependencies:
+      '@my/auth-backend':
+        specifier: workspace:*
+        version: link:../../auth/backend
+      '@my/events':
+        specifier: workspace:*
+        version: link:../../../packages/events
+      '@my/policy-backend':
+        specifier: workspace:*
+        version: link:../../policy/backend
+      '@my/prisma':
+        specifier: workspace:*
+        version: link:../../../packages/prisma
+      express:
+        specifier: ^4.19.2
+        version: 4.22.2
 
   modules/attachments/backend:
     dependencies:
@@ -505,6 +529,24 @@ importers:
       zod:
         specifier: ^3.22.0
         version: 3.25.76
+
+  modules/inventory/backend:
+    dependencies:
+      '@my/auth-backend':
+        specifier: workspace:*
+        version: link:../../auth/backend
+      '@my/events':
+        specifier: workspace:*
+        version: link:../../../packages/events
+      '@my/policy-backend':
+        specifier: workspace:*
+        version: link:../../policy/backend
+      '@my/prisma':
+        specifier: workspace:*
+        version: link:../../../packages/prisma
+      express:
+        specifier: ^4.19.2
+        version: 4.22.2
 
   modules/notifications/backend:
     dependencies:

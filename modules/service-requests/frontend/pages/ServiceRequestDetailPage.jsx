@@ -1,7 +1,7 @@
 // modules/service-requests/frontend/pages/ServiceRequestDetailPage.jsx
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, Home, Clock } from 'lucide-react';
+import { ArrowLeft, User, Home, Clock, Package } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader.jsx';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner.jsx';
 import { EmptyState } from '@/components/common/EmptyState.jsx';
@@ -13,6 +13,8 @@ import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import { CommentsSection } from 'modules/comments/frontend/components/CommentsSection.jsx';
 import { AttachmentsSection } from 'modules/attachments/frontend/components/AttachmentsSection.jsx';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/axios.js';
 
 const STATUS_LABELS = {
   PENDING: { label: 'Chờ xử lý', color: 'bg-amber-100 text-amber-700' },
@@ -40,7 +42,15 @@ export default function ServiceRequestDetailPage() {
 
   const [isResolveModalOpen, setIsResolveModalOpen] = useState(false);
   const [modalExpenses, setModalExpenses] = useState([{ description: '', amount: '' }]);
+  const [modalMaterials, setModalMaterials] = useState([{ inventory_item_id: '', quantity: '' }]);
   const [pendingStatus, setPendingStatus] = useState(null);
+
+  const { data: inventoryData } = useQuery({
+    queryKey: ['inventoryItems', 'simple'],
+    queryFn: () => api.get('/inventory/items').then(r => r.data.data?.items ?? r.data.data ?? []),
+    enabled: isResolveModalOpen
+  });
+  const inventoryItems = Array.isArray(inventoryData) ? inventoryData : [];
 
   const { mutate: updateStatus, isPending: updatingStatus } = useUpdateServiceRequestStatus({
     onSuccess: () => {
@@ -99,6 +109,20 @@ export default function ServiceRequestDetailPage() {
     setModalExpenses(next);
   };
 
+  const handleAddMaterialRow = () => {
+    setModalMaterials([...modalMaterials, { inventory_item_id: '', quantity: '' }]);
+  };
+
+  const handleRemoveMaterialRow = (index) => {
+    setModalMaterials(modalMaterials.filter((_, idx) => idx !== index));
+  };
+
+  const handleMaterialChange = (index, field, value) => {
+    const next = [...modalMaterials];
+    next[index][field] = value;
+    setModalMaterials(next);
+  };
+
   const handleSaveExpenses = () => {
     const validExpenses = modalExpenses
       .filter((exp) => exp.description.trim() && exp.amount !== '')
@@ -107,10 +131,18 @@ export default function ServiceRequestDetailPage() {
         amount: Number(exp.amount),
       }));
 
+    const validMaterials = modalMaterials
+      .filter((mat) => mat.inventory_item_id && mat.quantity !== '')
+      .map((mat) => ({
+        inventory_item_id: Number(mat.inventory_item_id),
+        quantity: Number(mat.quantity)
+      }));
+
     updateStatus({
       id: req.id,
       status: pendingStatus || req.status,
       expenses: validExpenses,
+      materials: validMaterials
     });
   };
 
@@ -176,6 +208,29 @@ export default function ServiceRequestDetailPage() {
             </div>
           )}
 
+          {/* Asset info */}
+          {req.asset && (
+            <div className="card p-5 bg-white space-y-2">
+              <p className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                <Package size={15} className="text-blue-500" />
+                Tài sản liên quan
+              </p>
+              <div className="flex items-center gap-3">
+                <span className="font-mono font-semibold text-indigo-600">{req.asset.asset_code}</span>
+                <span className="text-slate-400">·</span>
+                <span className="text-sm text-slate-600">
+                  {req.asset.name}
+                </span>
+                <button 
+                  onClick={() => navigate(`/assets/${req.asset.id}`)}
+                  className="text-xs text-blue-600 hover:underline font-semibold"
+                >
+                  Xem chi tiết tài sản
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Detailed Expenses Card */}
           {(canUpdateStatus || (req.expenses && req.expenses.length > 0)) && (
             <div className="card p-5 bg-white space-y-3">
@@ -226,6 +281,27 @@ export default function ServiceRequestDetailPage() {
                 </div>
               ) : (
                 <p className="text-xs text-slate-400 italic">Không ghi nhận chi phí nào phát sinh.</p>
+              )}
+
+              {req.materials_used && req.materials_used.length > 0 && (
+                <div className="mt-4 pt-3 border-t">
+                  <p className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1">
+                    <Package size={12} className="text-blue-500" />
+                    Vật tư sử dụng xuất từ Kho:
+                  </p>
+                  <div className="space-y-1.5">
+                    {req.materials_used.map((mat) => (
+                      <div key={mat.id} className="text-xs text-slate-600 flex justify-between bg-slate-50 p-2 rounded-lg border border-slate-100 items-center">
+                        <span className="font-medium">{mat.inventory_item?.item_name}</span>
+                        <div className="space-x-3">
+                          <span className="text-slate-500">Số lượng: <span className="font-bold text-slate-800">{mat.quantity} {mat.inventory_item?.unit}</span></span>
+                          <span className="text-gray-400">|</span>
+                          <span className="text-slate-500">Đơn giá: <span className="font-mono text-slate-700">{Number(mat.unit_cost).toLocaleString('vi-VN')} đ</span></span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           )}
@@ -336,6 +412,56 @@ export default function ServiceRequestDetailPage() {
                   )}
                 </span>
               </div>
+              {/* Materials Used Selection */}
+              {pendingStatus === 'RESOLVED' && (
+                <div className="border-t pt-3 space-y-3">
+                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">Khai báo vật tư sử dụng từ Kho</label>
+                  <p className="text-xs text-slate-500">Vật tư sẽ được tự động trừ tồn kho khi sự cố kỹ thuật này chuyển sang hoàn thành.</p>
+                  
+                  <div className="space-y-2.5 max-h-[180px] overflow-y-auto pr-1">
+                    {modalMaterials.map((mat, index) => (
+                      <div key={index} className="flex gap-2 items-center">
+                        <select
+                          value={mat.inventory_item_id}
+                          onChange={(e) => handleMaterialChange(index, 'inventory_item_id', e.target.value)}
+                          className="flex-1 p-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-500 outline-none bg-white"
+                        >
+                          <option value="">Chọn vật tư...</option>
+                          {inventoryItems.map(item => (
+                            <option key={item.id} value={item.id} disabled={item.current_stock <= 0}>
+                              {item.item_name} ({item.current_stock} {item.unit} trong kho)
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          placeholder="SL dùng"
+                          value={mat.quantity}
+                          onChange={(e) => handleMaterialChange(index, 'quantity', e.target.value)}
+                          className="w-20 p-2 border border-slate-200 rounded-lg text-xs text-right focus:ring-1 focus:ring-indigo-500 outline-none"
+                        />
+                        {modalMaterials.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveMaterialRow(index)}
+                            className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg shrink-0 transition-colors text-xs font-semibold"
+                          >
+                            Xóa
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <button
+                    type="button"
+                    onClick={handleAddMaterialRow}
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors"
+                  >
+                    + Thêm vật tư sử dụng
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 pt-2 border-t">

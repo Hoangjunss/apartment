@@ -47,6 +47,11 @@ import ServiceRequestsPage from 'modules/service-requests/frontend/pages/Service
 import ServiceRequestDetailPage from 'modules/service-requests/frontend/pages/ServiceRequestDetailPage.jsx';
 import PublicRequestPage from '@/pages/PublicRequestPage.jsx';
 
+// ── Inventory & Assets Module Pages ───────────────────────────────────────────────────────
+import InventoryDashboard from 'modules/inventory/frontend/pages/InventoryDashboard.jsx';
+import AssetsPage from 'modules/assets/frontend/pages/AssetsPage.jsx';
+import AssetDetailPage from 'modules/assets/frontend/pages/AssetDetailPage.jsx';
+
 // ── Notification + Audit ───────────────────────────────────────────────────────────────
 import { NotificationProvider } from '@/contexts/NotificationContext.jsx';
 import AuditLogsPage from 'modules/audit-log/frontend/pages/AuditLogsPage.jsx';
@@ -206,6 +211,9 @@ export default function App() {
               {/* Service Requests — tất cả role */}
               <Route path="/service-requests" element={<ProtectedRoute><ServiceRequestsPage /></ProtectedRoute>} />
               <Route path="/service-requests/:id" element={<ProtectedRoute><ServiceRequestDetailPage /></ProtectedRoute>} />
+              <Route path="/inventory" element={<ProtectedRoute><InventoryDashboard /></ProtectedRoute>} />
+              <Route path="/assets" element={<ProtectedRoute><AssetsPage /></ProtectedRoute>} />
+              <Route path="/assets/:id" element={<ProtectedRoute><AssetDetailPage /></ProtectedRoute>} />
               <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
 
               {/* Users — ADMIN only */}
