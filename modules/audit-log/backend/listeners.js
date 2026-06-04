@@ -101,6 +101,26 @@ const registerListeners = () => {
       newData: event.data?.newData
     });
   });
+
+  eventHub.on('inventory.stock_in', async (event) => {
+    await createLog({
+      actorId: event.actorId,
+      action: 'CREATE',
+      resourceType: 'StockTransaction',
+      resourceId: event.entityId,
+      newData: event.data
+    });
+  });
+
+  eventHub.on('inventory.stock_out', async (event) => {
+    await createLog({
+      actorId: event.actorId,
+      action: 'CREATE',
+      resourceType: 'StockTransaction',
+      resourceId: event.entityId,
+      newData: event.data
+    });
+  });
 };
 
 registerListeners();
