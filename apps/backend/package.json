@@ -7,6 +7,8 @@
     "@my/contract-backend": "workspace:*",
     "@my/finance-backend": "workspace:*",
     "@my/service-requests-backend": "workspace:*",
+    "@my/inventory-backend": "workspace:*",
+    "@my/assets-backend": "workspace:*",
     "@my/tenant-backend": "workspace:*",
     "@my/public-backend": "workspace:*",
     "@my/audit-log-backend": "workspace:*",
