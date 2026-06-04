@@ -60,7 +60,7 @@ Hệ thống sử dụng cơ chế phát và lắng nghe sự kiện (Event-Driv
 flowchart TD
     Service[Service Layer] -->|Emit Event| EventHub[Event Hub]
     
-    subgraph Listeners (Xử lý bất đồng bộ song song)
+    subgraph Listeners ["Listeners (Xử lý bất đồng bộ song song)"]
         EventHub -->|contract.created / invoice.paid / inventory.low_stock...| Audit[AuditLog Listener]
         EventHub -->|contract.created / invoice.paid / inventory.low_stock...| Timeline[Timeline Listener]
         EventHub -->|contract.created / invoice.paid / inventory.low_stock...| Notif[Notification Listener]
