@@ -19,6 +19,10 @@ async function main() {
   console.log('Seed starting with MASSIVE dataset (5x expansion)...');
 
   // 1. Clean up existing data in correct FK order
+  await prisma.serviceRequestMaterials.deleteMany({});
+  await prisma.stockTransactions.deleteMany({});
+  await prisma.inventoryItems.deleteMany({});
+  await prisma.warehouses.deleteMany({});
   await prisma.timeline.deleteMany({});
   await prisma.buildingAssignments.deleteMany({});
   await prisma.businessRules.deleteMany({});
@@ -32,6 +36,7 @@ async function main() {
   await prisma.contractCredits.deleteMany({});
   await prisma.buildingExpenses.deleteMany({});
   await prisma.serviceRequests.deleteMany({});
+  await prisma.assets.deleteMany({});
   await prisma.payments.deleteMany({});
   await prisma.invoices.deleteMany({});
   await prisma.utilityReadings.deleteMany({});
@@ -470,7 +475,84 @@ async function main() {
 
   console.log(`Generated ${totalInvoicesCreated} invoices and associated transactions.`);
 
-  // 9. ServiceRequests mẫu
+  // 9. Seed Warehouses, InventoryItems & Assets
+  console.log('Seeding Warehouses, InventoryItems & Assets...');
+  const w1 = await prisma.warehouses.create({
+    data: {
+      name: 'Kho kỹ thuật tầng 10',
+      building_id: b1.id,
+      description: 'Kho chứa thiết bị, vật tư sửa chữa kỹ thuật của Block A'
+    }
+  });
+
+  const w2 = await prisma.warehouses.create({
+    data: {
+      name: 'Kho tiêu hao tầng hầm B1',
+      building_id: b1.id,
+      description: 'Kho chứa các vật tư tiêu hao, hóa chất tẩy rửa Block A'
+    }
+  });
+
+  const itemsData = [
+    { warehouse_id: w1.id, item_name: 'Bóng đèn Điện Quang 18W', category: 'CONSUMABLE', current_stock: 20, min_stock_level: 5, unit: 'cái', unit_cost: 35000 },
+    { warehouse_id: w1.id, item_name: 'Dây cáp điện Cadivi', category: 'CONSUMABLE', current_stock: 50, min_stock_level: 10, unit: 'mét', unit_cost: 12000 },
+    { warehouse_id: w1.id, item_name: 'Van nước Inox', category: 'SPARE_PART', current_stock: 8, min_stock_level: 3, unit: 'cái', unit_cost: 85000 },
+    { warehouse_id: w2.id, item_name: 'Nước lau sàn Sunlight', category: 'CONSUMABLE', current_stock: 10, min_stock_level: 2, unit: 'chai', unit_cost: 45000 }
+  ];
+
+  const items = [];
+  for (const item of itemsData) {
+    const createdItem = await prisma.inventoryItems.create({ data: item });
+    items.push(createdItem);
+
+    // Initial Stock In transaction
+    await prisma.stockTransactions.create({
+      data: {
+        inventory_item_id: createdItem.id,
+        type: 'STOCK_IN',
+        quantity: item.current_stock,
+        unit_cost: item.unit_cost,
+        item_name_snapshot: item.item_name,
+        ref_type: 'MANUAL',
+        note: 'Nhập kho khởi tạo hệ thống',
+        recorded_by: admin.id
+      }
+    });
+  }
+
+  const elevatorAsset = await prisma.assets.create({
+    data: {
+      building_id: b1.id,
+      asset_code: 'AST-0001',
+      name: 'Thang máy Otis',
+      category: 'MACHINERY',
+      status: 'ACTIVE',
+      purchase_cost: 850000000,
+      salvage_value: 50000000,
+      useful_life_years: 15,
+      purchase_date: new Date('2022-01-15'),
+      depreciation_method: 'STRAIGHT_LINE',
+      description: 'Thang máy tải khách Otis Schindler Block A'
+    }
+  });
+
+  const generatorAsset = await prisma.assets.create({
+    data: {
+      building_id: b1.id,
+      asset_code: 'AST-0002',
+      name: 'Máy phát điện Mitsubishi',
+      category: 'MACHINERY',
+      status: 'ACTIVE',
+      purchase_cost: 450000000,
+      salvage_value: 30000000,
+      useful_life_years: 10,
+      purchase_date: new Date('2024-03-20'),
+      depreciation_method: 'STRAIGHT_LINE',
+      description: 'Máy phát điện dự phòng Mitsubishi Block A'
+    }
+  });
+
+  // 10. ServiceRequests mẫu
   const serviceReqData = [
     {
       title: 'Điều hòa phòng A101 không mát',
@@ -532,12 +614,64 @@ async function main() {
       type: 'MAINTENANCE',
       scheduled_start_date: new Date('2026-06-07')
     },
+    {
+      title: 'Bảo trì định kỳ Thang máy Otis',
+      description: 'Bảo trì định kỳ hàng tháng cho thang máy Otis Block A',
+      apartment_id: apartments[0].id,
+      requester_name: 'Nguyễn Văn Admin',
+      requester_phone: '0901234567',
+      assigned_to: tech.id,
+      status: 'RESOLVED',
+      source: 'INTERNAL',
+      type: 'MAINTENANCE',
+      asset_id: elevatorAsset.id,
+      scheduled_start_date: new Date('2026-05-15')
+    }
   ];
 
+  const createdRequests = [];
   for (const sr of serviceReqData) {
-    await prisma.serviceRequests.create({ data: sr });
+    const created = await prisma.serviceRequests.create({ data: sr });
+    createdRequests.push(created);
   }
   console.log(`Created ${serviceReqData.length} service requests.`);
+
+  // Seed ServiceRequestMaterials for resolved requests
+  const otisRequest = createdRequests.find(r => r.title === 'Bảo trì định kỳ Thang máy Otis');
+  if (otisRequest) {
+    const wireItem = items.find(i => i.item_name === 'Dây cáp điện Cadivi');
+    if (wireItem) {
+      await prisma.serviceRequestMaterials.create({
+        data: {
+          service_request_id: otisRequest.id,
+          inventory_item_id: wireItem.id,
+          quantity: 5,
+          unit_cost: wireItem.unit_cost
+        }
+      });
+
+      // Stock transaction for out of stock
+      await prisma.stockTransactions.create({
+        data: {
+          inventory_item_id: wireItem.id,
+          type: 'STOCK_OUT',
+          quantity: 5,
+          unit_cost: wireItem.unit_cost,
+          item_name_snapshot: wireItem.item_name,
+          ref_type: 'SERVICE_REQUEST',
+          ref_id: otisRequest.id,
+          note: 'Xuất kho dây cáp điện Cadivi bảo trì thang máy',
+          recorded_by: tech.id
+        }
+      });
+
+      // Update current stock of wireItem
+      await prisma.inventoryItems.update({
+        where: { id: wireItem.id },
+        data: { current_stock: { decrement: 5 } }
+      });
+    }
+  }
 
   // 10. Seed BuildingExpenses & Attachments
   console.log('Seeding Building Expenses & Attachments...');
