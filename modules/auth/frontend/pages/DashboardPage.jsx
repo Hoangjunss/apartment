@@ -208,15 +208,23 @@ export default function DashboardPage() {
       <div className="space-y-4">
         {/* Hàng 1 — Tổng quan bất động sản */}
         <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tổng quan bất động sản</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {loadingStats ? (
-            Array(4).fill(0).map((_, i) => <StatCardSkeleton key={i} />)
+            Array(5).fill(0).map((_, i) => <StatCardSkeleton key={i} />)
           ) : (
             <>
               <StatCard
+                title="Tổng số tòa nhà"
+                value={stats?.totalBuildings}
+                icon={Building2}
+                color="bg-slate-600"
+                sub="Tòa nhà đang quản lý"
+                onClick={() => navigate('/buildings')}
+              />
+              <StatCard
                 title="Căn hộ còn trống"
                 value={`${stats?.emptyApartments} / ${stats?.totalApartments}`}
-                icon={Building2}
+                icon={Home}
                 color="bg-emerald-500"
                 sub="Sẵn sàng đón khách thuê"
                 onClick={() => navigate('/apartments?status=AVAILABLE')}

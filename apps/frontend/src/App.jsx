@@ -50,6 +50,13 @@ import PublicRequestPage from '@/pages/PublicRequestPage.jsx';
 // ── Notification + Audit ───────────────────────────────────────────────────────────────
 import { NotificationProvider } from '@/contexts/NotificationContext.jsx';
 import AuditLogsPage from 'modules/audit-log/frontend/pages/AuditLogsPage.jsx';
+import CalendarPage from 'modules/calendar/frontend/pages/CalendarPage.jsx';
+import NotificationsPage from 'modules/notifications/frontend/pages/NotificationsPage.jsx';
+
+// ── Admin Config / Tier 2 Modules ──────────────────────────────────────────────────────
+import WorkflowConfigPage from 'modules/workflow/frontend/pages/WorkflowConfigPage.jsx';
+import RulesConfigPage from 'modules/rules/frontend/pages/RulesConfigPage.jsx';
+import BuildingAssignmentsPage from 'modules/policy/frontend/pages/BuildingAssignmentsPage.jsx';
 
 export default function App() {
   return (
@@ -187,10 +194,19 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/calendar"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER, ROLES.RECEPTIONIST]}>
+                    <CalendarPage />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Service Requests — tất cả role */}
               <Route path="/service-requests" element={<ProtectedRoute><ServiceRequestsPage /></ProtectedRoute>} />
               <Route path="/service-requests/:id" element={<ProtectedRoute><ServiceRequestDetailPage /></ProtectedRoute>} />
+              <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
 
               {/* Users — ADMIN only */}
               <Route
@@ -208,6 +224,36 @@ export default function App() {
                 element={
                   <ProtectedRoute roles={[ROLES.ADMIN, ROLES.MANAGER]}>
                     <AuditLogsPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Admin — Tier 2: Workflow Engine Config */}
+              <Route
+                path="/admin/workflow-config"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN]}>
+                    <WorkflowConfigPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Admin — Tier 2: Business Rules Engine */}
+              <Route
+                path="/admin/rules-config"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN]}>
+                    <RulesConfigPage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Admin — Tier 2: Policy Based Permission - Building Assignments */}
+              <Route
+                path="/admin/building-assignments"
+                element={
+                  <ProtectedRoute roles={[ROLES.ADMIN]}>
+                    <BuildingAssignmentsPage />
                   </ProtectedRoute>
                 }
               />

@@ -13,6 +13,10 @@ import {
   History,
   BarChart3,
   TrendingDown,
+  Calendar,
+  GitFork,
+  ShieldCheck,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import {
@@ -80,6 +84,12 @@ const NAV_ITEMS = [
     roles: ALL_ROLES,                    // Tất cả đều thấy
   },
   {
+    to: '/calendar',
+    label: 'Lịch làm việc',
+    icon: Calendar,
+    roles: [ROLES.ADMIN, ROLES.MANAGER, ROLES.RECEPTIONIST],
+  },
+  {
     to: '/reports',
     label: 'Báo cáo thống kê',
     icon: BarChart3,
@@ -96,6 +106,24 @@ const NAV_ITEMS = [
     label: 'Nhật ký hoạt động',
     icon: History,
     roles: [ROLES.ADMIN, ROLES.MANAGER],
+  },
+  {
+    to: '/admin/workflow-config',
+    label: 'Quy trình (Workflow)',
+    icon: GitFork,
+    roles: [ROLES.ADMIN],
+  },
+  {
+    to: '/admin/rules-config',
+    label: 'Luật nghiệp vụ',
+    icon: SlidersHorizontal,
+    roles: [ROLES.ADMIN],
+  },
+  {
+    to: '/admin/building-assignments',
+    label: 'Phân quyền tòa nhà',
+    icon: ShieldCheck,
+    roles: [ROLES.ADMIN],
   },
 ];
 
