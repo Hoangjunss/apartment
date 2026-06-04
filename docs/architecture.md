@@ -10,25 +10,25 @@ Hệ thống được thiết kế theo mô hình phân tầng rõ rệt từ Cl
 
 ```mermaid
 flowchart TD
-    subgraph Tầng Trình diễn (Presentation Layer)
+    subgraph Tầng Trình diễn ["Tầng Trình diễn (Presentation Layer)"]
         FE[Frontend: React + Vite + TailwindCSS]
     end
 
-    subgraph Tầng API & Routing (API Layer)
+    subgraph Tầng API & Routing ["Tầng API & Routing (API Layer)"]
         Express[Express.js App Router]
         Middleware[Middlewares: Auth, RBAC, Policy Engine]
     end
 
-    subgraph Tầng Nghiệp vụ (Business Service Layer)
+    subgraph Tầng Nghiệp vụ ["Tầng Nghiệp vụ (Business Service Layer)"]
         Service[Service Layer: Chứa Business Logic]
         EventHub[Event Hub: Phát sự kiện in-process]
     end
 
-    subgraph Tầng Truy xuất Dữ liệu (Data Access Layer)
+    subgraph Tầng Truy xuất Dữ liệu ["Tầng Truy xuất Dữ liệu (Data Access Layer)"]
         Prisma[Prisma ORM Client]
     end
 
-    subgraph Tầng Cơ sở Dữ liệu (Database Layer)
+    subgraph Tầng Cơ sở Dữ liệu ["Tầng Cơ sở Dữ liệu (Database Layer)"]
         MySQL[(MySQL Database)]
     end
 
