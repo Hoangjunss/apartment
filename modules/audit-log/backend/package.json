@@ -10,6 +10,7 @@
   "dependencies": {
     "@my/prisma": "workspace:*",
     "@my/auth-backend": "workspace:*",
+    "@my/events": "workspace:*",
     "express": "^4.19.2"
   }
 }
