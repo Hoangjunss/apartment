@@ -75,7 +75,7 @@ Event Hub (in-process) đảm nhiệm việc truyền tin bất đồng bộ nh�
 flowchart TD
     Service[Service Layer] -->|Emit Event| Hub[Event Hub]
     
-    subgraph Listeners (Bất đồng bộ song song)
+    subgraph Listeners ["Listeners (Bất đồng bộ song song)"]
         Hub -->|contract.created / invoice.paid / inventory.low_stock...| Audit[AuditLog Listener]
         Hub -->|contract.created / invoice.paid / inventory.low_stock...| Timeline[Timeline Listener]
         Hub -->|contract.created / invoice.paid / inventory.low_stock...| Notif[Notification Listener]
