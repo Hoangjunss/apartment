@@ -32,12 +32,12 @@ export default function BuildingAssignmentsPage() {
     try {
       const [assignRes, usersRes] = await Promise.all([
         api.get('/policy/assignments'),
-        api.get('/auth/users')
+        api.get('/auth/users?limit=1000')
       ]);
       setAssignments(assignRes.data.data || []);
       
       // Filter users to only allow MANAGER, TECHNICIAN, RECEPTIONIST
-      const allUsers = usersRes.data.data || [];
+      const allUsers = usersRes.data.data?.items || [];
       const staffUsers = allUsers.filter(u => ['MANAGER', 'TECHNICIAN', 'RECEPTIONIST'].includes(u.role) && u.is_active);
       setUsers(staffUsers);
     } catch (err) {
