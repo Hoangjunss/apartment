@@ -61,9 +61,9 @@ flowchart TD
     Service[Service Layer] -->|Emit Event| EventHub[Event Hub]
     
     subgraph Listeners (Xử lý bất đồng bộ song song)
-        EventHub -->|contract.created / invoice.paid...| Audit[AuditLog Listener]
-        EventHub -->|contract.created / invoice.paid...| Timeline[Timeline Listener]
-        EventHub -->|contract.created / invoice.paid...| Notif[Notification Listener]
+        EventHub -->|contract.created / invoice.paid / inventory.low_stock...| Audit[AuditLog Listener]
+        EventHub -->|contract.created / invoice.paid / inventory.low_stock...| Timeline[Timeline Listener]
+        EventHub -->|contract.created / invoice.paid / inventory.low_stock...| Notif[Notification Listener]
     end
 
     Audit -->|Tạo bản ghi độc lập| DB1[(AuditLogs Table)]
@@ -73,27 +73,26 @@ flowchart TD
 ```
 
 ### Đặc tính thiết kế:
-- **Non-blocking (Không chặn)**: Các Listener được bọc trong các khối `try/catch` riêng biệt. Nếu việc tạo thông báo hoặc ghi log audit gặp lỗi, giao dịch nghiệp vụ chính (như tạo hợp đồng, hoàn tất thanh toán) vẫn được cam kết thành công.
+- **Non-blocking (Không chặn)**: Các Listener được bọc trong các khối `try/catch` riêng biệt. Nếu việc tạo thông báo hoặc ghi log audit gặp lỗi, giao dịch nghiệp vụ chính (như tạo hợp đồng, hoàn tất thanh toán, cập nhật kho) vẫn được cam kết thành công.
 - **Tính năng phân rã (Decoupling)**: Khi thêm các yêu cầu phụ trợ mới (như gửi email, SMS, Zalo ZNS), chúng ta chỉ cần viết thêm một Listener đăng ký với Event Hub mà không phải sửa đổi code của Service nghiệp vụ chính.
 
-### Mẫu payload sự kiện (`contract.created`):
+### Mẫu payload sự kiện (`inventory.low_stock`):
 ```json
 {
-  "eventId": "evt_83910fbc892",
-  "eventName": "contract.created",
-  "timestamp": "2026-06-04T07:20:00Z",
+  "eventId": "evt_99182ac762f",
+  "eventName": "inventory.low_stock",
+  "timestamp": "2026-06-04T08:15:00Z",
   "actor": {
-    "id": 12,
-    "name": "Nguyen Van A",
-    "role": "MANAGER"
+    "id": 15,
+    "name": "Tran Van Tech",
+    "role": "TECHNICIAN"
   },
   "data": {
-    "contractId": 145,
-    "contractCode": "HD-A101-202606",
-    "apartmentId": 88,
-    "tenantId": 32,
-    "monthlyRent": "12000000.00",
-    "depositAmount": "24000000.00"
+    "itemId": 4,
+    "itemName": "Van nước Inox",
+    "currentStock": 1,
+    "minStockLevel": 2,
+    "buildingId": 1
   }
 }
 ```

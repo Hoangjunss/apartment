@@ -119,3 +119,27 @@ Tài liệu này tóm tắt các endpoint REST API hiện có của hệ thống
 - `POST /assignments`: Gán tòa nhà cho nhân viên.
 - `PATCH /assignments/:id/revoke`: Thu hồi phân quyền quản lý tòa nhà.
 - `GET /my-assignments`: Danh sách tòa nhà nhân viên hiện tại được quản lý.
+
+### 6. Inventory & Warehouses Module (`/api/inventory`)
+- `GET /warehouses`: Lấy danh sách kho hàng (lọc scope tòa nhà).
+- `GET /warehouses/:id`: Xem chi tiết thông tin kho hàng.
+- `POST /warehouses`: Khởi tạo kho hàng mới.
+- `PUT /warehouses/:id`: Cập nhật thông tin kho hàng.
+- `DELETE /warehouses/:id`: Xóa kho hàng.
+- `GET /items`: Danh sách vật tư trong các kho.
+- `GET /items/:id`: Xem chi tiết vật tư trong kho.
+- `POST /items`: Thêm vật tư mới vào kho.
+- `PUT /items/:id`: Cập nhật thông tin/giá vật tư.
+- `DELETE /items/:id`: Xóa vật tư khỏi danh mục.
+- `GET /transactions`: Nhật ký nhập xuất kho.
+- `POST /transactions`: Ghi nhận giao dịch nhập/xuất kho (STOCK_IN / STOCK_OUT).
+
+### 7. Assets Module (`/api/assets`)
+- `GET /`: Danh sách tài sản cố định (lọc scope tòa nhà, bao gồm khấu hao động).
+- `GET /:id`: Xem chi tiết tài sản (gồm thông số khấu hao, timeline và attachments).
+- `GET /code/:code`: Tra cứu nhanh tài sản qua mã QR Code.
+- `POST /`: Khởi tạo tài sản cố định mới.
+- `PUT /:id`: Cập nhật thông tin tài sản.
+- `DELETE /:id`: Xóa tài sản.
+- `GET /:id/timeline`: Dòng thời gian lịch sử hoạt động của tài sản.
+- `GET /:id/attachments`: Tệp đính kèm liên quan đến tài sản.
