@@ -9,13 +9,13 @@
 
 | Chỉ số | Số lượng | Tài liệu chi tiết |
 |--------|:---:|-------------------|
-| **Backend Modules** | 18 | [Tóm tắt Module](#3-core-modules) |
-| **Database Models** | 30+ | [database.md](file:///d:/Working/ASOL/apartment/docs/database.md) |
-| **REST APIs** | 70+ | [api.md](file:///d:/Working/ASOL/apartment/docs/api.md) |
-| **Cron Jobs** | 2 | [Background Jobs](#8-background-jobs) |
-| **Event Types** | 9 | [Event System](#7-event-system) |
-| **Notification Types** | 7 | [Thông báo real-time](file:///d:/Working/ASOL/apartment/docs/architecture.md#bell-đồng-bộ-real-time-socketio) |
-| **Roles (Nhân sự)** | 4 | [permissions.md](file:///d:/Working/ASOL/apartment/docs/permissions.md) |
+| **Backend Modules** | 18 | [Tóm tắt Module](#3-các-module-cốt-lõi-core-modules) |
+| **Database Models** | 30+ | [database.md](./docs/database.md) |
+| **REST APIs** | 70+ | [api.md](./docs/api.md) |
+| **Cron Jobs** | 2 | [Background Jobs](#8-tác-vụ-chạy-ngầm-background-jobs) |
+| **Event Types** | 9 | [Event System](#7-hệ-thống-sự-kiện-event-system) |
+| **Notification Types** | 7 | [Thông báo real-time](./docs/architecture.md#bell-đồng-bộ-real-time-socketio) |
+| **Roles (Nhân sự)** | 4 | [permissions.md](./docs/permissions.md) |
 
 ---
 
@@ -83,7 +83,7 @@ flowchart TD
     Notif --> DB3[(Notifications Table)]
     Notif -->|Socket.io Emit| Client[Browser Client]
 ```
-> 📄 Xem phân tích kiến trúc chi tiết tại [architecture.md](file:///d:/Working/ASOL/apartment/docs/architecture.md).
+> 📄 Xem phân tích kiến trúc chi tiết tại [architecture.md](./docs/architecture.md).
 
 ---
 
@@ -110,7 +110,7 @@ Hệ thống được module hóa thành 18 workspaces độc lập:
 17. **`report`**: Thống kê doanh thu, tỷ lệ lấp đầy căn hộ.
 18. **`public`**: Cổng quét mã QR công cộng tiếp nhận yêu cầu từ phòng khách thuê.
 
-> 📄 Xem chi tiết tóm tắt API của từng module tại [api.md](file:///d:/Working/ASOL/apartment/docs/api.md).
+> 📄 Xem chi tiết tóm tắt API của từng module tại [api.md](./docs/api.md).
 
 ---
 
@@ -122,8 +122,8 @@ Vòng đời nghiệp vụ của hệ thống được vận hành tự động 
 - **Luồng thu tiền & Hoàn dư**: Tạo phiếu thu $\rightarrow$ Cập nhật hóa đơn $\rightarrow$ Chuyển phần tiền đóng thừa thành số dư tích lũy kỳ sau.
 - **Luồng xử lý sự cố**: Khách quét QR phòng $\rightarrow$ Gửi yêu cầu public $\rightarrow$ Manager gán việc $\rightarrow$ Kỹ thuật viên xử lý và khai báo vật tư $\rightarrow$ RESOLVED.
 
-> 📄 Xem chi tiết các luồng nghiệp vụ và sơ đồ Mermaid tại [workflows.md](file:///d:/Working/ASOL/apartment/docs/workflows.md).  
-> 📄 Xem tài liệu tổng quan ca sử dụng (Use Cases) dành cho BA/Product tại [system-overview.md](file:///d:/Working/ASOL/apartment/docs/system-overview.md).
+> 📄 Xem chi tiết các luồng nghiệp vụ và sơ đồ Mermaid tại [workflows.md](./docs/workflows.md).  
+> 📄 Xem tài liệu tổng quan ca sử dụng (Use Cases) dành cho BA/Product tại [system-overview.md](./docs/system-overview.md).
 
 ---
 
@@ -133,7 +133,7 @@ Hệ thống áp dụng mô hình phân quyền hai lớp:
 1. **Role-Based Access Control (RBAC)**: Phân quyền theo 4 vai trò chính thông qua JWT middleware.
 2. **Policy Engine (Resource-Level Scope)**: Lọc dữ liệu tự động. Manager hay Technician chỉ nhìn thấy và thao tác được các căn hộ, hợp đồng, hóa đơn thuộc tòa nhà mà họ được phân công trong bảng `BuildingAssignments`.
 
-> 📄 Xem chi tiết ma trận phân quyền và hướng dẫn middleware tại [permissions.md](file:///d:/Working/ASOL/apartment/docs/permissions.md).
+> 📄 Xem chi tiết ma trận phân quyền và hướng dẫn middleware tại [permissions.md](./docs/permissions.md).
 
 ---
 
@@ -154,7 +154,7 @@ erDiagram
     APARTMENTS ||--o{ UTILITY_READINGS : records
     APARTMENTS ||--o{ SERVICE_REQUESTS : reports
 ```
-> 📄 Xem chi tiết kiểu dữ liệu, composite indexes và cascade rules tại [database.md](file:///d:/Working/ASOL/apartment/docs/database.md).
+> 📄 Xem chi tiết kiểu dữ liệu, composite indexes và cascade rules tại [database.md](./docs/database.md).
 
 ---
 
@@ -165,7 +165,7 @@ Mọi thay đổi trạng thái nghiệp vụ quan trọng đều phát đi sự
 - **Invoice Events**: `invoice.created`, `invoice.paid`, `payment.received`.
 - **Maintenance Events**: `maintenance.created`, `maintenance.assigned`, `maintenance.completed`.
 
-> 📄 Xem chi tiết cấu trúc payload sự kiện và cơ chế listener tại [architecture.md#kiến-trúc-hướng-sự-kiện-event-driven-architecture](file:///d:/Working/ASOL/apartment/docs/architecture.md#kiến-trúc-hướng-sự-kiện-event-driven-architecture).
+> 📄 Xem chi tiết cấu trúc payload sự kiện và cơ chế listener tại [architecture.md#kiến-trúc-hướng-sự-kiện-event-driven-architecture](./docs/architecture.md#kiến-trúc-hướng-sự-kiện-event-driven-architecture).
 
 ---
 
@@ -183,7 +183,7 @@ Hệ thống thiết lập 2 tiến trình chạy ngầm tự động (Cron Jobs
 - **Tiếp nhận Yêu cầu qua QR Bảo mật**: Khách thuê quét mã QR tại phòng để gửi phản ánh sự cố không cần login. Token QR (`ApartmentTokens`) được mã hóa ngẫu nhiên, giới hạn hiệu lực 90 ngày nhằm triệt tiêu nguy cơ brute-force gửi yêu cầu giả mạo phá hoại hệ thống.
 - **Không chặn tiến trình chính (Non-blocking Operations)**: Tách riêng luồng nghiệp vụ chính với việc lưu Audit Log và Notification. Nếu quá trình ghi log hay đẩy thông báo lỗi, nghiệp vụ chính (Ký hợp đồng, thanh toán) vẫn hoàn thành bình thường.
 - **Bảng lỗi tập trung (Exception Catalog)**: Đồng bộ mã lỗi nghiệp vụ với 25 exception codes cụ thể giúp client phản hồi toast UI trực quan và kỹ sư dễ dàng kiểm tra lịch sử log.
-  > 📄 Xem chi tiết danh mục lỗi tại [exceptions.md](file:///d:/Working/ASOL/apartment/docs/exceptions.md).
+  > 📄 Xem chi tiết danh mục lỗi tại [exceptions.md](./docs/exceptions.md).
 
 ---
 
@@ -194,7 +194,7 @@ Hệ thống có 3 điểm nợ kỹ thuật lớn nhất cần khắc phục kh
 2. **In-process Event Hub**: Event Hub chạy in-process bằng `EventEmitter` của Node.js, có thể gây nghẽn CPU chính khi lượng event phát sinh lớn, cần chuyển đổi sang hàng đợi ngoài như **Redis BullMQ**.
 3. **QR Token Security**: Token QR gửi sự cố truyền thô qua body API, cần ký JWT ngắn hạn hoặc triển khai Rate Limiting chặt chẽ.
 
-> 📄 Xem chi tiết mô tả và định hướng khắc phục tại [technical-debt.md](file:///d:/Working/ASOL/apartment/docs/technical-debt.md).
+> 📄 Xem chi tiết mô tả và định hướng khắc phục tại [technical-debt.md](./docs/technical-debt.md).
 
 ---
 
