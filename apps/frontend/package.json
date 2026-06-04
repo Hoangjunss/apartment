@@ -15,6 +15,7 @@
     "@my/tenant-frontend": "workspace:*",
     "@my/report-frontend": "workspace:*",
     "@my/expense-frontend": "workspace:*",
+    "@my/calendar-frontend": "workspace:*",
     "@tanstack/react-query": "^5.17.0",
     "axios": "^1.6.0",
     "date-fns": "^3.3.0",

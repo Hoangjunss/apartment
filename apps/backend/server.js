@@ -17,7 +17,12 @@ import attachmentsRouter from '@my/attachments-backend';
 import searchRouter from '@my/search-backend';
 import reportRouter from '@my/report-backend';
 import expenseRouter from '@my/expense-backend';
+import calendarRouter from '@my/calendar-backend';
+import workflowRouter from '@my/workflow-backend';
+import rulesRouter from '@my/rules-backend';
+import policyRouter from '@my/policy-backend';
 import '@my/contract-backend/cron.js';
+import '@my/notifications-backend/cron.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -75,6 +80,10 @@ app.use('/api/attachments', attachmentsRouter);
 app.use('/api/search', searchRouter);
 app.use('/api/report', reportRouter);
 app.use('/api/expense', expenseRouter);
+app.use('/api/calendar', calendarRouter);
+app.use('/api/workflows', workflowRouter);
+app.use('/api/rules', rulesRouter);
+app.use('/api/policy', policyRouter);
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 httpServer.listen(port, () => {
