@@ -14,6 +14,7 @@ const MGT_ROLES = ['ADMIN', 'MANAGER'];
 router.get('/tenants', authenticate, requireRole(ALL_ROLES), ctrl.getTenants);
 router.post('/tenants', authenticate, requireRole(ALL_ROLES), ctrl.createTenant);
 router.get('/tenants/:id', authenticate, requireRole(ALL_ROLES), ctrl.getTenantById);
+router.get('/tenants/:id/preview', authenticate, requireRole(ALL_ROLES), ctrl.getTenantPreview);
 router.put('/tenants/:id', authenticate, requireRole(ALL_ROLES), ctrl.updateTenant);
 
 router.get('/tenants/:id/history', authenticate, requireRole(MGT_ROLES), ctrl.getTenantHistory);

@@ -39,6 +39,16 @@ export const getTenantHistory = async (req, res) => {
   }
 };
 
+export const getTenantPreview = async (req, res) => {
+  try {
+    const data = await service.getTenantPreview(+req.params.id);
+    if (!data) return res.status(404).json({ success: false, message: 'Không tìm thấy hồ sơ khách thuê' });
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 export const createTenant = async (req, res) => {
   try {
     const data = await service.createTenant(req.body, req.user.userId);

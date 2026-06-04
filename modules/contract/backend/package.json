@@ -13,6 +13,9 @@
     "@my/auth-backend": "workspace:*",
     "@my/audit-log-backend": "workspace:*",
     "@my/notifications-backend": "workspace:*",
+    "@my/events": "workspace:*",
+    "@my/workflow-backend": "workspace:*",
+    "@my/policy-backend": "workspace:*",
     "@my/prisma": "workspace:*"
   }
 }

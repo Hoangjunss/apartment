@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/common/PageHeader.jsx';
 import { DataTable } from '@/components/common/DataTable.jsx';
 import { SearchBar } from '@/components/forms/SearchBar.jsx';
 import { ContractStatusBadge } from '@/components/common/StatusBadge.jsx';
+import { TenantQuickPreview } from '@/components/common/TenantQuickPreview.jsx';
 import { useTenants } from '../hooks/useTenant.js';
 import { useFilterState } from '@/hooks/useFilterState.js';
 
@@ -71,7 +72,9 @@ export default function TenantsPage() {
       label: 'Họ tên',
       render: (row) => (
         <div>
-          <p className="table-cell-primary">{row.full_name}</p>
+          <TenantQuickPreview tenantId={row.id}>
+            <span className="table-cell-primary">{row.full_name}</span>
+          </TenantQuickPreview>
           <p className="table-cell-muted">{row.email || ''}</p>
         </div>
       ),

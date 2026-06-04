@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Eye, Edit, Trash2, Calendar, DollarSign, FileText, CheckCircle, Clock, X, AlertTriangle, ArrowRight, RefreshCw } from 'lucide-react';
+import { Plus, Eye, Edit, Trash2, Calendar, DollarSign, FileText, CheckCircle, Clock, X, AlertTriangle, ArrowRight, RefreshCw, Paperclip } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageHeader } from '@/components/common/PageHeader.jsx';
 import { DataTable } from '@/components/common/DataTable.jsx';
@@ -71,8 +71,7 @@ export default function ExpensesPage() {
     amount: '',
     expense_date: new Date().toISOString().split('T')[0],
     status: 'PENDING',
-    description: '',
-    receipt_url: ''
+    description: ''
   });
 
   // Fetch Buildings for Filters and Form dropdown
@@ -106,10 +105,13 @@ export default function ExpensesPage() {
 
   // Mutations
   const createExpenseMutation = useCreateExpense({
-    onSuccess: () => {
+    onSuccess: (newExpense) => {
       toast.success('Ghi nhận chi phí thành công');
       setIsFormModalOpen(false);
       resetForm();
+      refetch();
+      setSelectedExpense(newExpense);
+      setIsDetailModalOpen(true);
     },
     onError: (err) => {
       toast.error(err.response?.data?.message || 'Có lỗi xảy ra');
@@ -117,11 +119,15 @@ export default function ExpensesPage() {
   });
 
   const updateExpenseMutation = useUpdateExpense({
-    onSuccess: () => {
+    onSuccess: (updatedExpense) => {
       toast.success('Cập nhật chi phí thành công');
       setIsFormModalOpen(false);
       setEditData(null);
       resetForm();
+      refetch();
+      if (selectedExpense && selectedExpense.id === updatedExpense.id) {
+        setSelectedExpense(updatedExpense);
+      }
     },
     onError: (err) => {
       toast.error(err.response?.data?.message || 'Có lỗi xảy ra');
@@ -162,8 +168,7 @@ export default function ExpensesPage() {
       amount: '',
       expense_date: new Date().toISOString().split('T')[0],
       status: 'PENDING',
-      description: '',
-      receipt_url: ''
+      description: ''
     });
     setIsFormModalOpen(true);
   };
@@ -178,8 +183,7 @@ export default function ExpensesPage() {
       amount: String(expense.amount),
       expense_date: new Date(expense.expense_date).toISOString().split('T')[0],
       status: expense.status,
-      description: expense.description || '',
-      receipt_url: expense.receipt_url || ''
+      description: expense.description || ''
     });
     setIsFormModalOpen(true);
   };
@@ -215,8 +219,7 @@ export default function ExpensesPage() {
       amount: Number(formFields.amount),
       expense_date: formFields.expense_date,
       status: formFields.status,
-      description: formFields.description,
-      receipt_url: formFields.receipt_url
+      description: formFields.description
     };
 
     if (editData) {
@@ -234,8 +237,7 @@ export default function ExpensesPage() {
       amount: '',
       expense_date: new Date().toISOString().split('T')[0],
       status: 'PENDING',
-      description: '',
-      receipt_url: ''
+      description: ''
     });
   };
 
@@ -283,6 +285,19 @@ export default function ExpensesPage() {
       key: 'amount',
       label: 'Số tiền',
       render: (row) => <span className="font-bold text-slate-900">{formatCurrency(row.amount)}</span>
+    },
+    {
+      key: 'attachment_count',
+      label: 'Chứng từ',
+      render: (row) => (
+        <span 
+          className="inline-flex items-center gap-1 text-slate-500 font-semibold text-xs bg-slate-50 border border-slate-100 rounded-full px-2.5 py-0.5" 
+          title={`${row.attachment_count || 0} tệp chứng từ`}
+        >
+          <Paperclip size={12} className="text-slate-400" />
+          {row.attachment_count || 0}
+        </span>
+      )
     },
     {
       key: 'status',
@@ -557,20 +572,6 @@ export default function ExpensesPage() {
                     </div>
                   )}
 
-                  {selectedExpense.receipt_url && (
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ảnh biên lai nhanh (URL)</span>
-                      <a
-                        href={selectedExpense.receipt_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-indigo-600 hover:underline block truncate mt-0.5"
-                      >
-                        {selectedExpense.receipt_url}
-                      </a>
-                    </div>
-                  )}
-
                   <div className="border-t border-slate-200/50 pt-3">
                     <p className="text-[10px] text-slate-400">
                       Ghi nhận bởi: <span className="font-semibold text-slate-500">{selectedExpense.creator?.full_name}</span>
@@ -723,19 +724,6 @@ export default function ExpensesPage() {
                     <option value="PENDING">Chờ thanh toán</option>
                     <option value="PAID">Đã thanh toán</option>
                   </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                    Ảnh biên lai nhanh (URL)
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://example.com/receipt.jpg"
-                    value={formFields.receipt_url}
-                    onChange={(e) => setFormFields({ ...formFields, receipt_url: e.target.value })}
-                    className="input w-full text-sm"
-                  />
                 </div>
               </div>
 
