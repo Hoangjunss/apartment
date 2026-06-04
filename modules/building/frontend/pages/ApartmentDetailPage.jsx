@@ -11,6 +11,7 @@ import { ApartmentStatusBadge } from '@/components/common/StatusBadge.jsx';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog.jsx';
 import { RoleGuard } from '@/components/common/RoleGuard.jsx';
 import { MANAGEMENT_ROLES, ROLES } from '@/constants/roles.js';
+import { useAuth } from '@/contexts/AuthContext.jsx';
 import {
   ROOM_TYPE_LABELS,
   FURNITURE_CONDITION_LABELS,
@@ -27,8 +28,10 @@ import { FurnitureForm } from '../components/FurnitureForm.jsx';
 import { StatusChangeForm } from '../components/StatusChangeForm.jsx';
 import { format, parseISO } from 'date-fns';
 
-const formatCurrency = (v) =>
-  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(v));
+const formatCurrency = (v) => {
+  if (v === null || v === undefined) return '—';
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(v));
+};
 
 // ── Furniture Tab ──────────────────────────────────────────────────────────────
 function FurnitureTab({ apartmentId }) {
@@ -166,7 +169,7 @@ function StatusLogsTab({ apartmentId }) {
             )}
             <p className="text-xs text-gray-400 mt-0.5">
               {log.user?.full_name ?? 'Hệ thống'} •{' '}
-              {log.created_at ? format(parseISO(log.created_at), 'dd/MM/yyyy HH:mm') : ''}
+              {log.changed_at ? format(parseISO(log.changed_at), 'dd/MM/yyyy HH:mm') : ''}
             </p>
           </div>
         </div>
