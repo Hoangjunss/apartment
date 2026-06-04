@@ -21,32 +21,26 @@ Hệ thống QLCHDC được thiết kế để phục vụ đội ngũ vận h�
 ## 🎯 Các Ca sử dụng chính (Key Use Cases)
 
 ```mermaid
-usecaseDiagram
-    actor Admin as "ADMIN"
-    actor Manager as "MANAGER"
-    actor Receptionist as "RECEPTIONIST"
-    actor Tech as "TECHNICIAN"
-    actor Tenant as "KHÁCH THUÊ (Public)"
-
-    Admin --> (Quản lý Nhân sự & Phân quyền)
-    Admin --> (Cấu hình Rules & Workflow Engine)
+flowchart LR
+    Admin((ADMIN)) --> UC1([Quản lý Nhân sự & Phân quyền])
+    Admin --> UC2([Cấu hình Rules & Workflow Engine])
     
-    Manager --> (CRUD Tòa nhà & Căn hộ)
-    Manager --> (Ký & Gia hạn Hợp đồng)
-    Manager --> (Lập Hóa đơn & Duyệt Chi phí)
-    Manager --> (Phân công Yêu cầu kỹ thuật)
-    Manager --> (Quản lý Kho & Tài sản cố định)
+    Manager((MANAGER)) --> UC3([CRUD Tòa nhà & Căn hộ])
+    Manager --> UC4([Ký & Gia hạn Hợp đồng])
+    Manager --> UC5([Lập Hóa đơn & Duyệt Chi phí])
+    Manager --> UC6([Phân công Yêu cầu kỹ thuật])
+    Manager --> UC7([Quản lý Kho & Tài sản cố định])
     
-    Receptionist --> (Quản lý Hồ sơ Khách thuê)
-    Receptionist --> (Ghi Chỉ số Điện Nước)
-    Receptionist --> (Lập Phiếu thu / Thu tiền)
-    Receptionist --> (Ghi nhận Sự cố kỹ thuật)
+    Receptionist((RECEPTIONIST)) --> UC8([Quản lý Hồ sơ Khách thuê])
+    Receptionist --> UC9([Ghi Chỉ số Điện Nước])
+    Receptionist --> UC10([Lập Phiếu thu / Thu tiền])
+    Receptionist --> UC11([Ghi nhận Sự cố kỹ thuật])
     
-    Tech --> (Xem việc được phân công)
-    Tech --> (Cập nhật trạng thái sửa chữa)
-    Tech --> (Khai báo vật tư & Chi phí sửa chữa)
+    Tech((TECHNICIAN)) --> UC12([Xem việc được phân công])
+    Tech --> UC13([Cập nhật trạng thái sửa chữa])
+    Tech --> UC14([Khai báo vật tư & Chi phí sửa chữa])
     
-    Tenant --> (Quét QR gửi yêu cầu sự cố)
+    Tenant((KHÁCH THUÊ Public)) --> UC15([Quét QR gửi yêu cầu sự cố])
 ```
 
 ---

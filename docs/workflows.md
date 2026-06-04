@@ -102,7 +102,7 @@ flowchart TD
     H --> J[Emit event contract.terminated]
     
     B -->|3. Hết hạn tự nhiên| K[Cron Job chạy 00:00 hàng ngày]
-    K --> L{end_date < Hôm nay?}
+    K --> L{"end_date < Hôm nay?"}
     L -- Đúng --> M[Tự động cập nhật status = EXPIRED]
     M --> N[Đổi trạng thái Căn hộ sang AVAILABLE]
     M --> O[Emit event contract.expired]
@@ -121,8 +121,7 @@ Quy trình lập hóa đơn tự động tích hợp cơ chế khấu trừ ví 
 ```mermaid
 flowchart TD
     A[Ghi chỉ số Điện Nước UtilityReadings hàng tháng YYYY-MM] --> B[Lập Hóa đơn Invoices cho Hợp đồng]
-    B --> C[Tính toán Tiền phải thu]
-    Note over C: Tiền phòng + Tiền điện (chênh lệch chỉ số * đơn giá) + Tiền nước + Dịch vụ + Phụ thu
+    B --> C["Tính toán Tiền phải thu (Tiền phòng + Điện + Nước + Dịch vụ + Phụ thu)"]
     C --> D{Kiểm tra ví dư của Hợp đồng ContractCredits}
     
     D -- "credit_balance = 0" --> E[amount_due = total_amount]
@@ -156,7 +155,7 @@ Hệ thống hỗ trợ thanh toán linh hoạt nhiều lần cho một hóa đ�
 flowchart TD
     A[Nhân viên tạo Phiếu thu Payments] --> B[Ghi nhận số tiền đóng amount]
     B --> C[Cập nhật tổng tiền đã thanh toán của hóa đơn]
-    B --> D{Số tiền đóng >= Số tiền còn nợ (amount_due)?}
+    B --> D{"Số tiền đóng >= Số tiền còn nợ (amount_due)?"}
     
     D -- Sai --> E[Cập nhật trạng thái Invoice: PARTIALLY_PAID]
     E --> F[Cập nhật nợ còn lại: amount_due = amount_due - amount]
@@ -280,7 +279,7 @@ flowchart TD
     A[Yêu cầu xem chi tiết Tài sản] --> B[Truy vấn DB lấy thông số: purchase_cost, salvage_value, useful_life_years, purchase_date]
     B --> C[Tính tổng số tháng sử dụng hữu ích: total_months = useful_life_years * 12]
     C --> D[Tính số tháng đã trôi qua kể từ ngày mua: months_used]
-    D --> E{months_used > total_months?}
+    D --> E{"months_used > total_months?"}
     E -- Đúng --> F[Khấu hao lũy kế = purchase_cost - salvage_value]
     F --> G[Giá trị còn lại = salvage_value]
     E -- Sai --> H[Khấu hao mỗi tháng: monthly_dep = purchase_cost - salvage_value / total_months]
