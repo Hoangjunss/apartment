@@ -17,6 +17,8 @@ import {
   GitFork,
   ShieldCheck,
   SlidersHorizontal,
+  Warehouse,
+  Package,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import {
@@ -82,6 +84,18 @@ const NAV_ITEMS = [
     label: 'Yêu cầu kỹ thuật',
     icon: Wrench,
     roles: ALL_ROLES,                    // Tất cả đều thấy
+  },
+  {
+    to: '/inventory',
+    label: 'Quản lý Kho',
+    icon: Warehouse,
+    roles: ALL_ROLES,
+  },
+  {
+    to: '/assets',
+    label: 'Tài sản cố định',
+    icon: Package,
+    roles: ALL_ROLES,
   },
   {
     to: '/calendar',

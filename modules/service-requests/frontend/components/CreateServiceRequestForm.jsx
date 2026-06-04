@@ -7,9 +7,13 @@ import { api } from '@/lib/axios.js';
 import { useQuery } from '@tanstack/react-query';
 
 export function CreateServiceRequestForm({ onClose }) {
+  const queryParams = new URLSearchParams(window.location.search);
+  const urlAssetId = queryParams.get('asset_id');
+
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [apartmentId, setApartmentId] = useState('');
+  const [assetId, setAssetId] = useState(urlAssetId || '');
   const [scheduledStartDate, setScheduledStartDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   const { data: aptsData } = useQuery({
@@ -18,6 +22,13 @@ export function CreateServiceRequestForm({ onClose }) {
     staleTime: 1000 * 60 * 5,
   });
   const apartments = Array.isArray(aptsData) ? aptsData : [];
+
+  const { data: assetsData } = useQuery({
+    queryKey: ['assets', 'simple'],
+    queryFn: () => api.get('/assets/assets').then(r => r.data.data?.items ?? r.data.data ?? []),
+    staleTime: 1000 * 60 * 5,
+  });
+  const assets = Array.isArray(assetsData) ? assetsData : [];
 
   const { mutate: create, isPending } = useCreateServiceRequest({
     onSuccess: () => {
@@ -37,6 +48,7 @@ export function CreateServiceRequestForm({ onClose }) {
       title: title.trim(),
       description: description.trim(),
       apartment_id: apartmentId || null,
+      asset_id: assetId ? Number(assetId) : null,
       scheduled_start_date: scheduledStartDate,
     });
   };
@@ -71,6 +83,22 @@ export function CreateServiceRequestForm({ onClose }) {
           </select>
         </div>
         
+        <div>
+          <label className="form-label">Tài sản cố định liên quan (nếu có)</label>
+          <select
+            className="form-input"
+            value={assetId}
+            onChange={e => setAssetId(e.target.value)}
+          >
+            <option value="">— Không chọn —</option>
+            {assets.map(asset => (
+              <option key={asset.id} value={asset.id}>
+                {asset.asset_code} — {asset.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div>
           <label className="form-label">Ngày dự kiến bắt đầu <span className="text-red-500">*</span></label>
           <input

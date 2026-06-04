@@ -21,6 +21,7 @@ export default defineConfig({
       'date-fns': path.resolve(__dirname, './node_modules/date-fns'),
       'axios': path.resolve(__dirname, './node_modules/axios'),
       'react-hot-toast': path.resolve(__dirname, './node_modules/react-hot-toast'),
+      'qrcode.react': path.resolve(__dirname, './node_modules/qrcode.react'),
     },
   },
   server: {
