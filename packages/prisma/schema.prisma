@@ -43,6 +43,7 @@ model Users {
   expense_creations   BuildingExpenses[]       @relation("ExpenseCreator")
   building_assignments BuildingAssignments[]    @relation("UserAssignments")
   assigned_others      BuildingAssignments[]    @relation("AssignerAssignments")
+  stock_transactions   StockTransactions[]
 }
 
 // ─── BUILDING & APARTMENT ────────────────────────────────
@@ -60,6 +61,8 @@ model Buildings {
   floors Floors[]
   expenses BuildingExpenses[]
   assignments BuildingAssignments[]
+  warehouses Warehouses[]
+  assets Assets[]
 }
 
 model Floors {
@@ -439,6 +442,7 @@ model ServiceRequests {
   id              Int                  @id @default(autoincrement())
   apartment_id    Int
   contract_id     Int?
+  asset_id        Int?
   title           String               @db.VarChar(200)
   description     String               @db.Text
   type            ServiceRequestType   @default(MAINTENANCE)
@@ -456,13 +460,16 @@ model ServiceRequests {
   apartment Apartments @relation(fields: [apartment_id], references: [id])
   contract  Contracts? @relation(fields: [contract_id], references: [id])
   assignee  Users?     @relation("AssignedTo", fields: [assigned_to], references: [id])
+  asset     Assets?    @relation(fields: [asset_id], references: [id], onDelete: SetNull)
   comments  ServiceRequestComments[]
   expenses  ServiceRequestExpenses[]
+  materials_used ServiceRequestMaterials[]
 
   @@index([apartment_id])
   @@index([contract_id])
   @@index([assigned_to])
   @@index([status])
+  @@index([asset_id])
 }
 
 model ApartmentTokens {
@@ -604,6 +611,9 @@ model CreditTransactions {
 enum ExpenseCategory {
   OPERATIONS
   MAINTENANCE
+  ASSET_MAINTENANCE
+  INVENTORY_PURCHASE
+  UTILITY_ELECTRICITY
 }
 
 enum ExpenseStatus {
@@ -717,5 +727,134 @@ model Timeline {
   created_at    DateTime @default(now())
 
   @@index([entity_type, entity_id])
+}
+
+// ─── INVENTORY & ASSET MANAGEMENT ────────────────────────
+
+enum InventoryCategory {
+  CONSUMABLE
+  SPARE_PART
+  TOOL
+  EQUIPMENT
+}
+
+enum StockTransactionType {
+  STOCK_IN
+  STOCK_OUT
+}
+
+enum StockRefType {
+  SERVICE_REQUEST
+  MANUAL
+  ADJUSTMENT
+}
+
+enum AssetStatus {
+  ACTIVE
+  UNDER_REPAIR
+  DECOMMISSIONED
+}
+
+enum AssetCategory {
+  ELECTRONICS
+  FURNITURE
+  MACHINERY
+  VEHICLE
+  OTHER
+}
+
+enum DepreciationMethod {
+  STRAIGHT_LINE
+}
+
+model Warehouses {
+  id          Int              @id @default(autoincrement())
+  name        String           @db.VarChar(100)
+  building_id Int
+  description String?          @db.Text
+  created_at  DateTime         @default(now())
+  updated_at  DateTime         @updatedAt
+
+  building        Buildings        @relation(fields: [building_id], references: [id], onDelete: Cascade)
+  inventory_items InventoryItems[]
+
+  @@index([building_id])
+}
+
+model InventoryItems {
+  id              Int               @id @default(autoincrement())
+  warehouse_id    Int
+  item_name       String            @db.VarChar(100)
+  category        InventoryCategory
+  current_stock   Int               @default(0)
+  min_stock_level Int               @default(0)
+  unit            String            @db.VarChar(30)
+  unit_cost       Decimal           @db.Decimal(15, 2)
+  created_at      DateTime          @default(now())
+  updated_at      DateTime          @updatedAt
+
+  warehouse          Warehouses                @relation(fields: [warehouse_id], references: [id], onDelete: Cascade)
+  stock_transactions StockTransactions[]
+  materials_used     ServiceRequestMaterials[]
+
+  @@index([warehouse_id])
+}
+
+model StockTransactions {
+  id                 Int                  @id @default(autoincrement())
+  inventory_item_id  Int
+  type               StockTransactionType
+  quantity           Int
+  unit_cost          Decimal              @db.Decimal(15, 2)
+  item_name_snapshot String               @db.VarChar(100)
+  ref_type           StockRefType
+  ref_id             Int?
+  note               String?              @db.Text
+  recorded_by        Int
+  created_at         DateTime             @default(now())
+
+  inventory_item InventoryItems @relation(fields: [inventory_item_id], references: [id], onDelete: Cascade)
+  recorder       Users          @relation(fields: [recorded_by], references: [id])
+
+  @@index([inventory_item_id])
+  @@index([recorded_by])
+}
+
+model ServiceRequestMaterials {
+  id                 Int      @id @default(autoincrement())
+  service_request_id Int
+  inventory_item_id  Int
+  quantity           Int
+  unit_cost          Decimal  @db.Decimal(15, 2)
+  created_at         DateTime @default(now())
+
+  service_request ServiceRequests @relation(fields: [service_request_id], references: [id], onDelete: Cascade)
+  inventory_item  InventoryItems  @relation(fields: [inventory_item_id], references: [id], onDelete: Cascade)
+
+  @@index([service_request_id])
+  @@index([inventory_item_id])
+}
+
+model Assets {
+  id                  Int                @id @default(autoincrement())
+  building_id         Int
+  asset_code          String             @unique @db.VarChar(50)
+  name                String             @db.VarChar(100)
+  category            AssetCategory
+  status              AssetStatus        @default(ACTIVE)
+  purchase_cost       Decimal            @db.Decimal(15, 2)
+  salvage_value       Decimal            @db.Decimal(15, 2)
+  useful_life_years   Int
+  purchase_date       DateTime           @db.Date
+  depreciation_method DepreciationMethod @default(STRAIGHT_LINE)
+  description         String?            @db.Text
+  created_at          DateTime           @default(now())
+  updated_at          DateTime           @updatedAt
+
+  building         Buildings         @relation(fields: [building_id], references: [id], onDelete: Cascade)
+  service_requests ServiceRequests[]
+
+  @@index([building_id])
+  @@index([asset_code])
 }
 
