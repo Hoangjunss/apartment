@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "echo \"No tests configured\"",
+    "lint": "echo \"No linting configured\"",
+    "build": "pnpm --filter frontend-main build",
     "dev": "pnpm --parallel -r dev"
   },
   "keywords": [],

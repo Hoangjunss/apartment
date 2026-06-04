@@ -6,10 +6,9 @@ services:
     container_name: apartment_db
     restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_DATABASE: apartment
-    ports:
-      - "3307:3306"
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password}
+      MYSQL_DATABASE: ${DB_NAME:-apartment}
+    # No port binding for db in production to ensure safety from public internet
     volumes:
       - mysql_data:/var/lib/mysql
 
@@ -20,13 +19,13 @@ services:
     container_name: apartment_backend
     restart: always
     ports:
-      - "3001:3001"
+      - "${BACKEND_PORT:-3001}:3001"
     environment:
-      DATABASE_URL: mysql://root:root_password@db:3306/apartment
+      DATABASE_URL: ${DATABASE_URL}
       PORT: 3001
-      JWT_SECRET: super_secret_jwt_key_123!
-      JWT_REFRESH_SECRET: super_secret_refresh_jwt_key_456!
-      TZ: Asia/Ho_Chi_Minh
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
     depends_on:
       - db
 
@@ -37,9 +36,9 @@ services:
     container_name: apartment_frontend
     restart: always
     ports:
-      - "5173:5173"
+      - "${FRONTEND_PORT:-5173}:5173"
     environment:
-      VITE_API_URL: http://localhost:3001/api
+      VITE_API_URL: ${VITE_API_URL}
     depends_on:
       - backend
 
