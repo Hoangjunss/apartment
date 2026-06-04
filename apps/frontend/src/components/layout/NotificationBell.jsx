@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Bell, CheckCheck, Clock, AlertCircle, FileText, Wrench, CreditCard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '@/contexts/NotificationContext.jsx';
+import { useAuth } from '@/contexts/AuthContext.jsx';
 
 const TYPE_ICONS = {
   CONTRACT_EXPIRING: FileText,
@@ -43,6 +44,7 @@ export function NotificationBell() {
   const ref = useRef(null);
   const navigate = useNavigate();
   const { unreadCount, notifications, markAsRead, markAllAsRead } = useNotifications();
+  const { user } = useAuth();
 
   // Đóng dropdown khi click ngoài
   useEffect(() => {
@@ -145,17 +147,24 @@ export function NotificationBell() {
           </div>
 
           {/* Footer */}
-          {notifications.length > 0 && (
-            <div className="px-4 py-2.5 border-t border-gray-100 text-center">
+          <div className="px-4 py-2.5 border-t border-gray-100 flex flex-col gap-1.5 text-center bg-slate-50/50">
+            <button
+              onClick={() => { navigate('/notifications'); setOpen(false); }}
+              className="text-xs text-indigo-600 hover:text-indigo-800 font-bold transition-colors"
+              id="view-all-notifications-btn"
+            >
+              Xem tất cả thông báo →
+            </button>
+            {user && ['ADMIN', 'MANAGER'].includes(user.role) && (
               <button
                 onClick={() => { navigate('/admin/audit-logs'); setOpen(false); }}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                id="view-all-notifications-btn"
+                className="text-[10px] text-slate-500 hover:text-slate-700 transition-colors"
+                id="view-audit-logs-btn"
               >
-                Xem lịch sử hoạt động →
+                Xem nhật ký hoạt động
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
     </div>
