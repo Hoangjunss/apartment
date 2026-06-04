@@ -9,12 +9,12 @@
 
 | Chỉ số | Số lượng | Tài liệu chi tiết |
 |--------|:---:|-------------------|
-| **Backend Modules** | 18 | [Tóm tắt Module](#3-các-module-cốt-lõi-core-modules) |
-| **Database Models** | 30+ | [database.md](./docs/database.md) |
-| **REST APIs** | 70+ | [api.md](./docs/api.md) |
+| **Backend Modules** | 20 | [Tóm tắt Module](#3-các-module-cốt-lõi-core-modules) |
+| **Database Models** | 35+ | [database.md](./docs/database.md) |
+| **REST APIs** | 85+ | [api.md](./docs/api.md) |
 | **Cron Jobs** | 2 | [Background Jobs](#8-tác-vụ-chạy-ngầm-background-jobs) |
-| **Event Types** | 9 | [Event System](#7-hệ-thống-sự-kiện-event-system) |
-| **Notification Types** | 7 | [Thông báo real-time](./docs/architecture.md#bell-đồng-bộ-real-time-socketio) |
+| **Event Types** | 12 | [Event System](#7-hệ-thống-sự-kiện-event-system) |
+| **Notification Types** | 8 | [Thông báo real-time](./docs/architecture.md#bell-đồng-bộ-real-time-socketio) |
 | **Roles (Nhân sự)** | 4 | [permissions.md](./docs/permissions.md) |
 
 ---
@@ -29,6 +29,8 @@ QLCHDC giải quyết trọn vẹn bài toán quản lý tài sản, cư trú v�
 - Ghi nhận chỉ số tiện ích động và cơ chế tự động lập Hóa đơn hàng tháng.
 - Quản lý công nợ gối đầu và khấu trừ tài chính thông qua Ví tích lũy hợp đồng.
 - Tiếp nhận sự cố sửa chữa nhanh chóng qua mã QR dán tại phòng mà không bắt buộc khách thuê phải login.
+- Quản lý Kho vật tư vận hành của từng tòa nhà, cảnh báo tồn kho thấp và khấu trừ tự động khi sửa chữa sự cố.
+- Quản lý Tài sản cố định của tòa nhà, biểu đồ tính khấu hao động theo phương pháp đường thẳng và tra cứu nhanh qua mã QR.
 
 ---
 
@@ -60,6 +62,7 @@ flowchart TD
     FE <-->|HTTP / WebSocket| Router
     Router --> Guard
     Guard --> Service
+    Service --> Guard
     Service --> Hub
     Service <--> Prisma
     Prisma <--> MySQL
@@ -73,9 +76,9 @@ flowchart TD
     Service[Service Layer] -->|Emit Event| Hub[Event Hub]
     
     subgraph Listeners (Bất đồng bộ song song)
-        Hub -->|contract.created / invoice.paid...| Audit[AuditLog Listener]
-        Hub -->|contract.created / invoice.paid...| Timeline[Timeline Listener]
-        Hub -->|contract.created / invoice.paid...| Notif[Notification Listener]
+        Hub -->|contract.created / invoice.paid / inventory.low_stock...| Audit[AuditLog Listener]
+        Hub -->|contract.created / invoice.paid / inventory.low_stock...| Timeline[Timeline Listener]
+        Hub -->|contract.created / invoice.paid / inventory.low_stock...| Notif[Notification Listener]
     end
 
     Audit --> DB1[(AuditLogs Table)]
@@ -89,7 +92,7 @@ flowchart TD
 
 ## 3. Các Module Cốt lõi (Core Modules)
 
-Hệ thống được module hóa thành 18 workspaces độc lập:
+Hệ thống được module hóa thành 20 workspaces độc lập:
 
 1. **`auth`**: Xác thực JWT (Access 8h + Refresh 7d) & phân quyền RBAC.
 2. **`building`**: Quản lý thông tin Tòa nhà, Tầng và Căn hộ.
@@ -109,6 +112,8 @@ Hệ thống được module hóa thành 18 workspaces độc lập:
 16. **`comments`**: Cho phép trao đổi nội bộ trên phiếu sự cố.
 17. **`report`**: Thống kê doanh thu, tỷ lệ lấp đầy căn hộ.
 18. **`public`**: Cổng quét mã QR công cộng tiếp nhận yêu cầu từ phòng khách thuê.
+19. **`inventory`**: Quản lý kho hàng vật tư vận hành của từng tòa nhà và nhập/xuất kho.
+20. **`assets`**: Quản lý tài sản cố định, quét mã QR và khấu hao động.
 
 > 📄 Xem chi tiết tóm tắt API của từng module tại [api.md](./docs/api.md).
 
@@ -120,7 +125,7 @@ Vòng đời nghiệp vụ của hệ thống được vận hành tự động 
 - **Luồng ký hợp đồng (Onboarding)**: Tạo khách thuê $\rightarrow$ Ký hợp đồng $\rightarrow$ Căn hộ tự động chuyển sang `OCCUPIED` $\rightarrow$ Kích hoạt ví dư `ContractCredits`.
 - **Luồng hóa đơn hàng tháng**: Ghi điện nước $\rightarrow$ Tính toán tiền theo chỉ số/khoán $\rightarrow$ Tự động cấn trừ số dư ví $\rightarrow$ Lập hóa đơn $\rightarrow$ Cộng dồn nợ cũ (nếu có).
 - **Luồng thu tiền & Hoàn dư**: Tạo phiếu thu $\rightarrow$ Cập nhật hóa đơn $\rightarrow$ Chuyển phần tiền đóng thừa thành số dư tích lũy kỳ sau.
-- **Luồng xử lý sự cố**: Khách quét QR phòng $\rightarrow$ Gửi yêu cầu public $\rightarrow$ Manager gán việc $\rightarrow$ Kỹ thuật viên xử lý và khai báo vật tư $\rightarrow$ RESOLVED.
+- **Luồng xử lý sự cố & Trừ kho**: Khách quét QR phòng $\rightarrow$ Gửi yêu cầu public $\rightarrow$ Manager gán việc $\rightarrow$ Kỹ thuật viên xử lý, khai báo vật tư đã dùng $\rightarrow$ Hệ thống tự động trừ kho an toàn (Atomic Update) và ghi nhật ký xuất kho $\rightarrow$ Chuyển trạng thái sang RESOLVED.
 
 > 📄 Xem chi tiết các luồng nghiệp vụ và sơ đồ Mermaid tại [workflows.md](./docs/workflows.md).  
 > 📄 Xem tài liệu tổng quan ca sử dụng (Use Cases) dành cho BA/Product tại [system-overview.md](./docs/system-overview.md).
@@ -131,7 +136,7 @@ Vòng đời nghiệp vụ của hệ thống được vận hành tự động 
 
 Hệ thống áp dụng mô hình phân quyền hai lớp:
 1. **Role-Based Access Control (RBAC)**: Phân quyền theo 4 vai trò chính thông qua JWT middleware.
-2. **Policy Engine (Resource-Level Scope)**: Lọc dữ liệu tự động. Manager hay Technician chỉ nhìn thấy và thao tác được các căn hộ, hợp đồng, hóa đơn thuộc tòa nhà mà họ được phân công trong bảng `BuildingAssignments`.
+2. **Policy Engine (Resource-Level Scope)**: Lọc dữ liệu tự động. Manager hay Technician chỉ nhìn thấy và thao tác được các căn hộ, hợp đồng, hóa đơn, kho vật tư, tài sản thuộc tòa nhà mà họ được phân công trong bảng `BuildingAssignments`.
 
 > 📄 Xem chi tiết ma trận phân quyền và hướng dẫn middleware tại [permissions.md](./docs/permissions.md).
 
@@ -140,7 +145,7 @@ Hệ thống áp dụng mô hình phân quyền hai lớp:
 ## 6. Thiết kế Cơ sở Dữ liệu (Database Design)
 
 Mô hình dữ liệu được chia làm 2 tầng chính:
-- **Core Domain Models**: `Users`, `Buildings`, `Apartments`, `Tenants`, `Contracts`, `Invoices`, `Payments`, `UtilityReadings`, `ServiceRequests`, `BuildingExpenses`.
+- **Core Domain Models**: `Users`, `Buildings`, `Apartments`, `Tenants`, `Contracts`, `Invoices`, `Payments`, `UtilityReadings`, `ServiceRequests`, `BuildingExpenses`, `Warehouses`, `InventoryItems`, `StockTransactions`, `Assets`, `ServiceRequestMaterials`.
 - **Supporting Models**: `AuditLogs`, `Notifications`, `Timeline`, `Attachments`, `ContractCredits`, `BuildingAssignments`, `BusinessRules`, `WorkflowTransitions`, `ApartmentTokens`.
 
 ```mermaid

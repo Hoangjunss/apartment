@@ -24,6 +24,10 @@ Tài liệu này chi tiết hóa ma trận phân quyền dựa trên Vai trò (R
 | **ServiceRequests: Tạo yêu cầu mới** | ✅ | ✅ | ✅ | ❌ |
 | **ServiceRequests: Phân công & Xem tất cả** | ✅ | ✅ | ❌ | ❌ |
 | **ServiceRequests: Cập nhật status việc được giao** | ✅ | ✅ | ❌ | ✅ |
+| **Quản lý Kho & Vật tư (Warehouses, Items CRUD)** | ✅ | ✅ | ❌ | ❌ |
+| **Xem Kho & Vật tư (Read-only)** | ✅ | ✅ | ✅ | ✅ |
+| **Quản lý Tài sản (Assets CRUD)** | ✅ | ✅ | ❌ | ❌ |
+| **Xem Tài sản (Read-only)** | ✅ | ✅ | ✅ | ✅ |
 
 ---
 

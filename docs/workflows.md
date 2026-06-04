@@ -233,3 +233,66 @@ flowchart TD
 ### Ràng buộc Nghiệp vụ:
 - **Không chặn luồng chính (Non-blocking)**: Các listener được bọc trong các khối `try/catch` độc lập. Nếu quá trình ghi Audit Log hoặc gửi Notification bị lỗi, nghiệp vụ chính (như tạo hợp đồng, trả hóa đơn) vẫn phải thành công bình thường.
 - **Cron Jobs**: Khi các tác vụ tự động chạy (ví dụ Cron 00:00 quét hợp đồng hết hạn), `actor_id` được ghi nhận là `0` và `actor_name` là `'Hệ thống'`.
+
+---
+
+## 📦 Quy trình 7: Quản lý Kho, Xuất kho Vật tư & Khấu hao Tài sản (Inventory & Asset Management)
+
+Quy trình này quản lý các đợt nhập/xuất kho vật tư vận hành và tự động hóa việc khấu hao tài sản cố định trong hệ thống QLCHDC.
+
+### 1. Luồng xuất kho vật tư khi hoàn thành Sự cố kỹ thuật:
+
+```mermaid
+sequenceDiagram
+    actor Tech as Kỹ thuật viên
+    participant SR as Service Request Module
+    participant Inv as Inventory Module
+    participant DB as Prisma (MySQL)
+    participant Notif as Notification Module
+
+    Tech->>SR: 1. Khai báo vật tư đã dùng & chuyển status sang RESOLVED
+    SR->>Inv: 2. Yêu cầu xuất kho vật tư (Atomic deduct)
+    Note over Inv: Bắt đầu Transaction
+    Inv->>DB: 3. Cập nhật số lượng vật tư (updateMany: current_stock >= quantity)
+    alt Đủ tồn kho (count > 0)
+        DB-->>Inv: Cập nhật thành công
+        Inv->>DB: 4. Ghi giao dịch kho (StockTransactions)
+        Inv->>DB: 5. Ghi nhận vật tư sự cố (ServiceRequestMaterials)
+        Note over Inv: Kết thúc Transaction thành công
+        SR-->>Tech: 6. Hoàn thành phiếu sự cố
+        alt Tồn kho sau xuất <= min_stock_level
+            Inv->>Notif: 7. Phát sự kiện inventory.low_stock
+            Notif->>Tech: 8. Gửi Socket.io cảnh báo tồn kho thấp cho Manager
+        end
+    else Không đủ tồn kho (count = 0)
+        Note over Inv: Rollback Transaction
+        Inv-->>SR: Thất bại (Lỗi INVENTORY_OUT_OF_STOCK)
+        SR-->>Tech: Báo lỗi không đủ vật tư trong kho
+    end
+```
+
+### 2. Luồng tính Khấu hao động Tài sản (Dynamic Depreciation):
+
+Giá trị khấu hao tài sản cố định được tính toán động (On-the-fly) khi có yêu cầu truy vấn thông tin chi tiết tài sản hoặc danh sách tài sản, loại bỏ việc dùng Cron Job để cập nhật bản ghi tĩnh:
+
+```mermaid
+flowchart TD
+    A[Yêu cầu xem chi tiết Tài sản] --> B[Truy vấn DB lấy thông số: purchase_cost, salvage_value, useful_life_years, purchase_date]
+    B --> C[Tính tổng số tháng sử dụng hữu ích: total_months = useful_life_years * 12]
+    C --> D[Tính số tháng đã trôi qua kể từ ngày mua: months_used]
+    D --> E{months_used > total_months?}
+    E -- Đúng --> F[Khấu hao lũy kế = purchase_cost - salvage_value]
+    F --> G[Giá trị còn lại = salvage_value]
+    E -- Sai --> H[Khấu hao mỗi tháng: monthly_dep = purchase_cost - salvage_value / total_months]
+    H --> I[Khấu hao lũy kế = monthly_dep * months_used]
+    I --> J[Giá trị còn lại = purchase_cost - Khấu hao lũy kế]
+    G & J --> K[Trả về response chứa thông tin tài sản kèm block depreciation]
+```
+
+### Ràng buộc Nghiệp vụ:
+- **Ngăn chặn Race Condition (Atomic updates)**: Không sử dụng quy trình `SELECT` kiểm tra tồn kho rồi mới `UPDATE` vì dễ gặp race condition. Thay vào đó, áp dụng điều kiện lọc trực tiếp số lượng tồn tối thiểu trong câu lệnh `UPDATE`:
+  ```js
+  where: { id: itemId, current_stock: { gte: quantity } }
+  ```
+  Nếu kết quả trả về có `count = 0`, hệ thống hiểu rằng tồn kho không đủ và lập tức trả lỗi để hủy bỏ giao dịch.
+- **Polymorphic Timeline & Attachments**: Hoạt động sửa chữa tài sản được tự động đồng bộ vào Timeline Engine bằng `entity_type = 'Asset'` và `entity_id = assetId`. Hồ sơ tài sản (biên bản giao nhận, hướng dẫn sử dụng) cũng được đính kèm polymorphic trong bảng `Attachments`.

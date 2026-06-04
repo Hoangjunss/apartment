@@ -35,6 +35,7 @@ usecaseDiagram
     Manager --> (Ký & Gia hạn Hợp đồng)
     Manager --> (Lập Hóa đơn & Duyệt Chi phí)
     Manager --> (Phân công Yêu cầu kỹ thuật)
+    Manager --> (Quản lý Kho & Tài sản cố định)
     
     Receptionist --> (Quản lý Hồ sơ Khách thuê)
     Receptionist --> (Ghi Chỉ số Điện Nước)
@@ -43,7 +44,7 @@ usecaseDiagram
     
     Tech --> (Xem việc được phân công)
     Tech --> (Cập nhật trạng thái sửa chữa)
-    Tech --> (Khai báo chi phí sửa chữa)
+    Tech --> (Khai báo vật tư & Chi phí sửa chữa)
     
     Tenant --> (Quét QR gửi yêu cầu sự cố)
 ```
@@ -66,8 +67,12 @@ Nghiệp vụ cốt lõi xoay quanh vòng đời của một **Căn hộ (Apartm
    - Thực hiện cấn trừ **Ví dư (ContractCredits)** nếu có tiền đóng dư từ tháng trước.
    - Ghi nhận **Phiếu thu (Payment)** khi khách đóng tiền phòng. Tiền đóng thừa sẽ được nạp ngược lại vào Ví dư.
 4. **Bảo trì & Sự cố kỹ thuật**:
-   - Khách thuê hoặc Lễ tân phản ánh sự cố tạo thành **Yêu cầu kỹ thuật (ServiceRequest)**.
-   - Quản lý phân công Kỹ thuật viên xử lý. Phát sinh vật tư được ghi nhận vào chi phí sửa chữa.
+   - Khách thuê hoặc Lễ tân phản ánh sự cố tạo thành **Yêu cầu kỹ thuật (ServiceRequest)** (có thể liên kết với một **Tài sản cố định** cụ thể gặp lỗi).
+   - Quản lý phân công Kỹ thuật viên xử lý. Phát sinh chi phí ngoài được ghi vào **ServiceRequestExpenses**.
+5. **Kho & Tài sản vận hành**:
+   - Mỗi Tòa nhà có một hoặc nhiều **Kho (Warehouses)** chứa các **Vật tư (InventoryItems)** phục vụ bảo trì.
+   - Các hoạt động nhập/xuất kho được ghi nhận thành **Giao dịch kho (StockTransactions)**. Khi giải quyết sự cố (`RESOLVED`), số vật tư Kỹ thuật viên đã dùng được tự động trừ khỏi kho thông qua câu lệnh cập nhật an toàn chống tranh chấp (Atomic Update).
+   - **Tài sản cố định (Assets)** được gán theo tòa nhà, gắn mã QR duy nhất phục vụ tra cứu nhanh và báo sự cố. Giá trị khấu hao lũy kế và giá trị còn lại của tài sản được tự động tính toán theo công thức khấu hao đường thẳng (Straight-Line Depreciation) mỗi khi truy vấn.
 
 ---
 

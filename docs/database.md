@@ -48,7 +48,27 @@ Hệ thống lưu giữ 11 thực thể nghiệp vụ cốt lõi, quản lý vò
 
 ### 10. `BuildingExpenses` (Chi phí tòa nhà)
 - **Vai trò**: Quản lý chi phí đầu ra để vận hành tòa nhà (tiền sửa chữa lớn, bảo dưỡng chung, lương nhân viên...).
-- **Fields quan trọng**: `id` (Int PK), `building_id` (FK), `category` (OPERATIONS/MAINTENANCE), `title`, `amount` (Decimal), `expense_date`, `status` (PENDING/PAID).
+- **Fields quan trọng**: `id` (Int PK), `building_id` (FK), `category` (OPERATIONS/MAINTENANCE/ASSET_MAINTENANCE/INVENTORY_PURCHASE/UTILITY_ELECTRICITY), `title`, `amount` (Decimal), `expense_date`, `status` (PENDING/PAID).
+
+### 11. `Warehouses` (Kho vật tư tòa nhà)
+- **Vai trò**: Điểm lưu trữ vật tư phục vụ cho việc vận hành bảo trì sửa chữa của tòa nhà.
+- **Fields quan trọng**: `id` (Int PK), `name` (String), `building_id` (Int FK - gán scope), `description` (Text?).
+
+### 12. `InventoryItems` (Vật tư trong kho)
+- **Vai trò**: Danh mục vật tư nằm trong từng kho cụ thể.
+- **Fields quan trọng**: `id` (Int PK), `warehouse_id` (Int FK), `item_name` (String), `category` (Enum: CONSUMABLE, SPARE_PART, TOOL, EQUIPMENT), `current_stock` (Int - số lượng tồn thực tế), `min_stock_level` (Int - ngưỡng cảnh báo tồn tối thiểu), `unit` (String - đơn vị tính), `unit_cost` (Decimal - đơn giá nhập hàng).
+
+### 13. `StockTransactions` (Giao dịch nhập xuất kho)
+- **Vai trò**: Nhật ký lưu trữ lịch sử tất cả các đợt nhập hàng (STOCK_IN) hoặc xuất hàng (STOCK_OUT) khỏi kho.
+- **Fields quan trọng**: `id` (Int PK), `inventory_item_id` (Int FK), `type` (Enum: STOCK_IN, STOCK_OUT), `quantity` (Int), `unit_cost` (Decimal - đơn giá snapshot lúc giao dịch), `item_name_snapshot` (String - tên vật tư snapshot lúc giao dịch), `ref_type` (Enum: SERVICE_REQUEST, MANUAL, ADJUSTMENT), `ref_id` (Int? - ID phiếu liên quan), `recorded_by` (Int FK - nhân viên thực hiện).
+
+### 14. `ServiceRequestMaterials` (Vật tư sử dụng cho sự cố)
+- **Vai trò**: Bảng trung gian ghi nhận danh sách và số lượng vật tư được Kỹ thuật viên khai báo sử dụng khi xử lý phiếu sự cố.
+- **Fields quan trọng**: `id` (Int PK), `service_request_id` (Int FK), `inventory_item_id` (Int FK), `quantity` (Int), `unit_cost` (Decimal - đơn giá snapshot lúc sử dụng).
+
+### 15. `Assets` (Tài sản cố định)
+- **Vai trò**: Quản lý các trang thiết bị tài sản cố định của tòa nhà (Ví dụ: Thang máy, máy bơm nước, điều hòa).
+- **Fields quan trọng**: `id` (Int PK), `building_id` (Int FK), `asset_code` (String UNIQUE - dùng quét QR), `name` (String), `category` (Enum: ELECTRONICS, FURNITURE, MACHINERY, VEHICLE, OTHER), `status` (Enum: ACTIVE, UNDER_REPAIR, DECOMMISSIONED), `purchase_cost` (Decimal - nguyên giá), `salvage_value` (Decimal - giá trị thu hồi ước tính), `useful_life_years` (Int - số năm sử dụng hữu ích), `purchase_date` (Date - ngày mua), `depreciation_method` (Enum: STRAIGHT_LINE).
 
 ---
 

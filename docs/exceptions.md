@@ -51,6 +51,11 @@ Dưới đây là danh mục 25 lỗi nghiệp vụ thường gặp trong hệ t
 | **Sự cố Kỹ thuật (Service Request)** | | |
 | `SERVICE_REQUEST_NOT_FOUND` | `404` | Không tìm thấy yêu cầu sửa chữa sự cố kỹ thuật. |
 | `SERVICE_REQUEST_FORBIDDEN_UPDATE` | `403` | Kỹ thuật viên (Technician) cố gắng sửa phiếu sự cố của người khác. |
+| **Kho & Tài sản (Inventory & Assets)** | | |
+| `INVENTORY_OUT_OF_STOCK` | `400` | Không đủ số lượng hàng tồn kho để thực hiện xuất kho. |
+| `INVENTORY_ITEM_NOT_FOUND` | `404` | Không tìm thấy vật tư được yêu cầu trong kho. |
+| `WAREHOUSE_NOT_FOUND` | `404` | Không tìm thấy kho hàng được chỉ định. |
+| `ASSET_NOT_FOUND` | `404` | Không tìm thấy tài sản cố định được yêu cầu. |
 | **Hệ thống Workflow & Rules** | | |
 | `WORKFLOW_TRANSITION_INVALID` | `400` | Chuyển đổi trạng thái không hợp lệ trong Workflow (VD: PENDING $\rightarrow$ RESOLVED mà không qua ASSIGNED). |
 | `RULE_EVALUATION_FAILED` | `500` | Lỗi xảy ra khi Business Rules Engine đánh giá các điều kiện động từ Database. |
