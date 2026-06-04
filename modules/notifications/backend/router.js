@@ -8,6 +8,8 @@ const router = Router();
 router.get('/', authenticate, ctrl.getNotifications);
 router.get('/count', authenticate, ctrl.getUnreadCount);
 router.put('/:id/read', authenticate, ctrl.markAsRead);
+router.patch('/:id/read', authenticate, ctrl.markAsRead);
 router.put('/read-all', authenticate, ctrl.markAllAsRead);
+router.patch('/read-all', authenticate, ctrl.markAllAsRead);
 
 export default router;

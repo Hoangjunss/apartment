@@ -5,11 +5,14 @@
   "main": "index.js",
   "exports": {
     ".": "./index.js",
-    "./service": "./service.js"
+    "./service": "./service.js",
+    "./cron.js": "./cron.js"
   },
   "dependencies": {
     "@my/prisma": "workspace:*",
     "@my/auth-backend": "workspace:*",
-    "express": "^4.19.2"
+    "@my/events": "workspace:*",
+    "express": "^4.19.2",
+    "node-cron": "^3.0.3"
   }
 }
