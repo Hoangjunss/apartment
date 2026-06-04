@@ -52,6 +52,16 @@ export const applyBuildingScope = async (currentUser, prismaWhere = {}, resource
           }
         };
         break;
+      case 'Warehouse':
+      case 'Asset':
+        prismaWhere.building_id = { in: allowedBuildingIds };
+        break;
+      case 'InventoryItem':
+        prismaWhere.warehouse = {
+          ...prismaWhere.warehouse,
+          building_id: { in: allowedBuildingIds }
+        };
+        break;
       default:
         console.warn(`[Policy] applyBuildingScope called with unsupported resource type: ${resourceType}`);
     }

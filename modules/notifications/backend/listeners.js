@@ -14,6 +14,33 @@ const getAdminAndManagerIds = async () => {
   return users.map(u => u.id);
 };
 
+// Helper lấy danh sách admin và manager phụ trách tòa nhà
+const getAdminAndManagerIdsForBuilding = async (buildingId) => {
+  if (!buildingId) {
+    return getAdminAndManagerIds();
+  }
+  const admins = await prisma.users.findMany({
+    where: { role: 'ADMIN', is_active: true },
+    select: { id: true }
+  });
+  const adminIds = admins.map(a => a.id);
+
+  const assignments = await prisma.buildingAssignments.findMany({
+    where: {
+      building_id: Number(buildingId),
+      revoked_at: null,
+      user: {
+        role: 'MANAGER',
+        is_active: true
+      }
+    },
+    select: { user_id: true }
+  });
+  const managerIds = assignments.map(a => a.user_id);
+
+  return Array.from(new Set([...adminIds, ...managerIds]));
+};
+
 const registerNotificationListeners = () => {
   // 1. contract.created
   eventHub.on('contract.created', async (event) => {
@@ -69,6 +96,21 @@ const registerNotificationListeners = () => {
         message: `Yêu cầu bảo trì "${event.data?.title}" đã được kỹ thuật viên xử lý xong.`,
         type: 'MAINTENANCE_RESOLVED',
         entityType: 'ServiceRequest',
+        entityId: event.entityId
+      });
+    }
+  });
+
+  // 5. inventory.low_stock
+  eventHub.on('inventory.low_stock', async (event) => {
+    const receivers = await getAdminAndManagerIdsForBuilding(event.data?.buildingId);
+    for (const userId of receivers) {
+      await createNotification({
+        userId,
+        title: 'Cảnh báo tồn kho thấp',
+        message: `Vật tư "${event.data?.itemName}" trong kho hiện chỉ còn ${event.data?.currentStock} (Ngưỡng an toàn: ${event.data?.minStockLevel}).`,
+        type: 'INVENTORY_LOW_STOCK',
+        entityType: 'InventoryItem',
         entityId: event.entityId
       });
     }

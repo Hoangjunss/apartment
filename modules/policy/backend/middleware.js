@@ -68,6 +68,30 @@ export const checkPolicy = (resourceType, action) => {
         });
         if (sr) entityBuildingId = sr.apartment.floor.building_id;
       }
+      
+      else if (resourceType === 'Warehouse') {
+        const wh = await prisma.warehouses.findUnique({
+          where: { id: resourceId },
+          select: { building_id: true }
+        });
+        if (wh) entityBuildingId = wh.building_id;
+      }
+      
+      else if (resourceType === 'Asset') {
+        const asset = await prisma.assets.findUnique({
+          where: { id: resourceId },
+          select: { building_id: true }
+        });
+        if (asset) entityBuildingId = asset.building_id;
+      }
+      
+      else if (resourceType === 'InventoryItem') {
+        const item = await prisma.inventoryItems.findUnique({
+          where: { id: resourceId },
+          include: { warehouse: { select: { building_id: true } } }
+        });
+        if (item) entityBuildingId = item.warehouse.building_id;
+      }
 
       // Kiểm tra xem building_id của thực thể có thuộc danh sách tòa nhà được gán
       if (entityBuildingId !== null && !assignedIds.includes(entityBuildingId)) {
