@@ -19,6 +19,18 @@ async function main() {
   console.log('Seed starting with MASSIVE dataset (5x expansion)...');
 
   // 1. Clean up existing data in correct FK order
+  await prisma.timeline.deleteMany({});
+  await prisma.buildingAssignments.deleteMany({});
+  await prisma.businessRules.deleteMany({});
+  await prisma.workflowTransitions.deleteMany({});
+  await prisma.workflowSteps.deleteMany({});
+  await prisma.workflows.deleteMany({});
+  await prisma.attachments.deleteMany({});
+  await prisma.serviceRequestComments.deleteMany({});
+  await prisma.serviceRequestExpenses.deleteMany({});
+  await prisma.creditTransactions.deleteMany({});
+  await prisma.contractCredits.deleteMany({});
+  await prisma.buildingExpenses.deleteMany({});
   await prisma.serviceRequests.deleteMany({});
   await prisma.payments.deleteMany({});
   await prisma.invoices.deleteMany({});
@@ -469,7 +481,8 @@ async function main() {
       assigned_to: tech.id,
       status: 'IN_PROGRESS',
       source: 'INTERNAL',
-      type: 'MAINTENANCE'
+      type: 'MAINTENANCE',
+      scheduled_start_date: new Date('2026-06-04')
     },
     {
       title: 'Két nước phòng B203 bị rò rỉ',
@@ -480,7 +493,8 @@ async function main() {
       assigned_to: tech.id,
       status: 'PENDING',
       source: 'INTERNAL',
-      type: 'MAINTENANCE'
+      type: 'MAINTENANCE',
+      scheduled_start_date: new Date('2026-06-05')
     },
     {
       title: 'Thay bóng đèn hành lang tầng 2',
@@ -491,7 +505,8 @@ async function main() {
       assigned_to: null,
       status: 'PENDING',
       source: 'INTERNAL',
-      type: 'MAINTENANCE'
+      type: 'MAINTENANCE',
+      scheduled_start_date: new Date('2026-06-06')
     },
     {
       title: 'Sửa khóa cửa phòng A204',
@@ -502,7 +517,8 @@ async function main() {
       assigned_to: tech.id,
       status: 'RESOLVED',
       source: 'INTERNAL',
-      type: 'MAINTENANCE'
+      type: 'MAINTENANCE',
+      scheduled_start_date: new Date('2026-06-02')
     },
     {
       title: 'Thay bình nóng lạnh phòng B102',
@@ -513,7 +529,8 @@ async function main() {
       assigned_to: tech.id,
       status: 'PENDING',
       source: 'INTERNAL',
-      type: 'MAINTENANCE'
+      type: 'MAINTENANCE',
+      scheduled_start_date: new Date('2026-06-07')
     },
   ];
 
@@ -521,6 +538,296 @@ async function main() {
     await prisma.serviceRequests.create({ data: sr });
   }
   console.log(`Created ${serviceReqData.length} service requests.`);
+
+  // 10. Seed BuildingExpenses & Attachments
+  console.log('Seeding Building Expenses & Attachments...');
+  const exp1 = await prisma.buildingExpenses.create({
+    data: {
+      building_id: b1.id,
+      category: 'OPERATIONS',
+      title: 'Electricity Bill - May 2026',
+      amount: 4250000,
+      expense_date: new Date('2026-05-05'),
+      status: 'PAID',
+      description: 'Hóa đơn tiền điện hành lang & vận hành Block A tháng 5/2026',
+      created_by: admin.id
+    }
+  });
+
+  const exp2 = await prisma.buildingExpenses.create({
+    data: {
+      building_id: b1.id,
+      category: 'OPERATIONS',
+      title: 'Water Bill - May 2026',
+      amount: 1200000,
+      expense_date: new Date('2026-05-06'),
+      status: 'PAID',
+      description: 'Hóa đơn tiền nước sinh hoạt công cộng Block A tháng 5/2026',
+      created_by: admin.id
+    }
+  });
+
+  const exp3 = await prisma.buildingExpenses.create({
+    data: {
+      building_id: b1.id,
+      category: 'MAINTENANCE',
+      title: 'Elevator Maintenance Schindler',
+      amount: 5000000,
+      expense_date: new Date('2026-05-12'),
+      status: 'PAID',
+      description: 'Chi phí bảo trì, bảo dưỡng định kỳ hệ thống thang máy Schindler Block A',
+      created_by: admin.id
+    }
+  });
+
+  const exp4 = await prisma.buildingExpenses.create({
+    data: {
+      building_id: b2.id,
+      category: 'OPERATIONS',
+      title: 'Cleaning Service Contract',
+      amount: 3500000,
+      expense_date: new Date('2026-05-15'),
+      status: 'PAID',
+      description: 'Chi phí thuê đơn vị vệ sinh ngoại cảnh cho Block B',
+      created_by: admin.id
+    }
+  });
+
+  const exp5 = await prisma.buildingExpenses.create({
+    data: {
+      building_id: b2.id,
+      category: 'OPERATIONS',
+      title: 'Security Service - May 2026',
+      amount: 6000000,
+      expense_date: new Date('2026-05-18'),
+      status: 'PENDING',
+      description: 'Chi phí thuê bảo vệ chuyên nghiệp tuần tra Block B tháng 5/2026',
+      created_by: admin.id
+    }
+  });
+
+  const exp6 = await prisma.buildingExpenses.create({
+    data: {
+      building_id: b1.id,
+      category: 'OPERATIONS',
+      title: 'Internet Service Viettel - May 2026',
+      amount: 850000,
+      expense_date: new Date('2026-05-20'),
+      status: 'PAID',
+      description: 'Tiền cước cáp quang Viettel tốc độ cao cho ban quản lý Block A tháng 5/2026',
+      created_by: admin.id
+    }
+  });
+
+  await prisma.attachments.createMany({
+    data: [
+      {
+        file_name: 'electricity-may.pdf',
+        file_url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800&auto=format&fit=crop',
+        file_size: 345000,
+        mime_type: 'application/pdf',
+        entity_type: 'BuildingExpense',
+        entity_id: exp1.id,
+        uploaded_by: admin.id,
+      },
+      {
+        file_name: 'water-may.pdf',
+        file_url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800&auto=format&fit=crop',
+        file_size: 215000,
+        mime_type: 'application/pdf',
+        entity_type: 'BuildingExpense',
+        entity_id: exp2.id,
+        uploaded_by: admin.id,
+      },
+      {
+        file_name: 'maintenance-invoice.jpg',
+        file_url: 'https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?w=800&auto=format&fit=crop',
+        file_size: 512000,
+        mime_type: 'image/jpeg',
+        entity_type: 'BuildingExpense',
+        entity_id: exp3.id,
+        uploaded_by: admin.id,
+      },
+      {
+        file_name: 'cleaning-contract.pdf',
+        file_url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800&auto=format&fit=crop',
+        file_size: 890000,
+        mime_type: 'application/pdf',
+        entity_type: 'BuildingExpense',
+        entity_id: exp4.id,
+        uploaded_by: admin.id,
+      }
+    ]
+  });
+
+  // 11. Seed Notifications
+  console.log('Seeding Notifications...');
+  const seededInvoices = await prisma.invoices.findMany({ take: 2 });
+  const seededRequests = await prisma.serviceRequests.findMany({ take: 2 });
+
+  await prisma.notifications.createMany({
+    data: [
+      {
+        user_id: admin.id,
+        title: 'Hợp đồng sắp hết hạn',
+        message: `Hợp đồng căn hộ ${contracts[0].contract_code} sắp hết hạn trong vòng 30 ngày.`,
+        type: 'CONTRACT_EXPIRING',
+        entity_type: 'Contract',
+        entity_id: contracts[0].id,
+        is_read: false,
+        created_at: new Date('2026-06-03T10:00:00Z')
+      },
+      {
+        user_id: admin.id,
+        title: 'Hóa đơn quá hạn',
+        message: `Hóa đơn ${seededInvoices[0]?.invoice_code ?? 'INV-001'} đã quá hạn thanh toán. Vui lòng kiểm tra.`,
+        type: 'INVOICE_OVERDUE',
+        entity_type: 'Invoice',
+        entity_id: seededInvoices[0]?.id ?? 1,
+        is_read: false,
+        created_at: new Date('2026-06-03T11:30:00Z')
+      },
+      {
+        user_id: admin.id,
+        title: 'Sự cố kỹ thuật đã hoàn thành',
+        message: `Căn hộ: Yêu cầu "${seededRequests[0]?.title ?? 'Sửa khóa cửa'}" đã được hoàn thành.`,
+        type: 'MAINTENANCE_RESOLVED',
+        entity_type: 'ServiceRequest',
+        entity_id: seededRequests[0]?.id ?? 1,
+        is_read: true,
+        created_at: new Date('2026-06-02T15:45:00Z')
+      }
+    ]
+  });
+
+  // 12. Seed Workflows
+  console.log('Seeding Workflows & Steps...');
+  const contractWorkflow = await prisma.workflows.create({
+    data: {
+      name: 'ContractWorkflow',
+      description: 'Quy trình quản lý vòng đời hợp đồng thuê căn hộ',
+    }
+  });
+
+  const activeStep = await prisma.workflowSteps.create({
+    data: { workflow_id: contractWorkflow.id, step_name: 'ACTIVE', order_number: 1, is_initial: true }
+  });
+  const expiringStep = await prisma.workflowSteps.create({
+    data: { workflow_id: contractWorkflow.id, step_name: 'EXPIRING_SOON', order_number: 2 }
+  });
+  const expiredStep = await prisma.workflowSteps.create({
+    data: { workflow_id: contractWorkflow.id, step_name: 'EXPIRED', order_number: 3, is_final: true }
+  });
+  const terminatedStep = await prisma.workflowSteps.create({
+    data: { workflow_id: contractWorkflow.id, step_name: 'TERMINATED', order_number: 4, is_final: true }
+  });
+
+  // Transitions cho ContractWorkflow
+  await prisma.workflowTransitions.createMany({
+    data: [
+      { workflow_id: contractWorkflow.id, from_step_id: activeStep.id, to_step_id: expiringStep.id, name: 'Cảnh báo sắp hết hạn' },
+      { workflow_id: contractWorkflow.id, from_step_id: activeStep.id, to_step_id: terminatedStep.id, name: 'Chấm dứt sớm', role_allowed: 'ADMIN,MANAGER' },
+      { workflow_id: contractWorkflow.id, from_step_id: expiringStep.id, to_step_id: activeStep.id, name: 'Gia hạn hợp đồng', role_allowed: 'ADMIN,MANAGER' },
+      { workflow_id: contractWorkflow.id, from_step_id: expiringStep.id, to_step_id: expiredStep.id, name: 'Hết hạn hợp đồng' },
+      { workflow_id: contractWorkflow.id, from_step_id: expiringStep.id, to_step_id: terminatedStep.id, name: 'Chấm dứt sớm', role_allowed: 'ADMIN,MANAGER' },
+    ]
+  });
+
+  const srWorkflow = await prisma.workflows.create({
+    data: {
+      name: 'ServiceRequestWorkflow',
+      description: 'Quy trình xử lý sự cố kỹ thuật và yêu cầu dịch vụ',
+    }
+  });
+
+  const pendingStep = await prisma.workflowSteps.create({
+    data: { workflow_id: srWorkflow.id, step_name: 'PENDING', order_number: 1, is_initial: true }
+  });
+  const assignedStep = await prisma.workflowSteps.create({
+    data: { workflow_id: srWorkflow.id, step_name: 'ASSIGNED', order_number: 2 }
+  });
+  const inProgressStep = await prisma.workflowSteps.create({
+    data: { workflow_id: srWorkflow.id, step_name: 'IN_PROGRESS', order_number: 3 }
+  });
+  const resolvedStep = await prisma.workflowSteps.create({
+    data: { workflow_id: srWorkflow.id, step_name: 'RESOLVED', order_number: 4, is_final: true }
+  });
+  const cancelledStep = await prisma.workflowSteps.create({
+    data: { workflow_id: srWorkflow.id, step_name: 'CANCELLED', order_number: 5, is_final: true }
+  });
+  const postponedStep = await prisma.workflowSteps.create({
+    data: { workflow_id: srWorkflow.id, step_name: 'POSTPONED', order_number: 6 }
+  });
+
+  // Transitions cho ServiceRequestWorkflow
+  await prisma.workflowTransitions.createMany({
+    data: [
+      { workflow_id: srWorkflow.id, from_step_id: pendingStep.id, to_step_id: assignedStep.id, name: 'Phân công kỹ thuật viên', role_allowed: 'ADMIN,MANAGER' },
+      { workflow_id: srWorkflow.id, from_step_id: pendingStep.id, to_step_id: cancelledStep.id, name: 'Hủy yêu cầu' },
+      { workflow_id: srWorkflow.id, from_step_id: assignedStep.id, to_step_id: inProgressStep.id, name: 'Bắt đầu xử lý' },
+      { workflow_id: srWorkflow.id, from_step_id: assignedStep.id, to_step_id: pendingStep.id, name: 'Hủy phân công', role_allowed: 'ADMIN,MANAGER' },
+      { workflow_id: srWorkflow.id, from_step_id: assignedStep.id, to_step_id: cancelledStep.id, name: 'Hủy yêu cầu' },
+      { workflow_id: srWorkflow.id, from_step_id: inProgressStep.id, to_step_id: resolvedStep.id, name: 'Hoàn thành xử lý' },
+      { workflow_id: srWorkflow.id, from_step_id: inProgressStep.id, to_step_id: postponedStep.id, name: 'Tạm hoãn', role_allowed: 'ADMIN,MANAGER' },
+      { workflow_id: srWorkflow.id, from_step_id: postponedStep.id, to_step_id: inProgressStep.id, name: 'Tiếp tục xử lý' },
+    ]
+  });
+
+  // 13. Seed BusinessRules
+  console.log('Seeding Business Rules...');
+  await prisma.businessRules.createMany({
+    data: [
+      {
+        name: 'Nhắc nhở hợp đồng sắp hết hạn',
+        entity: 'Contract',
+        condition: { field: 'days_remaining', operator: '<=', value: 30 },
+        action: 'SEND_NOTIFICATION',
+        action_data: { template: 'Hợp đồng {contract_code} của căn hộ {apartment_code} sắp hết hạn trong {days_remaining} ngày nữa.' }
+      },
+      {
+        name: 'Nhắc nhở bảo trì sắp đến hạn',
+        entity: 'ServiceRequest',
+        condition: { field: 'days_to_start', operator: '<=', value: 2 },
+        action: 'SEND_NOTIFICATION',
+        action_data: { template: 'Yêu cầu bảo trì "{title}" được lên lịch bắt đầu vào ngày {scheduled_start_date}. Vui lòng kiểm tra.' }
+      },
+      {
+        name: 'Tự động báo hóa đơn quá hạn',
+        entity: 'Invoice',
+        condition: { field: 'days_overdue', operator: '>=', value: 1 },
+        action: 'SEND_NOTIFICATION',
+        action_data: { template: 'Hóa đơn {invoice_code} đã quá hạn {days_overdue} ngày. Vui lòng gửi lời nhắc thanh toán.' }
+      }
+    ]
+  });
+
+  // 14. Seed BuildingAssignments
+  console.log('Seeding Building Assignments...');
+  await prisma.buildingAssignments.createMany({
+    data: [
+      {
+        user_id: manager.id,
+        building_id: b1.id,
+        assigned_by: admin.id,
+        assigned_at: new Date('2026-06-01T08:00:00Z'),
+      },
+      {
+        user_id: tech.id,
+        building_id: b1.id,
+        assigned_by: admin.id,
+        assigned_at: new Date('2026-06-01T08:30:00Z'),
+      },
+      // Một phân công đã bị thu hồi (revoked) cho manager đối với tòa b2
+      {
+        user_id: manager.id,
+        building_id: b2.id,
+        assigned_by: admin.id,
+        assigned_at: new Date('2026-05-01T09:00:00Z'),
+        revoked_at: new Date('2026-06-01T17:00:00Z'),
+      }
+    ]
+  });
+
   console.log('Seed finished successfully.');
 }
 
