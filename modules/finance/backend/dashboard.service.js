@@ -74,6 +74,13 @@ export const getDashboardStats = async (role, userId) => {
     activeContractsCount,
     activeContracts,
     totalBuildings,
+    totalWarehouses,
+    totalInventoryItems,
+    allInventoryItems,
+    serviceRequestsPending,
+    serviceRequestsInProgress,
+    recentExpenses,
+    recentServiceRequests
   ] = await Promise.all([
     prisma.apartments.count(),
     prisma.apartments.count({ where: { status: 'AVAILABLE' } }),
@@ -83,7 +90,23 @@ export const getDashboardStats = async (role, userId) => {
       where: { status: 'ACTIVE' },
       select: { id: true, tenant_id: true, end_date: true }
     }),
-    prisma.buildings.count({ where: { deleted_at: null } })
+    prisma.buildings.count({ where: { deleted_at: null } }),
+    prisma.warehouses.count(),
+    prisma.inventoryItems.count(),
+    prisma.inventoryItems.findMany({ select: { id: true, current_stock: true, min_stock_level: true } }),
+    prisma.serviceRequests.count({ where: { status: 'PENDING' } }),
+    prisma.serviceRequests.count({ where: { status: 'IN_PROGRESS' } }),
+    prisma.buildingExpenses.findMany({
+      where: { deleted_at: null },
+      orderBy: { expense_date: 'desc' },
+      take: 5,
+      include: { building: { select: { name: true, code: true } } }
+    }),
+    prisma.serviceRequests.findMany({
+      orderBy: { created_at: 'desc' },
+      take: 5,
+      include: { apartment: { select: { apartment_code: true } } }
+    })
   ]);
 
   const tenantIds = new Set(activeContracts.map(c => c.tenant_id));
@@ -96,6 +119,8 @@ export const getDashboardStats = async (role, userId) => {
   const expiringContracts = await prisma.contracts.count({
     where: { status: 'EXPIRING_SOON' }
   });
+
+  const lowStockCount = allInventoryItems.filter(item => item.current_stock <= item.min_stock_level).length;
 
   const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
   const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -145,7 +170,14 @@ export const getDashboardStats = async (role, userId) => {
     grossProfit,
     unpaidAmount,
     unpaidCount,
-    occupancyRate
+    occupancyRate,
+    totalWarehouses,
+    totalInventoryItems,
+    lowStockCount,
+    serviceRequestsPending,
+    serviceRequestsInProgress,
+    recentExpenses,
+    recentServiceRequests
   };
 };
 

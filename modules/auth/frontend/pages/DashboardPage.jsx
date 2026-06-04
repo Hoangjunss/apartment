@@ -16,7 +16,9 @@ import {
   Activity, 
   CreditCard, 
   Home,
-  RefreshCw
+  RefreshCw,
+  Wrench,
+  Package
 } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader.jsx';
 import { ContractStatusBadge } from '@/components/common/StatusBadge.jsx';
@@ -42,6 +44,46 @@ import {
 
 const formatCurrency = (v) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(v));
+
+const PRIORITY_COLORS = {
+  LOW: 'bg-slate-50 text-slate-700 border-slate-200',
+  NORMAL: 'bg-blue-50 text-blue-700 border-blue-200',
+  HIGH: 'bg-orange-50 text-orange-700 border-orange-200',
+  URGENT: 'bg-red-50 text-red-700 border-red-200 animate-pulse'
+};
+
+const PRIORITY_LABELS = {
+  LOW: 'Thấp',
+  NORMAL: 'Thường',
+  HIGH: 'Cao',
+  URGENT: 'Khẩn cấp'
+};
+
+const STATUS_COLORS = {
+  PENDING: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+  ASSIGNED: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+  IN_PROGRESS: 'bg-blue-50 text-blue-700 border-blue-200',
+  RESOLVED: 'bg-green-50 text-green-700 border-green-200',
+  CANCELLED: 'bg-slate-50 text-slate-700 border-slate-200',
+  POSTPONED: 'bg-purple-50 text-purple-700 border-purple-200'
+};
+
+const STATUS_LABELS = {
+  PENDING: 'Chờ duyệt',
+  ASSIGNED: 'Đã giao',
+  IN_PROGRESS: 'Đang xử lý',
+  RESOLVED: 'Đã giải quyết',
+  CANCELLED: 'Đã hủy',
+  POSTPONED: 'Tạm hoãn'
+};
+
+const EXPENSE_CATEGORY_LABELS = {
+  OPERATIONS: 'Vận hành',
+  MAINTENANCE: 'Bảo trì',
+  ASSET_MAINTENANCE: 'Bảo trì tài sản',
+  INVENTORY_PURCHASE: 'Mua vật tư',
+  UTILITY_ELECTRICITY: 'Tiền điện/nước'
+};
 
 const formatValue = (v) => {
   const num = Number(v);
@@ -320,6 +362,41 @@ export default function DashboardPage() {
             </>
           )}
         </div>
+
+        {/* Hàng 3 — Kho & Kỹ thuật */}
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider pt-2">Kho & Sự cố Kỹ thuật</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {loadingStats ? (
+            Array(3).fill(0).map((_, i) => <StatCardSkeleton key={i} />)
+          ) : (
+            <>
+              <StatCard
+                title="Yêu cầu sửa chữa đang mở"
+                value={`${stats?.serviceRequestsPending || 0} chờ duyệt / ${stats?.serviceRequestsInProgress || 0} đang xử lý`}
+                icon={Wrench}
+                color="bg-amber-500"
+                sub="Yêu cầu sửa chữa cần kỹ thuật xử lý"
+                onClick={() => navigate('/service-requests')}
+              />
+              <StatCard
+                title="Vật tư dưới mức tối thiểu"
+                value={`${stats?.lowStockCount || 0} vật tư`}
+                icon={Package}
+                color={stats?.lowStockCount > 0 ? "bg-red-500" : "bg-emerald-500"}
+                sub="Cảnh báo tồn kho cần nhập thêm"
+                onClick={() => navigate('/inventory')}
+              />
+              <StatCard
+                title="Kho & Vật tư vận hành"
+                value={`${stats?.totalWarehouses || 0} kho / ${stats?.totalInventoryItems || 0} mặt hàng`}
+                icon={Building2}
+                color="bg-blue-600"
+                sub="Tổng quan quản lý kho vận hành"
+                onClick={() => navigate('/inventory')}
+              />
+            </>
+          )}
+        </div>
       </div>
 
       {/* SECTION 2 — BIỂU ĐỒ (2 cột) */}
@@ -595,6 +672,123 @@ export default function DashboardPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* SECTION 4 — VẬN HÀNH & KỸ THUẬT CHI TIẾT */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Bảng 1 — Yêu cầu kỹ thuật gần đây */}
+        <div className="card bg-white overflow-hidden xl:col-span-2">
+          <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Wrench size={18} className="text-amber-500" />
+              <h2 className="text-sm font-bold text-gray-900">Yêu cầu sửa chữa gần đây</h2>
+            </div>
+            <button
+              onClick={() => navigate('/service-requests')}
+              className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
+            >
+              Xem tất cả →
+            </button>
+          </div>
+
+          {loadingStats ? (
+            <TableSkeleton />
+          ) : !stats?.recentServiceRequests || stats.recentServiceRequests.length === 0 ? (
+            <div className="py-10 text-center text-sm text-gray-400">
+              Không có yêu cầu kỹ thuật nào gần đây
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50 text-slate-500 font-semibold uppercase text-[10px] tracking-wider">
+                    <th className="px-4 py-3 text-left">Tiêu đề sự cố</th>
+                    <th className="px-4 py-3 text-left">Căn hộ</th>
+                    <th className="px-4 py-3 text-left">Độ ưu tiên</th>
+                    <th className="px-4 py-3 text-left">Ngày tạo</th>
+                    <th className="px-4 py-3 text-right">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {stats.recentServiceRequests.map((req) => (
+                    <tr
+                      key={req.id}
+                      className="hover:bg-slate-50 transition cursor-pointer"
+                      onClick={() => navigate(`/service-requests/${req.id}`)}
+                    >
+                      <td className="px-4 py-3 font-semibold text-gray-800">
+                        {req.title}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-600">
+                        {req.apartment?.apartment_code ?? '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border ${PRIORITY_COLORS[req.priority] || 'bg-slate-50 text-slate-700 border-slate-200'}`}>
+                          {PRIORITY_LABELS[req.priority] || req.priority}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">
+                        {format(parseISO(req.created_at), 'dd/MM/yyyy HH:mm')}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold border ${STATUS_COLORS[req.status] || 'bg-slate-50 text-slate-700 border-slate-200'}`}>
+                          {STATUS_LABELS[req.status] || req.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Bảng 2 — Chi phí vận hành gần đây */}
+        <div className="card bg-white overflow-hidden xl:col-span-1">
+          <div className="px-5 py-4 border-b border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <DollarSign size={18} className="text-rose-500" />
+              <h2 className="text-sm font-bold text-gray-900">Chi phí vận hành gần đây</h2>
+            </div>
+            <button
+              onClick={() => navigate('/expenses')}
+              className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
+            >
+              Xem tất cả →
+            </button>
+          </div>
+
+          {loadingStats ? (
+            <TableSkeleton />
+          ) : !stats?.recentExpenses || stats.recentExpenses.length === 0 ? (
+            <div className="py-10 text-center text-sm text-gray-400">
+              Không có khoản chi phí nào gần đây
+            </div>
+          ) : (
+            <div className="p-4 space-y-3">
+              {stats.recentExpenses.map((exp) => (
+                <div
+                  key={exp.id}
+                  className="flex justify-between items-start p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                  onClick={() => navigate('/expenses')}
+                >
+                  <div className="space-y-1">
+                    <p className="font-bold text-slate-800 text-xs">{exp.title}</p>
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                      <span className="bg-slate-200 text-slate-700 px-1.5 py-0.2 rounded font-mono font-medium">{exp.building?.code}</span>
+                      <span>•</span>
+                      <span>{EXPENSE_CATEGORY_LABELS[exp.category] || exp.category}</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-rose-600 text-xs">-{formatCurrency(exp.amount)}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{format(parseISO(exp.expense_date), 'dd/MM/yyyy')}</p>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
