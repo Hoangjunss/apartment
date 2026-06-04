@@ -7,6 +7,9 @@
     "@my/auth-backend": "workspace:*",
     "@my/prisma": "workspace:*",
     "@my/notifications-backend": "workspace:*",
+    "@my/events": "workspace:*",
+    "@my/workflow-backend": "workspace:*",
+    "@my/policy-backend": "workspace:*",
     "express": "^4.19.2"
   }
 }

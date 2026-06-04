@@ -10,6 +10,7 @@ export function CreateServiceRequestForm({ onClose }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [apartmentId, setApartmentId] = useState('');
+  const [scheduledStartDate, setScheduledStartDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   const { data: aptsData } = useQuery({
     queryKey: ['apartments', 'simple'],
@@ -36,6 +37,7 @@ export function CreateServiceRequestForm({ onClose }) {
       title: title.trim(),
       description: description.trim(),
       apartment_id: apartmentId || null,
+      scheduled_start_date: scheduledStartDate,
     });
   };
 
@@ -67,6 +69,17 @@ export function CreateServiceRequestForm({ onClose }) {
               </option>
             ))}
           </select>
+        </div>
+        
+        <div>
+          <label className="form-label">Ngày dự kiến bắt đầu <span className="text-red-500">*</span></label>
+          <input
+            type="date"
+            className="form-input"
+            value={scheduledStartDate}
+            onChange={e => setScheduledStartDate(e.target.value)}
+            required
+          />
         </div>
 
         <div>

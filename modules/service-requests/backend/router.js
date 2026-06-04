@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requireRole } from '@my/auth-backend';
 import * as ctrl from './controller.js';
+import { checkPolicy } from '@my/policy-backend';
 
 const router = Router();
 
@@ -15,17 +16,15 @@ router.get('/', authenticate, requireRole(MGT_ROLES), ctrl.getAll);
 router.get('/my', authenticate, ctrl.getMy);
 
 // Chi tiết 1 yêu cầu — tất cả role
-router.get('/:id', authenticate, requireRole(ALL_ROLES), ctrl.getById);
+router.get('/:id', authenticate, requireRole(ALL_ROLES), checkPolicy('ServiceRequest', 'read'), ctrl.getById);
 
 // Tạo yêu cầu mới — ADMIN/MANAGER/RECEPTIONIST
 router.post('/', authenticate, requireRole(CREATOR_ROLES), ctrl.create);
 
 // Assign cho kỹ thuật viên — ADMIN/MANAGER
-router.patch('/:id/assign', authenticate, requireRole(MGT_ROLES), ctrl.assign);
+router.patch('/:id/assign', authenticate, requireRole(MGT_ROLES), checkPolicy('ServiceRequest', 'update'), ctrl.assign);
 
-// Cập nhật status:
-// - ADMIN/MANAGER: update bất kỳ
-// - TECHNICIAN: chỉ update việc được giao cho mình (kiểm tra trong controller)
-router.patch('/:id/status', authenticate, requireRole(ALL_ROLES), ctrl.updateStatus);
+// Cập nhật status
+router.patch('/:id/status', authenticate, requireRole(ALL_ROLES), checkPolicy('ServiceRequest', 'update'), ctrl.updateStatus);
 
 export default router;

@@ -2,7 +2,7 @@ import * as service from './service.js';
 
 export const getAll = async (req, res) => {
   try {
-    const data = await service.getAll(req.query);
+    const data = await service.getAll(req.query, req.user);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -11,7 +11,7 @@ export const getAll = async (req, res) => {
 
 export const getMy = async (req, res) => {
   try {
-    const data = await service.getMy(req.user.userId, req.user.role);
+    const data = await service.getMy(req.user.userId, req.user.role, req.user);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -30,7 +30,7 @@ export const getById = async (req, res) => {
 
 export const create = async (req, res) => {
   try {
-    const data = await service.create(req.body, req.user.userId);
+    const data = await service.create(req.body, req.user.userId, req.user);
     res.status(201).json({ success: true, data });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
@@ -41,7 +41,7 @@ export const assign = async (req, res) => {
   try {
     const { assigned_to } = req.body;
     if (!assigned_to) return res.status(400).json({ success: false, message: 'Thiếu assigned_to' });
-    const data = await service.assign(Number(req.params.id), Number(assigned_to));
+    const data = await service.assign(Number(req.params.id), Number(assigned_to), req.user.userId);
     res.json({ success: true, data });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
