@@ -41,6 +41,8 @@ model Users {
   attachments         Attachments[]            @relation("UserAttachments")
   credit_transactions CreditTransactions[]     @relation("CreditTxRecorder")
   expense_creations   BuildingExpenses[]       @relation("ExpenseCreator")
+  building_assignments BuildingAssignments[]    @relation("UserAssignments")
+  assigned_others      BuildingAssignments[]    @relation("AssignerAssignments")
 }
 
 // ─── BUILDING & APARTMENT ────────────────────────────────
@@ -57,6 +59,7 @@ model Buildings {
 
   floors Floors[]
   expenses BuildingExpenses[]
+  assignments BuildingAssignments[]
 }
 
 model Floors {
@@ -232,6 +235,9 @@ model Contracts {
   @@index([apartment_id])
   @@index([status])
   @@index([end_date])
+  @@index([status, end_date])
+  @@index([apartment_id, status])
+  @@index([tenant_id, status])
 }
 
 model ContractRenewals {
@@ -375,6 +381,7 @@ model Invoices {
   @@unique([contract_id, billing_month])
   @@index([status])
   @@index([due_date])
+  @@index([status, due_date])
 }
 
 enum PaymentMethod {
@@ -442,6 +449,7 @@ model ServiceRequests {
   requester_phone String?              @db.VarChar(20)
   assigned_to     Int?
   resolved_at     DateTime?
+  scheduled_start_date DateTime?             @db.Date
   created_at      DateTime             @default(now())
   updated_at      DateTime             @updatedAt
 
@@ -612,7 +620,6 @@ model BuildingExpenses {
   expense_date DateTime        @db.Date
   status       ExpenseStatus   @default(PENDING)
   description  String?         @db.Text
-  receipt_url  String?         @db.VarChar(512)
   created_by   Int
   created_at   DateTime        @default(now())
   updated_at   DateTime        @updatedAt
@@ -624,5 +631,91 @@ model BuildingExpenses {
   @@index([building_id])
   @@index([status])
   @@index([expense_date])
+}
+
+// ─── SENIOR LEVEL WORKFLOW, RULES & POLICIES ──────────────
+
+model Workflows {
+  id          Int                  @id @default(autoincrement())
+  name        String               @unique @db.VarChar(100)
+  description String?              @db.Text
+  created_at  DateTime             @default(now())
+  updated_at  DateTime             @updatedAt
+
+  steps       WorkflowSteps[]
+  transitions WorkflowTransitions[]
+}
+
+model WorkflowSteps {
+  id           Int      @id @default(autoincrement())
+  workflow_id  Int
+  step_name    String   @db.VarChar(50)
+  order_number Int
+  is_initial   Boolean  @default(false)
+  is_final     Boolean  @default(false)
+
+  workflow     Workflows @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
+  
+  transitions_from WorkflowTransitions[] @relation("FromStep")
+  transitions_to   WorkflowTransitions[] @relation("ToStep")
+
+  @@unique([workflow_id, step_name])
+}
+
+model WorkflowTransitions {
+  id           Int      @id @default(autoincrement())
+  workflow_id  Int
+  from_step_id Int
+  to_step_id   Int
+  name         String?  @db.VarChar(100)
+  role_allowed String?  @db.VarChar(100)
+
+  workflow     Workflows     @relation(fields: [workflow_id], references: [id], onDelete: Cascade)
+  from_step    WorkflowSteps @relation("FromStep", fields: [from_step_id], references: [id], onDelete: Cascade)
+  to_step      WorkflowSteps @relation("ToStep", fields: [to_step_id], references: [id], onDelete: Cascade)
+
+  @@index([workflow_id])
+}
+
+model BusinessRules {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique @db.VarChar(100)
+  entity      String   @db.VarChar(50)
+  condition   Json
+  action      String   @db.VarChar(50)
+  action_data Json?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+}
+
+model BuildingAssignments {
+  id          Int       @id @default(autoincrement())
+  user_id     Int
+  building_id Int
+  assigned_at DateTime  @default(now())
+  assigned_by Int
+  revoked_at  DateTime?
+
+  user        Users     @relation("UserAssignments", fields: [user_id], references: [id], onDelete: Cascade)
+  building    Buildings @relation(fields: [building_id], references: [id], onDelete: Cascade)
+  assigner    Users     @relation("AssignerAssignments", fields: [assigned_by], references: [id])
+
+  @@unique([user_id, building_id])
+  @@index([user_id])
+  @@index([building_id])
+}
+
+model Timeline {
+  id            Int      @id @default(autoincrement())
+  entity_type   String   @db.VarChar(50)
+  entity_id     Int
+  title         String   @db.VarChar(200)
+  description   String?  @db.Text
+  actor_id      Int?
+  actor_name    String?  @db.VarChar(100)
+  created_at    DateTime @default(now())
+
+  @@index([entity_type, entity_id])
 }
 

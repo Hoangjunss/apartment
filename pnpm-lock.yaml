@@ -26,6 +26,9 @@ importers:
       '@my/building-backend':
         specifier: workspace:*
         version: link:../../modules/building/backend
+      '@my/calendar-backend':
+        specifier: workspace:*
+        version: link:../../modules/calendar/backend
       '@my/comments-backend':
         specifier: workspace:*
         version: link:../../modules/comments/backend
@@ -41,12 +44,18 @@ importers:
       '@my/notifications-backend':
         specifier: workspace:*
         version: link:../../modules/notifications/backend
+      '@my/policy-backend':
+        specifier: workspace:*
+        version: link:../../modules/policy/backend
       '@my/public-backend':
         specifier: workspace:*
         version: link:../../modules/public/backend
       '@my/report-backend':
         specifier: workspace:*
         version: link:../../modules/report/backend
+      '@my/rules-backend':
+        specifier: workspace:*
+        version: link:../../modules/rules/backend
       '@my/search-backend':
         specifier: workspace:*
         version: link:../../modules/search/backend
@@ -56,6 +65,9 @@ importers:
       '@my/tenant-backend':
         specifier: workspace:*
         version: link:../../modules/tenant/backend
+      '@my/workflow-backend':
+        specifier: workspace:*
+        version: link:../../modules/workflow/backend
       cors:
         specifier: ^2.8.6
         version: 2.8.6
@@ -80,6 +92,9 @@ importers:
       '@my/building-frontend':
         specifier: workspace:*
         version: link:../../modules/building/frontend
+      '@my/calendar-frontend':
+        specifier: workspace:*
+        version: link:../../modules/calendar/frontend
       '@my/contract-frontend':
         specifier: workspace:*
         version: link:../../modules/contract/frontend
@@ -174,6 +189,9 @@ importers:
       '@my/auth-backend':
         specifier: workspace:*
         version: link:../../auth/backend
+      '@my/events':
+        specifier: workspace:*
+        version: link:../../../packages/events
       '@my/prisma':
         specifier: workspace:*
         version: link:../../../packages/prisma
@@ -244,6 +262,9 @@ importers:
       '@my/auth-backend':
         specifier: workspace:*
         version: link:../../auth/backend
+      '@my/policy-backend':
+        specifier: workspace:*
+        version: link:../../policy/backend
       '@my/prisma':
         specifier: workspace:*
         version: link:../../../packages/prisma
@@ -284,6 +305,36 @@ importers:
         specifier: ^3.22.0
         version: 3.25.76
 
+  modules/calendar/backend:
+    dependencies:
+      '@my/auth-backend':
+        specifier: workspace:*
+        version: link:../../auth/backend
+      '@my/prisma':
+        specifier: workspace:*
+        version: link:../../../packages/prisma
+      express:
+        specifier: ^4.19.2
+        version: 4.22.2
+
+  modules/calendar/frontend:
+    dependencies:
+      '@tanstack/react-query':
+        specifier: ^5.17.0
+        version: 5.100.14(react@18.3.1)
+      date-fns:
+        specifier: ^3.3.0
+        version: 3.6.0
+      lucide-react:
+        specifier: ^0.309.0
+        version: 0.309.0(react@18.3.1)
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-router-dom:
+        specifier: ^6.22.0
+        version: 6.30.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+
   modules/comments/backend:
     dependencies:
       '@my/auth-backend':
@@ -304,12 +355,21 @@ importers:
       '@my/auth-backend':
         specifier: workspace:*
         version: link:../../auth/backend
+      '@my/events':
+        specifier: workspace:*
+        version: link:../../../packages/events
       '@my/notifications-backend':
         specifier: workspace:*
         version: link:../../notifications/backend
+      '@my/policy-backend':
+        specifier: workspace:*
+        version: link:../../policy/backend
       '@my/prisma':
         specifier: workspace:*
         version: link:../../../packages/prisma
+      '@my/workflow-backend':
+        specifier: workspace:*
+        version: link:../../workflow/backend
       express:
         specifier: ^4.19.2
         version: 4.22.2
@@ -394,9 +454,15 @@ importers:
       '@my/auth-backend':
         specifier: workspace:*
         version: link:../../auth/backend
+      '@my/events':
+        specifier: workspace:*
+        version: link:../../../packages/events
       '@my/notifications-backend':
         specifier: workspace:*
         version: link:../../notifications/backend
+      '@my/policy-backend':
+        specifier: workspace:*
+        version: link:../../policy/backend
       '@my/prisma':
         specifier: workspace:*
         version: link:../../../packages/prisma
@@ -441,6 +507,24 @@ importers:
         version: 3.25.76
 
   modules/notifications/backend:
+    dependencies:
+      '@my/auth-backend':
+        specifier: workspace:*
+        version: link:../../auth/backend
+      '@my/events':
+        specifier: workspace:*
+        version: link:../../../packages/events
+      '@my/prisma':
+        specifier: workspace:*
+        version: link:../../../packages/prisma
+      express:
+        specifier: ^4.19.2
+        version: 4.22.2
+      node-cron:
+        specifier: ^3.0.3
+        version: 3.0.3
+
+  modules/policy/backend:
     dependencies:
       '@my/auth-backend':
         specifier: workspace:*
@@ -494,6 +578,24 @@ importers:
         specifier: ^3.8.1
         version: 3.8.1(react-dom@18.3.1(react@18.3.1))(react-is@19.2.6)(react@18.3.1)(redux@5.0.1)
 
+  modules/rules/backend:
+    dependencies:
+      '@my/auth-backend':
+        specifier: workspace:*
+        version: link:../../auth/backend
+      '@my/notifications-backend':
+        specifier: workspace:*
+        version: link:../../notifications/backend
+      '@my/prisma':
+        specifier: workspace:*
+        version: link:../../../packages/prisma
+      express:
+        specifier: ^4.19.2
+        version: 4.22.2
+      node-cron:
+        specifier: ^3.0.3
+        version: 3.0.3
+
   modules/search/backend:
     dependencies:
       '@my/auth-backend':
@@ -511,12 +613,21 @@ importers:
       '@my/auth-backend':
         specifier: workspace:*
         version: link:../../auth/backend
+      '@my/events':
+        specifier: workspace:*
+        version: link:../../../packages/events
       '@my/notifications-backend':
         specifier: workspace:*
         version: link:../../notifications/backend
+      '@my/policy-backend':
+        specifier: workspace:*
+        version: link:../../policy/backend
       '@my/prisma':
         specifier: workspace:*
         version: link:../../../packages/prisma
+      '@my/workflow-backend':
+        specifier: workspace:*
+        version: link:../../workflow/backend
       express:
         specifier: ^4.19.2
         version: 4.22.2
@@ -565,6 +676,20 @@ importers:
       zod:
         specifier: ^3.22.0
         version: 3.25.76
+
+  modules/workflow/backend:
+    dependencies:
+      '@my/auth-backend':
+        specifier: workspace:*
+        version: link:../../auth/backend
+      '@my/prisma':
+        specifier: workspace:*
+        version: link:../../../packages/prisma
+      express:
+        specifier: ^4.19.2
+        version: 4.22.2
+
+  packages/events: {}
 
   packages/prisma:
     dependencies:
