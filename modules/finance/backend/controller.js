@@ -69,7 +69,7 @@ export const getInvoices = async (req, res) => {
       contract_id: contract_id ? +contract_id : undefined,
       billing_month,
       apartment_id: apartment_id ? +apartment_id : undefined
-    });
+    }, req.user);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

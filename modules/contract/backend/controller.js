@@ -25,7 +25,7 @@ export const getContracts = async (req, res) => {
       tenant_id: tenant_id ? +tenant_id : undefined,
       building_id: building_id ? +building_id : undefined,
       month,
-    });
+    }, req.user);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -49,7 +49,7 @@ export const createContract = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đủ thông tin bắt buộc' });
     }
 
-    const data = await service.createContract(req.body, req.user.userId);
+    const data = await service.createContract(req.body, req.user.userId, req.user);
     res.status(201).json({ success: true, data, message: 'Tạo hợp đồng thành công' });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });
@@ -69,7 +69,7 @@ export const updateContract = async (req, res) => {
 export const terminateContract = async (req, res) => {
   try {
     const { termination_reason } = req.body;
-    const data = await service.terminateContract(+req.params.id, termination_reason, req.user.userId);
+    const data = await service.terminateContract(+req.params.id, termination_reason, req.user.userId, req.user.role);
     res.json({ success: true, data, message: 'Chấm dứt hợp đồng thành công' });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });
@@ -83,7 +83,7 @@ export const renewContract = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp new_end_date' });
     }
 
-    const data = await service.renewContract(+req.params.id, req.body, req.user.userId);
+    const data = await service.renewContract(+req.params.id, req.body, req.user.userId, req.user.role);
     res.json({ success: true, data, message: 'Gia hạn hợp đồng thành công' });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });

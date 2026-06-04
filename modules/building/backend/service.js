@@ -1,12 +1,13 @@
 import { prisma } from '@my/prisma';
 import { createLog } from '@my/audit-log-backend';
+import { applyBuildingScope } from '@my/policy-backend';
 
 // ==========================================
 // BUILDINGS
 // ==========================================
 
-export const getBuildings = async ({ page = 1, limit = 20, search }) => {
-  const where = search
+export const getBuildings = async ({ page = 1, limit = 20, search } = {}, currentUser) => {
+  let where = search
     ? {
         OR: [
           { name: { contains: search } },
@@ -14,6 +15,8 @@ export const getBuildings = async ({ page = 1, limit = 20, search }) => {
         ],
       }
     : {};
+
+  where = await applyBuildingScope(currentUser, where, 'Building');
 
   const [items, total] = await Promise.all([
     prisma.buildings.findMany({
@@ -104,8 +107,8 @@ export const bulkCreateFloors = async (buildingId, fromFloor, toFloor) => {
 // APARTMENTS
 // ==========================================
 
-export const getApartments = async ({ page = 1, limit = 20, status, building_id, floor_id, room_type }) => {
-  const where = {};
+export const getApartments = async ({ page = 1, limit = 20, status, building_id, floor_id, room_type } = {}, currentUser) => {
+  let where = {};
   
   if (status) where.status = status;
   if (room_type) where.room_type = room_type;
@@ -114,6 +117,8 @@ export const getApartments = async ({ page = 1, limit = 20, status, building_id,
   } else if (building_id) {
     where.floor = { building_id: building_id };
   }
+
+  where = await applyBuildingScope(currentUser, where, 'Apartment');
 
   const [items, total] = await Promise.all([
     prisma.apartments.findMany({

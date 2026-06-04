@@ -73,6 +73,7 @@ export const getDashboardStats = async (role, userId) => {
     rentingApartments,
     activeContractsCount,
     activeContracts,
+    totalBuildings,
   ] = await Promise.all([
     prisma.apartments.count(),
     prisma.apartments.count({ where: { status: 'AVAILABLE' } }),
@@ -81,7 +82,8 @@ export const getDashboardStats = async (role, userId) => {
     prisma.contracts.findMany({
       where: { status: 'ACTIVE' },
       select: { id: true, tenant_id: true, end_date: true }
-    })
+    }),
+    prisma.buildings.count({ where: { deleted_at: null } })
   ]);
 
   const tenantIds = new Set(activeContracts.map(c => c.tenant_id));
@@ -134,6 +136,7 @@ export const getDashboardStats = async (role, userId) => {
     emptyApartments,
     rentingApartments,
     totalApartments,
+    totalBuildings,
     activeContracts: activeContractsCount,
     activeTenants,
     expiringContracts,

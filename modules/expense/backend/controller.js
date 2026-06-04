@@ -48,7 +48,7 @@ export const getExpensesSummary = async (req, res) => {
 
 export const createExpense = async (req, res) => {
   try {
-    const { building_id, category, title, amount, expense_date, status, description, receipt_url } = req.body;
+    const { building_id, category, title, amount, expense_date, status, description } = req.body;
     if (!building_id || !category || !title || amount === undefined || !expense_date) {
       return res.status(400).json({ success: false, message: 'Vui lòng điền đầy đủ thông tin bắt buộc' });
     }

@@ -1,5 +1,7 @@
 import { prisma } from '@my/prisma';
-import { createLog } from '@my/audit-log-backend/service';
+import eventHub from '@my/events';
+import { validateTransition } from '@my/workflow-backend';
+import { applyBuildingScope, getAssignedBuildingIds } from '@my/policy-backend';
 
 
 // Helper: Sinh mã hợp đồng
@@ -17,8 +19,8 @@ const generateContractCode = async () => {
   return `HD${year}-${String(seq).padStart(4, '0')}`;
 };
 
-export const getContracts = async ({ page = 1, limit = 20, status, apartment_id, tenant_id, building_id, month }) => {
-  const where = {};
+export const getContracts = async ({ page = 1, limit = 20, status, apartment_id, tenant_id, building_id, month }, currentUser) => {
+  let where = {};
   if (status) where.status = status;
   if (apartment_id) where.apartment_id = apartment_id;
   if (tenant_id) where.tenant_id = tenant_id;
@@ -41,6 +43,9 @@ export const getContracts = async ({ page = 1, limit = 20, status, apartment_id,
     where.start_date = { lte: endOfMonth };
     where.end_date = { gte: startOfMonth };
   }
+
+  // Áp dụng Building Scope dựa trên phân quyền người dùng
+  where = await applyBuildingScope(currentUser, where, 'Contract');
 
   const [items, total] = await Promise.all([
     prisma.contracts.findMany({
@@ -72,7 +77,7 @@ export const getContractById = async (id) => {
   });
 };
 
-export const createContract = async (data, userId) => {
+export const createContract = async (data, userId, currentUser) => {
   const startDate = new Date(data.start_date);
   const endDate = new Date(data.end_date);
 
@@ -85,8 +90,19 @@ export const createContract = async (data, userId) => {
   }
 
   // 1. Kiểm tra trạng thái căn hộ
-  const apartment = await prisma.apartments.findUnique({ where: { id: data.apartment_id } });
+  const apartment = await prisma.apartments.findUnique({
+    where: { id: data.apartment_id },
+    include: { floor: true }
+  });
   if (!apartment) throw new Error('Không tìm thấy căn hộ');
+
+  // Check policy gán tòa nhà đối với role MANAGER/TECHNICIAN/RECEPTIONIST
+  if (currentUser && currentUser.role !== 'ADMIN') {
+    const assignedIds = await getAssignedBuildingIds(currentUser.userId);
+    if (!assignedIds.includes(apartment.floor.building_id)) {
+      throw new Error(`Bạn không có quyền quản lý tòa nhà chứa căn hộ này (Tòa nhà #${apartment.floor.building_id})`);
+    }
+  }
   
   if (!['AVAILABLE', 'RESERVED'].includes(apartment.status)) {
     throw new Error(`Không thể ký hợp đồng, căn hộ đang ở trạng thái ${apartment.status}`);
@@ -151,13 +167,10 @@ export const createContract = async (data, userId) => {
     }),
   ]);
 
-  await createLog({
+  eventHub.emit('contract.created', {
     actorId: userId,
-    actorName: '',
-    action: 'CREATE',
-    resourceType: 'Contract',
-    resourceId: newContract.id,
-    newData: { contract_code: contractCode, tenant_id: data.tenant_id, apartment_id: data.apartment_id },
+    entityId: newContract.id,
+    data: { contract_code: contractCode, tenant_id: data.tenant_id, apartment_id: data.apartment_id, start_date: startDate },
   });
 
   return newContract;
@@ -194,28 +207,22 @@ export const updateContract = async (id, data, actor) => {
         newData[key] = updated[key];
       }
     }
-    await createLog({
+    eventHub.emit('contract.updated', {
       actorId: actor.userId,
-      actorName: actor.full_name,
-      action: 'UPDATE',
-      resourceType: 'Contract',
-      resourceId: id,
-      oldData,
-      newData,
-      ipAddress: actor.ipAddress,
+      entityId: id,
+      data: { oldData, newData }
     });
   }
 
   return updated;
 };
 
-export const terminateContract = async (id, termination_reason, userId) => {
+export const terminateContract = async (id, termination_reason, userId, userRole) => {
   const contract = await prisma.contracts.findUnique({ where: { id } });
   if (!contract) throw new Error('Không tìm thấy hợp đồng');
   
-  if (contract.status === 'TERMINATED' || contract.status === 'EXPIRED') {
-    throw new Error(`Hợp đồng đã ở trạng thái ${contract.status}, không thể chấm dứt`);
-  }
+  // Xác thực transition trạng thái qua Workflow Engine
+  await validateTransition('ContractWorkflow', contract.status, 'TERMINATED', userRole);
 
   const [terminatedContract] = await prisma.$transaction([
     prisma.contracts.update({
@@ -237,26 +244,24 @@ export const terminateContract = async (id, termination_reason, userId) => {
     }),
   ]);
 
-  await createLog({
+  eventHub.emit('contract.terminated', {
     actorId: userId,
-    actorName: '',
-    action: 'DELETE',
-    resourceType: 'Contract',
-    resourceId: id,
-    oldData: { status: contract.status, contract_code: contract.contract_code },
-    newData: { status: 'TERMINATED', termination_reason },
+    entityId: id,
+    data: {
+      oldData: { status: contract.status, contract_code: contract.contract_code },
+      newData: { status: 'TERMINATED', termination_reason }
+    }
   });
 
   return terminatedContract;
 };
 
-export const renewContract = async (id, data, userId) => {
+export const renewContract = async (id, data, userId, userRole) => {
   const contract = await prisma.contracts.findUnique({ where: { id } });
   if (!contract) throw new Error('Không tìm thấy hợp đồng');
 
-  if (!['ACTIVE', 'EXPIRING_SOON'].includes(contract.status)) {
-    throw new Error('Chỉ được gia hạn hợp đồng đang ở trạng thái ACTIVE hoặc EXPIRING_SOON');
-  }
+  // Xác thực transition trạng thái qua Workflow Engine
+  await validateTransition('ContractWorkflow', contract.status, 'ACTIVE', userRole);
 
   const newEndDate = new Date(data.new_end_date);
   if (newEndDate <= contract.end_date) {
@@ -284,23 +289,23 @@ export const renewContract = async (id, data, userId) => {
     }),
   ]);
 
-  await createLog({
+  eventHub.emit('contract.renewed', {
     actorId: userId,
-    actorName: '',
-    action: 'UPDATE',
-    resourceType: 'Contract',
-    resourceId: id,
-    oldData: {
-      end_date: contract.end_date ? new Date(contract.end_date).toISOString().split('T')[0] : null,
-      monthly_rent: contract.monthly_rent,
-      status: contract.status,
-    },
-    newData: {
-      end_date: newEndDate.toISOString().split('T')[0],
-      monthly_rent: data.new_monthly_rent ?? contract.monthly_rent,
-      status: 'ACTIVE',
-      reason: 'Gia hạn hợp đồng',
-    },
+    entityId: id,
+    data: {
+      oldData: {
+        end_date: contract.end_date ? new Date(contract.end_date).toISOString().split('T')[0] : null,
+        monthly_rent: contract.monthly_rent,
+        status: contract.status,
+      },
+      newData: {
+        end_date: newEndDate.toISOString().split('T')[0],
+        monthly_rent: data.new_monthly_rent ?? contract.monthly_rent,
+        status: 'ACTIVE',
+      },
+      new_end_date: newEndDate,
+      new_monthly_rent: data.new_monthly_rent ?? contract.monthly_rent
+    }
   });
 
   return renewedContract;

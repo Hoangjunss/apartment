@@ -266,3 +266,60 @@ export const getAllRegistrations = async ({ page = 1, limit = 20, month, year })
 
   return { items, total, page, limit };
 };
+
+export const getTenantPreview = async (id) => {
+  const tenant = await prisma.tenants.findUnique({
+    where: { id },
+    include: {
+      contracts: {
+        orderBy: { start_date: 'desc' },
+        take: 1,
+        include: {
+          apartment: { select: { apartment_code: true } },
+        },
+      },
+    },
+  });
+
+  if (!tenant) return null;
+
+  const latestContract = tenant.contracts[0];
+
+  // Calculate live outstanding debt
+  const tenantContracts = await prisma.contracts.findMany({
+    where: { tenant_id: id },
+    select: { id: true },
+  });
+  const contractIds = tenantContracts.map((c) => c.id);
+
+  let outstandingDebt = 0;
+  if (contractIds.length > 0) {
+    const unpaidInvoices = await prisma.invoices.findMany({
+      where: {
+        contract_id: { in: contractIds },
+        status: { in: ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE'] },
+      },
+      include: {
+        payments: true,
+      },
+    });
+
+    for (const inv of unpaidInvoices) {
+      const totalPaid = inv.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+      const remaining = Number(inv.total_amount) - totalPaid;
+      if (remaining > 0) {
+        outstandingDebt += remaining;
+      }
+    }
+  }
+
+  return {
+    id: tenant.id,
+    full_name: tenant.full_name,
+    phone: tenant.phone,
+    apartment_code: latestContract?.apartment?.apartment_code || null,
+    contract_status: latestContract?.status || null,
+    outstanding_debt: outstandingDebt,
+  };
+};
+

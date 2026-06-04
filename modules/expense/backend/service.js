@@ -25,7 +25,33 @@ export const getExpenses = async ({ page = 1, limit = 20, building_id, category,
     prisma.buildingExpenses.count({ where })
   ]);
 
-  return { items, total, page, limit };
+  // Fetch attachment count for each expense in the list
+  const expenseIds = items.map((item) => item.id);
+  let attachmentCounts = [];
+  if (expenseIds.length > 0) {
+    attachmentCounts = await prisma.attachments.groupBy({
+      by: ['entity_id'],
+      where: {
+        entity_type: 'BuildingExpense',
+        entity_id: { in: expenseIds }
+      },
+      _count: {
+        id: true
+      }
+    });
+  }
+
+  const countsMap = attachmentCounts.reduce((acc, curr) => {
+    acc[curr.entity_id] = curr._count.id;
+    return acc;
+  }, {});
+
+  const itemsWithCounts = items.map((item) => ({
+    ...item,
+    attachment_count: countsMap[item.id] || 0
+  }));
+
+  return { items: itemsWithCounts, total, page, limit };
 };
 
 export const getExpensesSummary = async ({ building_id, year, month }) => {
@@ -59,7 +85,7 @@ export const getExpensesSummary = async ({ building_id, year, month }) => {
 };
 
 export const createExpense = async (data, userId) => {
-  const { building_id, category, title, amount, expense_date, status, description, receipt_url } = data;
+  const { building_id, category, title, amount, expense_date, status, description } = data;
 
   if (Number(amount) <= 0) {
     throw new Error('Số tiền chi phí phải lớn hơn 0');
@@ -74,14 +100,17 @@ export const createExpense = async (data, userId) => {
       expense_date,
       status: status || 'PENDING',
       description,
-      receipt_url,
       created_by: userId
+    },
+    include: {
+      building: { select: { id: true, name: true, code: true } },
+      creator: { select: { id: true, full_name: true } }
     }
   });
 };
 
 export const updateExpense = async (id, data) => {
-  const { building_id, category, title, amount, expense_date, description, receipt_url } = data;
+  const { building_id, category, title, amount, expense_date, description } = data;
 
   if (Number(amount) <= 0) {
     throw new Error('Số tiền chi phí phải lớn hơn 0');
@@ -103,8 +132,11 @@ export const updateExpense = async (id, data) => {
       title,
       amount: Number(amount),
       expense_date,
-      description,
-      receipt_url
+      description
+    },
+    include: {
+      building: { select: { id: true, name: true, code: true } },
+      creator: { select: { id: true, full_name: true } }
     }
   });
 };

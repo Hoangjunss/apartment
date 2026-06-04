@@ -182,6 +182,7 @@ export default function ApartmentDetailPage() {
   const [activeTab, setActiveTab] = useState('furniture');
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const { user } = useAuth();
   const showQR = false; // Tạm ẩn QR code
 
   const { data: apartment, isLoading } = useApartmentById(apartmentId);
@@ -398,9 +399,11 @@ export default function ApartmentDetailPage() {
                   </div>
                 </div>
                 <div className="mt-4">
-                  <Link to={`/contracts/${activeContract.id}`} className="btn-secondary">
-                    Xem hợp đồng →
-                  </Link>
+                  {user?.role !== 'TECHNICIAN' && (
+                    <Link to={`/contracts/${activeContract.id}`} className="btn-secondary">
+                      Xem hợp đồng →
+                    </Link>
+                  )}
                 </div>
               </div>
             ) : (

@@ -1,8 +1,9 @@
 import { prisma } from '@my/prisma';
-import { createNotification } from '@my/notifications-backend/service';
+import eventHub from '@my/events';
 import { WATER_PRICE_PER_PERSON } from './constants.js';
 import { calculateWaterCost } from './utils.js';
 import xlsx from 'xlsx';
+import { applyBuildingScope } from '@my/policy-backend';
 
 // ==========================================
 // UTILITY READINGS (ĐIỆN NƯỚC)
@@ -117,12 +118,14 @@ export const recordUtilityReading = async (data, userId) => {
 // INVOICES (HÓA ĐƠN)
 // ==========================================
 
-export const getInvoices = async ({ page = 1, limit = 20, status, contract_id, billing_month, apartment_id }) => {
-  const where = {};
+export const getInvoices = async ({ page = 1, limit = 20, status, contract_id, billing_month, apartment_id }, currentUser) => {
+  let where = {};
   if (status) where.status = status;
   if (contract_id) where.contract_id = contract_id;
   if (billing_month) where.billing_month = billing_month;
   if (apartment_id) where.apartment_id = apartment_id;
+
+  where = await applyBuildingScope(currentUser, where, 'Invoice');
 
   const [items, total] = await Promise.all([
     prisma.invoices.findMany({
@@ -285,7 +288,7 @@ export const generateInvoice = async (data, userId) => {
 
   const other = Number(other_amount);
 
-  return prisma.$transaction(async (tx) => {
+  const newInvoice = await prisma.$transaction(async (tx) => {
     // 1. Quét nợ cũ (Debt Rollover)
     const unpaidInvoices = await tx.invoices.findMany({
       where: {
@@ -358,7 +361,7 @@ export const generateInvoice = async (data, userId) => {
     }
 
     // Create invoice
-    const newInvoice = await tx.invoices.create({
+    const newInvoiceRecord = await tx.invoices.create({
       data: {
         invoice_code,
         contract_id,
@@ -389,7 +392,7 @@ export const generateInvoice = async (data, userId) => {
       await tx.creditTransactions.create({
         data: {
           contract_id,
-          invoice_id: newInvoice.id,
+          invoice_id: newInvoiceRecord.id,
           type: 'CREDIT_APPLY',
           amount: credit_applied,
           description: `Khấu trừ tự động tiền dư vào hóa đơn tháng ${billing_month} (Số tiền: ${credit_applied.toLocaleString('vi-VN')} đ)`,
@@ -398,8 +401,20 @@ export const generateInvoice = async (data, userId) => {
       });
     }
 
-    return newInvoice;
+    return newInvoiceRecord;
   });
+
+  eventHub.emit('invoice.created', {
+    actorId: userId,
+    entityId: newInvoice.id,
+    data: {
+      invoice_code: newInvoice.invoice_code,
+      billing_month: newInvoice.billing_month,
+      total_amount: newInvoice.total_amount
+    }
+  });
+
+  return newInvoice;
 };
 
 export const updateInvoiceStatus = async (id, status) => {
@@ -526,35 +541,23 @@ export const recordPayment = async (data, userId) => {
     return { paymentRecord, creditSurplus };
   });
 
-  // Gửi thông báo tới Admin và Manager
-  (async () => {
-    try {
-      const managers = await prisma.users.findMany({
-        where: { role: { in: ['ADMIN', 'MANAGER'] }, is_active: true },
-        select: { id: true }
-      });
-      
-      const invoice = await prisma.invoices.findUnique({
-        where: { id: invoice_id },
-        include: { apartment: { select: { apartment_code: true } } }
-      });
+  // Phát sự kiện invoice.paid qua EventHub
+  const invoiceAfterPayment = await prisma.invoices.findUnique({
+    where: { id: invoice_id }
+  });
 
-      const aptCode = invoice?.apartment?.apartment_code ?? '';
-
-      for (const manager of managers) {
-        await createNotification({
-          userId: manager.id,
-          title: 'Đã nhận thanh toán',
-          message: `Căn hộ ${aptCode}: Nhận thanh toán ${Number(amount).toLocaleString('vi-VN')} đ cho hóa đơn ${invoice?.invoice_code}.`,
-          type: 'PAYMENT_RECEIVED',
-          entityType: 'Invoice',
-          entityId: invoice_id
-        });
-      }
-    } catch (err) {
-      console.error('[Notification] Failed to send payment notification:', err.message);
+  eventHub.emit('invoice.paid', {
+    actorId: userId,
+    entityId: invoice_id,
+    data: {
+      invoiceCode: invoiceAfterPayment?.invoice_code,
+      billingMonth: invoiceAfterPayment?.billing_month,
+      paymentAmount: paymentRecord.amount,
+      paymentMethod: payment_method,
+      newStatus: invoiceAfterPayment?.status,
+      contractId: invoiceAfterPayment?.contract_id
     }
-  })();
+  });
 
   return paymentRecord;
 };
