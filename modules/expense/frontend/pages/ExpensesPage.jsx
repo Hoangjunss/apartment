@@ -15,6 +15,7 @@ import {
   useUpdateExpenseStatus,
   useDeleteExpense
 } from '../hooks/useExpense.js';
+import { useActiveBuilding } from '@/contexts/BuildingContext.jsx';
 
 const formatCurrency = (v) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(v));
@@ -47,9 +48,9 @@ export function ExpenseCategoryBadge({ category }) {
 
 export default function ExpensesPage() {
   const { user } = useAuth();
+  const { selectedBuildingId, setSelectedBuildingId } = useActiveBuilding();
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({
-    building_id: '',
     category: '',
     status: '',
     start_date: '',
@@ -82,7 +83,7 @@ export default function ExpensesPage() {
   const params = {
     page,
     limit: 20,
-    building_id: filters.building_id ? Number(filters.building_id) : undefined,
+    building_id: selectedBuildingId !== 'all' ? Number(selectedBuildingId) : undefined,
     category: filters.category || undefined,
     status: filters.status || undefined,
     start_date: filters.start_date || undefined,
@@ -95,7 +96,7 @@ export default function ExpensesPage() {
   const total = data?.total ?? 0;
 
   const { data: summary } = useExpensesSummary({
-    building_id: filters.building_id ? Number(filters.building_id) : undefined
+    building_id: selectedBuildingId !== 'all' ? Number(selectedBuildingId) : undefined
   });
 
   // Reset page when filters change
@@ -247,12 +248,12 @@ export default function ExpensesPage() {
 
   const handleClearFilters = () => {
     setFilters({
-      building_id: '',
       category: '',
       status: '',
       start_date: '',
       end_date: ''
     });
+    setSelectedBuildingId('all');
   };
 
   const columns = [
@@ -406,7 +407,7 @@ export default function ExpensesPage() {
             <Clock size={16} className="text-slate-400" />
             Bộ lọc nâng cao
           </h4>
-          {(filters.building_id || filters.category || filters.status || filters.start_date || filters.end_date) && (
+          {(selectedBuildingId !== 'all' || filters.category || filters.status || filters.start_date || filters.end_date) && (
             <button
               onClick={handleClearFilters}
               className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold flex items-center gap-1"
@@ -420,12 +421,14 @@ export default function ExpensesPage() {
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1.5">Tòa nhà</label>
             <select
-              value={filters.building_id}
-              onChange={(e) => handleFilterChange('building_id', e.target.value)}
+              value={selectedBuildingId}
+              onChange={(e) => {
+                setSelectedBuildingId(e.target.value || 'all');
+              }}
               className="input w-full text-xs"
               id="filter-building-select"
             >
-              <option value="">Tất cả tòa nhà</option>
+              <option value="all">Tất cả tòa nhà</option>
               {buildings.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}

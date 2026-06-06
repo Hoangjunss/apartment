@@ -685,6 +685,9 @@ importers:
       '@my/auth-backend':
         specifier: workspace:*
         version: link:../../auth/backend
+      '@my/policy-backend':
+        specifier: workspace:*
+        version: link:../../policy/backend
       '@my/prisma':
         specifier: workspace:*
         version: link:../../../packages/prisma

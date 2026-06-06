@@ -14,7 +14,7 @@ const getErrorStatus = (message) => {
 export const getBuildings = async (req, res) => {
   try {
     const { page = 1, limit = 20, search } = req.query;
-    const data = await service.getBuildings({ page: +page, limit: +limit, search });
+    const data = await service.getBuildings({ page: +page, limit: +limit, search }, req.user);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -89,7 +89,7 @@ export const getApartments = async (req, res) => {
       building_id: building_id ? +building_id : undefined,
       floor_id: floor_id ? +floor_id : undefined,
       room_type,
-    });
+    }, req.user);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -221,6 +221,15 @@ export const getApartmentPreview = async (req, res) => {
     res.json({ success: true, data });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });
+  }
+};
+
+export const getMyBuildings = async (req, res) => {
+  try {
+    const data = await service.getMyBuildings(req.user);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 

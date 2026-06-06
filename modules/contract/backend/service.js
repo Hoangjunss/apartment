@@ -321,10 +321,12 @@ export const getRenewals = async (contractId) => {
   });
 };
 
-export const getExpiringSoon = async () => {
-  // Logic đếm số ngày còn lại xử lý ở frontend hoặc map thêm ở đây
+export const getExpiringSoon = async (currentUser) => {
+  let where = { status: 'EXPIRING_SOON' };
+  where = await applyBuildingScope(currentUser, where, 'Contract');
+
   const contracts = await prisma.contracts.findMany({
-    where: { status: 'EXPIRING_SOON' },
+    where,
     orderBy: { end_date: 'asc' },
     include: {
       tenant: { select: { full_name: true, phone: true } },

@@ -9,10 +9,21 @@ import { applyBuildingScope } from '@my/policy-backend';
 // UTILITY READINGS (ĐIỆN NƯỚC)
 // ==========================================
 
-export const getUtilityReadings = async ({ page = 1, limit = 20, apartment_id, billing_month }) => {
-  const where = {};
+export const getUtilityReadings = async ({ page = 1, limit = 20, apartment_id, billing_month, building_id }, currentUser) => {
+  let where = {};
   if (apartment_id) where.apartment_id = apartment_id;
   if (billing_month) where.billing_month = billing_month;
+  if (building_id) {
+    where.apartment = {
+      ...where.apartment,
+      floor: {
+        ...where.apartment?.floor,
+        building_id: Number(building_id)
+      }
+    };
+  }
+
+  where = await applyBuildingScope(currentUser, where, 'UtilityReading');
 
   const [items, total] = await Promise.all([
     prisma.utilityReadings.findMany({
@@ -118,12 +129,21 @@ export const recordUtilityReading = async (data, userId) => {
 // INVOICES (HÓA ĐƠN)
 // ==========================================
 
-export const getInvoices = async ({ page = 1, limit = 20, status, contract_id, billing_month, apartment_id }, currentUser) => {
+export const getInvoices = async ({ page = 1, limit = 20, status, contract_id, billing_month, apartment_id, building_id }, currentUser) => {
   let where = {};
   if (status) where.status = status;
   if (contract_id) where.contract_id = contract_id;
   if (billing_month) where.billing_month = billing_month;
   if (apartment_id) where.apartment_id = apartment_id;
+  if (building_id) {
+    where.apartment = {
+      ...where.apartment,
+      floor: {
+        ...where.apartment?.floor,
+        building_id: Number(building_id)
+      }
+    };
+  }
 
   where = await applyBuildingScope(currentUser, where, 'Invoice');
 

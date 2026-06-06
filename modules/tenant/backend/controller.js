@@ -13,7 +13,7 @@ const getErrorStatus = (message) => {
 export const getTenants = async (req, res) => {
   try {
     const { page = 1, limit = 20, search, status } = req.query;
-    const data = await service.getTenants({ page: +page, limit: +limit, search, status });
+    const data = await service.getTenants({ page: +page, limit: +limit, search, status }, req.user);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -101,7 +101,7 @@ export const getAllRegistrations = async (req, res) => {
       limit: +limit, 
       month: month ? +month : undefined, 
       year: year ? +year : undefined 
-    });
+    }, req.user);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

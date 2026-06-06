@@ -15,6 +15,7 @@ import { useContracts, useExpiringSoon } from '../hooks/useContract.js';
 import { useBuildings } from 'modules/building/frontend/hooks/useBuilding.js';
 import { useFilterState } from '@/hooks/useFilterState.js';
 import { format, parseISO, differenceInDays } from 'date-fns';
+import { useActiveBuilding } from '@/contexts/BuildingContext.jsx';
 
 const formatCurrency = (v) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(v));
@@ -22,12 +23,12 @@ const formatCurrency = (v) =>
 export default function ContractsPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
+  const { selectedBuildingId, setSelectedBuildingId } = useActiveBuilding();
 
   const searchInputRef = useRef(null);
   const defaultFilters = {
     search: '',
     status: '',
-    building_id: '',
     month: '',
   };
 
@@ -36,12 +37,12 @@ export default function ContractsPage() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [filters.search, filters.status, filters.building_id, filters.month]);
+  }, [filters.search, filters.status, filters.month, selectedBuildingId]);
 
   const { data, isLoading } = useContracts({
     search: filters.search || undefined,
     status: filters.status || undefined,
-    building_id: filters.building_id || undefined,
+    building_id: selectedBuildingId !== 'all' ? selectedBuildingId : undefined,
     month: filters.month || undefined,
     page,
     limit: 20,
@@ -216,12 +217,14 @@ export default function ContractsPage() {
         </select>
 
         <select
-          value={filters.building_id}
-          onChange={(e) => setFilter('building_id', e.target.value)}
+          value={selectedBuildingId}
+          onChange={(e) => {
+            setSelectedBuildingId(e.target.value || 'all');
+          }}
           className="input w-44"
           id="filter-building"
         >
-          <option value="">Tất cả tòa nhà</option>
+          <option value="all">Tất cả tòa nhà</option>
           {buildings.map((b) => (
             <option key={b.id} value={b.id}>{b.name}</option>
           ))}

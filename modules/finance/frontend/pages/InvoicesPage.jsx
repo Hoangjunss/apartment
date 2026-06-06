@@ -12,6 +12,7 @@ import { useInvoices, useGenerateInvoice } from '../hooks/useFinance.js';
 import { useContracts } from 'modules/contract/frontend/hooks/useContract.js';
 import { useApartments } from 'modules/building/frontend/hooks/useBuilding.js';
 import { useFilterState } from '@/hooks/useFilterState.js';
+import { useActiveBuilding } from '@/contexts/BuildingContext.jsx';
 import { Modal } from '@/components/common/Modal.jsx';
 import { ModalFooter } from '@/components/forms/ModalFooter.jsx';
 
@@ -35,6 +36,8 @@ export default function InvoicesPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationResults, setGenerationResults] = useState([]); // Array of { contract, success, error }
 
+  const { selectedBuildingId } = useActiveBuilding();
+
   const defaultFilters = {
     status: '',
     billing_month: '',
@@ -46,7 +49,9 @@ export default function InvoicesPage() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [filters.status, filters.billing_month, filters.apartment_id]);
+  }, [filters.status, filters.billing_month, filters.apartment_id, selectedBuildingId]);
+
+  const selectedBuildingIdNum = selectedBuildingId !== 'all' ? Number(selectedBuildingId) : undefined;
 
   const params = {
     page,
@@ -54,11 +59,16 @@ export default function InvoicesPage() {
     status: filters.status || undefined,
     billing_month: filters.billing_month || undefined,
     apartment_id: filters.apartment_id || undefined,
+    building_id: selectedBuildingIdNum,
   };
 
   const { data, isLoading, refetch } = useInvoices(params);
   const { data: activeContractsData } = useContracts({ status: 'ACTIVE', limit: 100 });
-  const { data: apartmentsData } = useApartments({ limit: 100 });
+  
+  const { data: apartmentsData } = useApartments({
+    limit: 500,
+    building_id: selectedBuildingIdNum
+  });
   const activeContracts = activeContractsData?.items ?? [];
   const apartments = apartmentsData?.items ?? [];
 
@@ -265,7 +275,9 @@ export default function InvoicesPage() {
           >
             <option value="">Tất cả căn hộ</option>
             {apartments.map((a) => (
-              <option key={a.id} value={a.id}>{a.apartment_code}</option>
+              <option key={a.id} value={a.id}>
+                {a.apartment_code} {selectedBuildingId === 'all' && a.floor?.building?.name ? `(${a.floor?.building?.name})` : ''}
+              </option>
             ))}
           </select>
         </div>

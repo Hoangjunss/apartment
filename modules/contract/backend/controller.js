@@ -101,7 +101,7 @@ export const getRenewals = async (req, res) => {
 
 export const getExpiringSoon = async (req, res) => {
   try {
-    const data = await service.getExpiringSoon();
+    const data = await service.getExpiringSoon(req.user);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

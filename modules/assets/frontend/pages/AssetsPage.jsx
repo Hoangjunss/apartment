@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Package, 
@@ -22,16 +22,22 @@ import toast from 'react-hot-toast';
 
 import { useAssets, useCreateAsset, useDeleteAsset } from '../hooks/useAssets.js';
 import { useBuildings } from 'modules/building/frontend/hooks/useBuilding.js';
+import { useActiveBuilding } from '@/contexts/BuildingContext.jsx';
 
 export default function AssetsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { selectedBuildingId, setSelectedBuildingId } = useActiveBuilding();
   
   // Search & Filters
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
-  const [buildingId, setBuildingId] = useState('');
   const [page, setPage] = useState(1);
+
+  // Trigger page reset when active building changes
+  useEffect(() => {
+    setPage(1);
+  }, [selectedBuildingId]);
 
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -54,7 +60,7 @@ export default function AssetsPage() {
   const { data: assetsData, isLoading } = useAssets({ 
     search, 
     category, 
-    building_id: buildingId ? +buildingId : undefined,
+    building_id: selectedBuildingId !== 'all' ? +selectedBuildingId : undefined,
     page, 
     limit: 10 
   });
@@ -204,11 +210,14 @@ export default function AssetsPage() {
         </div>
         <div>
           <select 
-            value={buildingId}
-            onChange={(e) => { setBuildingId(e.target.value); setPage(1); }}
+            value={selectedBuildingId}
+            onChange={(e) => {
+              setSelectedBuildingId(e.target.value || 'all');
+              setPage(1);
+            }}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500"
           >
-            <option value="">Tất cả tòa nhà</option>
+            <option value="all">Tất cả tòa nhà</option>
             {buildings.map(b => (
               <option key={b.id} value={b.id}>{b.name}</option>
             ))}

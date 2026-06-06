@@ -22,13 +22,14 @@ const getErrorStatus = (message) => {
 // Utilities (Điện Nước)
 export const getUtilities = async (req, res) => {
   try {
-    const { page = 1, limit = 20, apartment_id, billing_month } = req.query;
+    const { page = 1, limit = 20, apartment_id, billing_month, building_id } = req.query;
     const data = await service.getUtilityReadings({
       page: +page,
       limit: +limit,
       apartment_id: apartment_id ? +apartment_id : undefined,
-      billing_month
-    });
+      billing_month,
+      building_id: building_id ? +building_id : undefined
+    }, req.user);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -61,14 +62,15 @@ export const recordUtility = async (req, res) => {
 // Invoices (Hóa Đơn)
 export const getInvoices = async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, contract_id, billing_month, apartment_id } = req.query;
+    const { page = 1, limit = 20, status, contract_id, billing_month, apartment_id, building_id } = req.query;
     const data = await service.getInvoices({
       page: +page,
       limit: +limit,
       status,
       contract_id: contract_id ? +contract_id : undefined,
       billing_month,
-      apartment_id: apartment_id ? +apartment_id : undefined
+      apartment_id: apartment_id ? +apartment_id : undefined,
+      building_id: building_id ? +building_id : undefined
     }, req.user);
     res.json({ success: true, data });
   } catch (err) {

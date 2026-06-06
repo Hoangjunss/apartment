@@ -7,9 +7,11 @@ import { ROLE_LABELS } from '@/constants/roles.js';
 import { NotificationBell } from './NotificationBell.jsx';
 import { useGlobalSearch } from 'modules/search/frontend/hooks/useSearch.js';
 import { SearchDropdown } from 'modules/search/frontend/components/SearchDropdown.jsx';
+import { useActiveBuilding } from '@/contexts/BuildingContext.jsx';
 
 export function Navbar() {
   const { user, logout } = useAuth();
+  const { buildings, selectedBuildingId, setSelectedBuildingId } = useActiveBuilding();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -91,7 +93,26 @@ export function Navbar() {
       </div>
 
       {/* Right: notification bell + user menu */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        {/* Global Building Selector */}
+        {buildings.length > 0 && (
+          <div className="flex items-center gap-1.5 no-print">
+            <select
+              value={selectedBuildingId}
+              onChange={(e) => setSelectedBuildingId(e.target.value)}
+              className="bg-slate-50 border border-slate-200 hover:border-slate-300 focus:border-indigo-500 rounded-xl text-xs px-2.5 py-1.5 outline-none transition-colors font-medium text-gray-700"
+              id="global-building-selector"
+            >
+              <option value="all">Tất cả tòa nhà</option>
+              {buildings.map((b) => (
+                <option key={b.id} value={b.id}>
+                  [{b.code}] {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <NotificationBell />
 
         {/* User menu dropdown */}

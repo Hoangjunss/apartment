@@ -1,49 +1,63 @@
 import express from 'express';
 import { authenticate } from '@my/auth-backend';
 import * as service from './dashboard.service.js';
+import { getAssignedBuildingIds } from '@my/policy-backend';
 
 const router = express.Router();
 
-router.get('/stats', authenticate, async (req, res) => {
+// Middleware lấy allowedBuildingIds một lần duy nhất cho request
+const injectAllowedBuildings = async (req, res, next) => {
   try {
-    const data = await service.getDashboardStats(req.user.role, req.user.userId);
+    req.allowedBuildingIds = req.user.role === 'ADMIN' ? 'ALL' : await getAssignedBuildingIds(req.user.userId);
+    next();
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Lỗi xác thực phạm vi tòa nhà: ' + err.message });
+  }
+};
+
+router.use(authenticate);
+router.use(injectAllowedBuildings);
+
+router.get('/stats', async (req, res) => {
+  try {
+    const data = await service.getDashboardStats(req.user.role, req.user.userId, req.allowedBuildingIds);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-router.get('/revenue', authenticate, async (req, res) => {
+router.get('/revenue', async (req, res) => {
   try {
     const months = req.query.months ? Number(req.query.months) : 6;
-    const data = await service.getRevenueHistory(months);
+    const data = await service.getRevenueHistory(months, req.allowedBuildingIds);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-router.get('/apartment-types', authenticate, async (req, res) => {
+router.get('/apartment-types', async (req, res) => {
   try {
-    const data = await service.getApartmentTypes();
+    const data = await service.getApartmentTypes(req.allowedBuildingIds);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-router.get('/unpaid-invoices', authenticate, async (req, res) => {
+router.get('/unpaid-invoices', async (req, res) => {
   try {
-    const data = await service.getUnpaidInvoices();
+    const data = await service.getUnpaidInvoices(req.allowedBuildingIds);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-router.get('/recent-activities', authenticate, async (req, res) => {
+router.get('/recent-activities', async (req, res) => {
   try {
-    const data = await service.getRecentActivities();
+    const data = await service.getRecentActivities(req.allowedBuildingIds);
     res.json({ success: true, data });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

@@ -1,12 +1,13 @@
 import { prisma } from '@my/prisma';
 import { createLog } from '@my/audit-log-backend';
+import { applyBuildingScope } from '@my/policy-backend';
 
 // ==========================================
 // TENANTS
 // ==========================================
 
-export const getTenants = async ({ page = 1, limit = 20, search, status }) => {
-  const where = {
+export const getTenants = async ({ page = 1, limit = 20, search, status } = {}, currentUser) => {
+  let where = {
     AND: [
       search
         ? {
@@ -34,6 +35,8 @@ export const getTenants = async ({ page = 1, limit = 20, search, status }) => {
         : {},
     ],
   };
+
+  where = await applyBuildingScope(currentUser, where, 'Tenant');
 
   const [items, total] = await Promise.all([
     prisma.tenants.findMany({
@@ -237,8 +240,8 @@ export const createRegistration = async (tenantId, data, submittedBy) => {
   });
 };
 
-export const getAllRegistrations = async ({ page = 1, limit = 20, month, year }) => {
-  const where = {};
+export const getAllRegistrations = async ({ page = 1, limit = 20, month, year }, currentUser) => {
+  let where = {};
   
   if (month && year) {
     const startDate = new Date(year, month - 1, 1);
@@ -248,6 +251,8 @@ export const getAllRegistrations = async ({ page = 1, limit = 20, month, year })
       lte: endDate,
     };
   }
+
+  where = await applyBuildingScope(currentUser, where, 'TemporaryRegistration');
 
   const [items, total] = await Promise.all([
     prisma.temporaryRegistrations.findMany({

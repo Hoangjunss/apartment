@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient.js';
 import { AuthProvider } from '@/contexts/AuthContext.jsx';
+import { BuildingProvider } from '@/contexts/BuildingContext.jsx';
 import { AppLayout } from '@/components/layout/AppLayout.jsx';
 import { ProtectedRoute } from '@/components/common/ProtectedRoute.jsx';
 import {
@@ -67,8 +68,9 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <NotificationProvider>
-        <BrowserRouter>
+        <BuildingProvider>
+          <NotificationProvider>
+          <BrowserRouter>
           <Routes>
             {/* ── Public ──────────────────────────────────────── */}
             <Route path="/login" element={<LoginPage />} />
@@ -270,8 +272,9 @@ export default function App() {
             {/* Fallback */}
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
-        </BrowserRouter>
-        </NotificationProvider>
+          </BrowserRouter>
+          </NotificationProvider>
+        </BuildingProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

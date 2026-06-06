@@ -9,11 +9,14 @@ import { useApartments } from 'modules/building/frontend/hooks/useBuilding.js';
 import { UtilityReadingForm } from '../components/UtilityReadingForm.jsx';
 import { BulkUtilityReadingModal } from '../components/BulkUtilityReadingModal.jsx';
 import { useFilterState } from '@/hooks/useFilterState.js';
+import { useActiveBuilding } from '@/contexts/BuildingContext.jsx';
 
 export default function UtilityReadingsPage() {
   const [page, setPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+
+  const { selectedBuildingId } = useActiveBuilding();
 
   const defaultFilters = {
     apartment_id: '',
@@ -25,17 +28,24 @@ export default function UtilityReadingsPage() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [filters.apartment_id, filters.billing_month]);
+  }, [filters.apartment_id, filters.billing_month, selectedBuildingId]);
+
+  const selectedBuildingIdNum = selectedBuildingId !== 'all' ? Number(selectedBuildingId) : undefined;
 
   const params = {
     page,
     limit: 20,
     apartment_id: filters.apartment_id ? Number(filters.apartment_id) : undefined,
     billing_month: filters.billing_month || undefined,
+    building_id: selectedBuildingIdNum,
   };
 
   const { data, isLoading } = useUtilities(params);
-  const { data: apartmentsData } = useApartments({ limit: 100 });
+  
+  const { data: apartmentsData } = useApartments({
+    limit: 500,
+    building_id: selectedBuildingIdNum
+  });
 
   const readings = data?.items ?? [];
   const total = data?.total ?? 0;
@@ -175,7 +185,7 @@ export default function UtilityReadingsPage() {
             <option value="">Tất cả căn hộ</option>
             {apartments.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.apartment_code} - {a.floor?.building?.name}
+                {a.apartment_code} {selectedBuildingId === 'all' && a.floor?.building?.name ? `(${a.floor?.building?.name})` : ''}
               </option>
             ))}
           </select>

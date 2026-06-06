@@ -1,6 +1,6 @@
 import { prisma } from '@my/prisma';
 import { createLog } from '@my/audit-log-backend';
-import { applyBuildingScope } from '@my/policy-backend';
+import { applyBuildingScope, getAssignedBuildingIds } from '@my/policy-backend';
 
 // ==========================================
 // BUILDINGS
@@ -443,6 +443,30 @@ export const getApartmentPreview = async (id) => {
     contract_code: activeContract ? activeContract.contract_code : null,
     images: attachments.map(att => att.file_url),
   };
+};
+
+// Lấy danh sách tòa nhà mà user hiện tại được quản lý
+export const getMyBuildings = async (currentUser) => {
+  if (!currentUser) return [];
+
+  // ADMIN bypass toàn bộ
+  if (currentUser.role === 'ADMIN') {
+    return prisma.buildings.findMany({
+      where: { deleted_at: null },
+      orderBy: { name: 'asc' }
+    });
+  }
+
+  const assignedIds = await getAssignedBuildingIds(currentUser.userId);
+  if (assignedIds.length === 0) return [];
+
+  return prisma.buildings.findMany({
+    where: {
+      id: { in: assignedIds },
+      deleted_at: null
+    },
+    orderBy: { name: 'asc' }
+  });
 };
 
 

@@ -706,12 +706,12 @@ model BuildingAssignments {
   assigned_at DateTime  @default(now())
   assigned_by Int
   revoked_at  DateTime?
+  notes       String?   @db.VarChar(255)
 
   user        Users     @relation("UserAssignments", fields: [user_id], references: [id], onDelete: Cascade)
   building    Buildings @relation(fields: [building_id], references: [id], onDelete: Cascade)
   assigner    Users     @relation("AssignerAssignments", fields: [assigned_by], references: [id])
 
-  @@unique([user_id, building_id])
   @@index([user_id])
   @@index([building_id])
 }

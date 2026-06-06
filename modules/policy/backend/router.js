@@ -5,10 +5,9 @@ import { authenticate, requireRole } from '@my/auth-backend';
 const router = Router();
 
 router.use(authenticate);
-router.use(requireRole(['ADMIN'])); // Chỉ Admin mới được quản lý gán tòa nhà
 
 router.get('/assignments', ctrl.getAll);
-router.post('/assignments', ctrl.assign);
-router.patch('/assignments/:id/revoke', ctrl.revoke);
+router.post('/assignments', requireRole(['ADMIN']), ctrl.assign);
+router.patch('/assignments/:id/revoke', requireRole(['ADMIN']), ctrl.revoke);
 
 export default router;

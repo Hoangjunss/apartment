@@ -13,6 +13,7 @@ import { useApartments, useBuildings, useDistinctRoomTypes } from '../hooks/useB
 import { ApartmentForm } from '../components/ApartmentForm.jsx';
 import { ApartmentPreviewTooltip } from '../components/ApartmentPreviewTooltip.jsx';
 import { useFilterState } from '@/hooks/useFilterState.js';
+import { useActiveBuilding } from '@/contexts/BuildingContext.jsx';
 
 const formatCurrency = (v) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(v));
@@ -21,12 +22,12 @@ export default function ApartmentsPage() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const { selectedBuildingId, setSelectedBuildingId } = useActiveBuilding();
 
   const searchInputRef = useRef(null);
   const defaultFilters = {
     search: '',
     status: '',
-    building_id: '',
     room_type: '',
   };
 
@@ -35,12 +36,12 @@ export default function ApartmentsPage() {
   // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [filters.search, filters.status, filters.building_id, filters.room_type]);
+  }, [filters.search, filters.status, filters.room_type, selectedBuildingId]);
 
   const params = {
     search: filters.search || undefined,
     status: filters.status || undefined,
-    building_id: filters.building_id || undefined,
+    building_id: selectedBuildingId !== 'all' ? selectedBuildingId : undefined,
     room_type: filters.room_type || undefined,
     page,
     limit: 20,
@@ -156,13 +157,15 @@ export default function ApartmentsPage() {
           ))}
         </select>
 
-        <select
-          value={filters.building_id}
-          onChange={(e) => setFilter('building_id', e.target.value)}
+         <select
+          value={selectedBuildingId}
+          onChange={(e) => {
+            setSelectedBuildingId(e.target.value || 'all');
+          }}
           className="input w-44"
           id="filter-building"
         >
-          <option value="">Tất cả tòa nhà</option>
+          <option value="all">Tất cả tòa nhà</option>
           {buildings.map((b) => (
             <option key={b.id} value={b.id}>{b.name}</option>
           ))}
@@ -195,9 +198,9 @@ export default function ApartmentsPage() {
         )}
 
         {/* Dynamic Highlight Badge for Available apartments */}
-        {filters.status === 'AVAILABLE' && filters.building_id && (
+        {filters.status === 'AVAILABLE' && selectedBuildingId !== 'all' && (
           <div className="flex items-center text-xs font-semibold px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400 border border-emerald-500/20 animate-pulse">
-            ⚡ {buildings.find(b => String(b.id) === String(filters.building_id))?.name || 'Tòa nhà'}: {total} căn trống
+            ⚡ {buildings.find(b => String(b.id) === String(selectedBuildingId))?.name || 'Tòa nhà'}: {total} căn trống
           </div>
         )}
       </div>
