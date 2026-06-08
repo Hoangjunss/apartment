@@ -53,6 +53,9 @@ importers:
       '@my/policy-backend':
         specifier: workspace:*
         version: link:../../modules/policy/backend
+      '@my/prisma':
+        specifier: workspace:*
+        version: link:../../packages/prisma
       '@my/public-backend':
         specifier: workspace:*
         version: link:../../modules/public/backend

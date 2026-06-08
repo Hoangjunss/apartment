@@ -3,6 +3,7 @@
   "type": "module",
   "dependencies": {
     "@my/auth-backend": "workspace:*",
+    "@my/prisma": "workspace:*",
     "@my/building-backend": "workspace:*",
     "@my/contract-backend": "workspace:*",
     "@my/finance-backend": "workspace:*",
