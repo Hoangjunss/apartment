@@ -27,6 +27,10 @@ model Users {
   last_login_at DateTime?
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
+  deleted_at    DateTime?
+  created_by    Int?
+  updated_by    Int?
+  deleted_by    Int?
 
   // Relations
   created_contracts   Contracts[]              @relation("ContractCreator")
@@ -44,6 +48,9 @@ model Users {
   building_assignments BuildingAssignments[]    @relation("UserAssignments")
   assigned_others      BuildingAssignments[]    @relation("AssignerAssignments")
   stock_transactions   StockTransactions[]
+  sessions             UserSessions[]           @relation("UserSessions")
+
+  @@index([deleted_at])
 }
 
 // ─── BUILDING & APARTMENT ────────────────────────────────
@@ -56,13 +63,19 @@ model Buildings {
   total_floors Int
   description  String?   @db.Text
   created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now()) @updatedAt
   deleted_at   DateTime?
+  created_by   Int?
+  updated_by   Int?
+  deleted_by   Int?
 
   floors Floors[]
   expenses BuildingExpenses[]
   assignments BuildingAssignments[]
   warehouses Warehouses[]
   assets Assets[]
+
+  @@index([deleted_at])
 }
 
 model Floors {
@@ -70,11 +83,18 @@ model Floors {
   building_id  Int
   floor_number Int
   description  String? @db.VarChar(255)
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @default(now()) @updatedAt
+  deleted_at   DateTime?
+  created_by   Int?
+  updated_by   Int?
+  deleted_by   Int?
 
   building   Buildings    @relation(fields: [building_id], references: [id])
   apartments Apartments[]
 
   @@index([building_id])
+  @@index([deleted_at])
 }
 
 enum ApartmentStatus {
@@ -105,6 +125,9 @@ model Apartments {
   created_at     DateTime        @default(now())
   updated_at     DateTime        @updatedAt
   deleted_at     DateTime?
+  created_by     Int?
+  updated_by     Int?
+  deleted_by     Int?
 
   floor              Floors                   @relation(fields: [floor_id], references: [id])
   furniture          ApartmentFurniture[]
@@ -118,6 +141,7 @@ model Apartments {
 
   @@index([floor_id])
   @@index([status])
+  @@index([deleted_at])
 }
 
 enum FurnitureCondition {
@@ -180,12 +204,16 @@ model Tenants {
   created_at               DateTime  @default(now())
   updated_at               DateTime  @updatedAt
   deleted_at               DateTime?
+  created_by               Int?
+  updated_by               Int?
+  deleted_by               Int?
 
   contracts               Contracts[]
   temporary_registrations TemporaryRegistrations[]
 
   @@index([national_id])
   @@index([phone])
+  @@index([deleted_at])
 }
 
 enum ContractStatus {
@@ -212,6 +240,8 @@ model Contracts {
   created_at         DateTime       @default(now())
   updated_at         DateTime       @updatedAt
   deleted_at         DateTime?
+  updated_by         Int?
+  deleted_by         Int?
 
   // Real-world fields
   occupants_count          Int            @default(1)
@@ -241,6 +271,7 @@ model Contracts {
   @@index([status, end_date])
   @@index([apartment_id, status])
   @@index([tenant_id, status])
+  @@index([deleted_at])
 }
 
 model ContractRenewals {
@@ -302,8 +333,16 @@ model Services {
   unit        String      @db.VarChar(30)
   description String?     @db.Text
   is_active   Boolean     @default(true)
+  created_at  DateTime    @default(now())
+  updated_at  DateTime    @default(now()) @updatedAt
+  deleted_at  DateTime?
+  created_by  Int?
+  updated_by  Int?
+  deleted_by  Int?
 
   subscriptions ServiceSubscriptions[]
+
+  @@index([deleted_at])
 }
 
 enum SubscriptionStatus {
@@ -373,7 +412,10 @@ model Invoices {
   note               String?       @db.Text
   created_by         Int
   created_at         DateTime      @default(now())
+  updated_at         DateTime      @default(now()) @updatedAt
   deleted_at         DateTime?
+  updated_by         Int?
+  deleted_by         Int?
 
   contract            Contracts            @relation(fields: [contract_id], references: [id])
   apartment           Apartments           @relation(fields: [apartment_id], references: [id])
@@ -385,6 +427,7 @@ model Invoices {
   @@index([status])
   @@index([due_date])
   @@index([status, due_date])
+  @@index([deleted_at])
 }
 
 enum PaymentMethod {
@@ -402,12 +445,18 @@ model Payments {
   note             String?       @db.Text
   recorded_by      Int
   created_at       DateTime      @default(now())
+  updated_at       DateTime      @default(now()) @updatedAt
+  deleted_at       DateTime?
+  created_by       Int?
+  updated_by       Int?
+  deleted_by       Int?
 
   invoice             Invoices             @relation(fields: [invoice_id], references: [id])
   recorder            Users                @relation(fields: [recorded_by], references: [id])
   credit_transactions CreditTransactions[]
 
   @@index([invoice_id])
+  @@index([deleted_at])
 }
 
 enum ServiceRequestType {
@@ -456,6 +505,10 @@ model ServiceRequests {
   scheduled_start_date DateTime?             @db.Date
   created_at      DateTime             @default(now())
   updated_at      DateTime             @updatedAt
+  deleted_at      DateTime?
+  created_by      Int?
+  updated_by      Int?
+  deleted_by      Int?
 
   apartment Apartments @relation(fields: [apartment_id], references: [id])
   contract  Contracts? @relation(fields: [contract_id], references: [id])
@@ -470,6 +523,7 @@ model ServiceRequests {
   @@index([assigned_to])
   @@index([status])
   @@index([asset_id])
+  @@index([deleted_at])
 }
 
 model ApartmentTokens {
@@ -634,6 +688,8 @@ model BuildingExpenses {
   created_at   DateTime        @default(now())
   updated_at   DateTime        @updatedAt
   deleted_at   DateTime?
+  updated_by   Int?
+  deleted_by   Int?
 
   building   Buildings @relation(fields: [building_id], references: [id], onDelete: Cascade)
   creator    Users     @relation("ExpenseCreator", fields: [created_by], references: [id])
@@ -641,6 +697,7 @@ model BuildingExpenses {
   @@index([building_id])
   @@index([status])
   @@index([expense_date])
+  @@index([deleted_at])
 }
 
 // ─── SENIOR LEVEL WORKFLOW, RULES & POLICIES ──────────────
@@ -774,11 +831,16 @@ model Warehouses {
   description String?          @db.Text
   created_at  DateTime         @default(now())
   updated_at  DateTime         @updatedAt
+  deleted_at  DateTime?
+  created_by   Int?
+  updated_by   Int?
+  deleted_by   Int?
 
   building        Buildings        @relation(fields: [building_id], references: [id], onDelete: Cascade)
   inventory_items InventoryItems[]
 
   @@index([building_id])
+  @@index([deleted_at])
 }
 
 model InventoryItems {
@@ -792,12 +854,17 @@ model InventoryItems {
   unit_cost       Decimal           @db.Decimal(15, 2)
   created_at      DateTime          @default(now())
   updated_at      DateTime          @updatedAt
+  deleted_at      DateTime?
+  created_by      Int?
+  updated_by      Int?
+  deleted_by      Int?
 
   warehouse          Warehouses                @relation(fields: [warehouse_id], references: [id], onDelete: Cascade)
   stock_transactions StockTransactions[]
   materials_used     ServiceRequestMaterials[]
 
   @@index([warehouse_id])
+  @@index([deleted_at])
 }
 
 model StockTransactions {
@@ -850,11 +917,33 @@ model Assets {
   description         String?            @db.Text
   created_at          DateTime           @default(now())
   updated_at          DateTime           @updatedAt
+  deleted_at          DateTime?
+  created_by          Int?
+  updated_by          Int?
+  deleted_by          Int?
 
   building         Buildings         @relation(fields: [building_id], references: [id], onDelete: Cascade)
   service_requests ServiceRequests[]
 
   @@index([building_id])
   @@index([asset_code])
+  @@index([deleted_at])
+}
+
+model UserSessions {
+  id                 Int       @id @default(autoincrement())
+  user_id            Int
+  refresh_token_hash String    @unique @db.VarChar(64) // HMAC-SHA256 hex output
+  ip_address         String?   @db.VarChar(45)
+  user_agent         String?   @db.Text
+  expires_at         DateTime
+  revoked_at         DateTime?
+  created_at         DateTime  @default(now())
+
+  user               Users     @relation("UserSessions", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([refresh_token_hash])
+  @@index([expires_at])
 }
 
