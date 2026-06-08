@@ -1,11 +1,11 @@
-import { prisma } from '@my/prisma';
+import { prisma, notDeleted } from '@my/prisma';
 import eventHub from '@my/events';
 import { applyBuildingScope } from '@my/policy-backend';
 
 // ─── WAREHOUSES ──────────────────────────────────────────
 
 export const getWarehouses = async ({ page = 1, limit = 20, search, building_id } = {}, currentUser) => {
-  let where = {};
+  let where = { ...notDeleted };
   
   if (building_id) {
     where.building_id = Number(building_id);
@@ -34,45 +34,52 @@ export const getWarehouses = async ({ page = 1, limit = 20, search, building_id 
 };
 
 export const getWarehouseById = async (id) => {
-  return prisma.warehouses.findUnique({
-    where: { id: Number(id) },
+  return prisma.warehouses.findFirst({
+    where: { id: Number(id), ...notDeleted },
     include: {
       building: { select: { id: true, name: true, code: true } }
     }
   });
 };
 
-export const createWarehouse = async (data) => {
+export const createWarehouse = async (data, userId) => {
   return prisma.warehouses.create({
     data: {
       name: data.name,
       building_id: Number(data.building_id),
-      description: data.description || null
+      description: data.description || null,
+      created_by: userId
     }
   });
 };
 
-export const updateWarehouse = async (id, data) => {
+export const updateWarehouse = async (id, data, userId) => {
   return prisma.warehouses.update({
     where: { id: Number(id) },
     data: {
       name: data.name,
       building_id: data.building_id ? Number(data.building_id) : undefined,
-      description: data.description !== undefined ? data.description : undefined
+      description: data.description !== undefined ? data.description : undefined,
+      updated_by: userId
     }
   });
 };
 
-export const deleteWarehouse = async (id) => {
-  return prisma.warehouses.delete({
-    where: { id: Number(id) }
+export const deleteWarehouse = async (id, userId) => {
+  const warehouse = await prisma.warehouses.findFirst({
+    where: { id: Number(id), ...notDeleted }
+  });
+  if (!warehouse) throw new Error('Không tìm thấy kho');
+  return prisma.warehouses.update({
+    where: { id: Number(id) },
+    data: { deleted_at: new Date(), deleted_by: userId }
   });
 };
 
 // ─── INVENTORY ITEMS ──────────────────────────────────────
 
 export const getInventoryItems = async ({ page = 1, limit = 20, search, warehouse_id, category } = {}, currentUser) => {
-  let where = {};
+  let where = { ...notDeleted };
 
   if (warehouse_id) {
     where.warehouse_id = Number(warehouse_id);
@@ -109,8 +116,8 @@ export const getInventoryItems = async ({ page = 1, limit = 20, search, warehous
 };
 
 export const getInventoryItemById = async (id) => {
-  return prisma.inventoryItems.findUnique({
-    where: { id: Number(id) },
+  return prisma.inventoryItems.findFirst({
+    where: { id: Number(id), ...notDeleted },
     include: {
       warehouse: {
         select: {
@@ -123,7 +130,7 @@ export const getInventoryItemById = async (id) => {
   });
 };
 
-export const createInventoryItem = async (data) => {
+export const createInventoryItem = async (data, userId) => {
   return prisma.inventoryItems.create({
     data: {
       warehouse_id: Number(data.warehouse_id),
@@ -132,12 +139,13 @@ export const createInventoryItem = async (data) => {
       current_stock: data.current_stock !== undefined ? Number(data.current_stock) : 0,
       min_stock_level: data.min_stock_level !== undefined ? Number(data.min_stock_level) : 0,
       unit: data.unit,
-      unit_cost: Number(data.unit_cost)
+      unit_cost: Number(data.unit_cost),
+      created_by: userId
     }
   });
 };
 
-export const updateInventoryItem = async (id, data) => {
+export const updateInventoryItem = async (id, data, userId) => {
   return prisma.inventoryItems.update({
     where: { id: Number(id) },
     data: {
@@ -146,14 +154,20 @@ export const updateInventoryItem = async (id, data) => {
       category: data.category,
       min_stock_level: data.min_stock_level !== undefined ? Number(data.min_stock_level) : undefined,
       unit: data.unit,
-      unit_cost: data.unit_cost !== undefined ? Number(data.unit_cost) : undefined
+      unit_cost: data.unit_cost !== undefined ? Number(data.unit_cost) : undefined,
+      updated_by: userId
     }
   });
 };
 
-export const deleteInventoryItem = async (id) => {
-  return prisma.inventoryItems.delete({
-    where: { id: Number(id) }
+export const deleteInventoryItem = async (id, userId) => {
+  const item = await prisma.inventoryItems.findFirst({
+    where: { id: Number(id), ...notDeleted }
+  });
+  if (!item) throw new Error('Không tìm thấy vật tư');
+  return prisma.inventoryItems.update({
+    where: { id: Number(id) },
+    data: { deleted_at: new Date(), deleted_by: userId }
   });
 };
 

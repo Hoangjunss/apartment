@@ -35,7 +35,7 @@ export const getWarehouseById = async (req, res) => {
 
 export const createWarehouse = async (req, res) => {
   try {
-    const data = await service.createWarehouse(req.body);
+    const data = await service.createWarehouse(req.body, req.user.userId);
     res.status(201).json({ success: true, data });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });
@@ -44,7 +44,7 @@ export const createWarehouse = async (req, res) => {
 
 export const updateWarehouse = async (req, res) => {
   try {
-    const data = await service.updateWarehouse(+req.params.id, req.body);
+    const data = await service.updateWarehouse(+req.params.id, req.body, req.user.userId);
     res.json({ success: true, data });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });
@@ -53,7 +53,7 @@ export const updateWarehouse = async (req, res) => {
 
 export const deleteWarehouse = async (req, res) => {
   try {
-    await service.deleteWarehouse(+req.params.id);
+    await service.deleteWarehouse(+req.params.id, req.user.userId);
     res.json({ success: true, message: 'Xóa kho thành công' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -90,7 +90,7 @@ export const getInventoryItemById = async (req, res) => {
 
 export const createInventoryItem = async (req, res) => {
   try {
-    const data = await service.createInventoryItem(req.body);
+    const data = await service.createInventoryItem(req.body, req.user.userId);
     res.status(201).json({ success: true, data });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });
@@ -99,7 +99,7 @@ export const createInventoryItem = async (req, res) => {
 
 export const updateInventoryItem = async (req, res) => {
   try {
-    const data = await service.updateInventoryItem(+req.params.id, req.body);
+    const data = await service.updateInventoryItem(+req.params.id, req.body, req.user.userId);
     res.json({ success: true, data });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });
@@ -108,7 +108,7 @@ export const updateInventoryItem = async (req, res) => {
 
 export const deleteInventoryItem = async (req, res) => {
   try {
-    await service.deleteInventoryItem(+req.params.id);
+    await service.deleteInventoryItem(+req.params.id, req.user.userId);
     res.json({ success: true, message: 'Xóa vật tư thành công' });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
