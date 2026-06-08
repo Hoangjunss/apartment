@@ -1,4 +1,4 @@
-import { prisma } from '@my/prisma';
+import { prisma, notDeleted } from '@my/prisma';
 import eventHub from '@my/events';
 import { validateTransition } from '@my/workflow-backend';
 import { applyBuildingScope, getAssignedBuildingIds } from '@my/policy-backend';
@@ -36,7 +36,7 @@ const INCLUDE_FULL = {
 
 // GET / — Tất cả yêu cầu (ADMIN/MANAGER)
 export const getAll = async (filters = {}, currentUser) => {
-  let where = {};
+  let where = { ...notDeleted };
   if (filters.status) where.status = filters.status;
   if (filters.assigned_to) where.assigned_to = Number(filters.assigned_to);
   if (filters.apartment_id) where.apartment_id = Number(filters.apartment_id);
@@ -53,8 +53,8 @@ export const getAll = async (filters = {}, currentUser) => {
 // GET /my — Yêu cầu của user hiện tại (TECHNICIAN xem việc được giao + RECEPTIONIST xem việc do mình tạo)
 export const getMy = async (userId, role, currentUser) => {
   let where = role === 'TECHNICIAN'
-    ? { assigned_to: userId }
-    : {};
+    ? { assigned_to: userId, ...notDeleted }
+    : { ...notDeleted };
 
   where = await applyBuildingScope(currentUser, where, 'ServiceRequest');
 
@@ -67,8 +67,8 @@ export const getMy = async (userId, role, currentUser) => {
 
 // GET /:id — Chi tiết
 export const getById = async (id) => {
-  return prisma.serviceRequests.findUnique({
-    where: { id },
+  return prisma.serviceRequests.findFirst({
+    where: { id, ...notDeleted },
     include: INCLUDE_FULL,
   });
 };
@@ -132,6 +132,7 @@ export const create = async (data, requestedByUserId, currentUser) => {
       requester_phone: requesterPhone,
       assigned_to: data.assigned_to ? Number(data.assigned_to) : null,
       scheduled_start_date: data.scheduled_start_date ? new Date(data.scheduled_start_date) : new Date(),
+      created_by: requestedByUserId,
     },
     include: INCLUDE_FULL,
   });
@@ -157,7 +158,8 @@ export const assign = async (id, assignedTo, actorId) => {
     where: { id },
     data: { 
       assigned_to: assignedTo,
-      status: 'ASSIGNED'
+      status: 'ASSIGNED',
+      updated_by: actorId
     },
     include: INCLUDE_FULL,
   });
@@ -190,7 +192,7 @@ export const updateStatus = async (id, status, requesterId, requesterRole, body 
   // Xác thực transition trạng thái qua Workflow Engine
   await validateTransition('ServiceRequestWorkflow', sr.status, status, requesterRole);
 
-  const updateData = { status };
+  const updateData = { status, updated_by: requesterId };
   if (status === 'RESOLVED') {
     updateData.resolved_at = new Date();
   } else {
