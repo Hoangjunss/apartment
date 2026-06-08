@@ -1,18 +1,29 @@
 import { prisma } from '@my/prisma';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'fallback_refresh_secret';
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 const SALT_ROUNDS = 10;
+
+/**
+ * Mã hóa một chiều Refresh Token bằng HMAC-SHA256
+ */
+export const hashToken = (token) => {
+  return crypto
+    .createHmac('sha256', JWT_REFRESH_SECRET)
+    .update(token)
+    .digest('hex');
+};
 
 /**
  * Đăng nhập và sinh token
  */
-export const login = async (email, password) => {
+export const login = async (email, password, ipAddress, userAgent) => {
   const user = await prisma.users.findUnique({ where: { email } });
   
-  if (!user) {
+  if (!user || user.deleted_at !== null) {
     throw new Error('Sai thông tin đăng nhập');
   }
 
@@ -33,7 +44,21 @@ export const login = async (email, password) => {
 
   const payload = { userId: user.id, email: user.email, role: user.role };
   const accessToken = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
-  const refreshToken = jwt.sign({ userId: user.id }, JWT_REFRESH_SECRET, { expiresIn: '7d' });
+  const refreshToken = jwt.sign({ userId: user.id, jti: crypto.randomUUID() }, JWT_REFRESH_SECRET, { expiresIn: '7d' });
+
+  // Lưu phiên vào DB
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7);
+
+  await prisma.userSessions.create({
+    data: {
+      user_id: user.id,
+      refresh_token_hash: hashToken(refreshToken),
+      expires_at: expiresAt,
+      ip_address: ipAddress || null,
+      user_agent: userAgent || null,
+    },
+  });
 
   // Loại bỏ password_hash trước khi trả về
   const { password_hash, ...userWithoutPassword } = user;
@@ -42,23 +67,78 @@ export const login = async (email, password) => {
 };
 
 /**
- * Refresh token
+ * Refresh token với cơ chế RTR (Atomic)
  */
 export const refresh = async (refreshToken) => {
   try {
     const payload = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+    const incomingHash = hashToken(refreshToken);
+
+    // Thu hồi token cũ atomic
+    const updateResult = await prisma.userSessions.updateMany({
+      where: {
+        refresh_token_hash: incomingHash,
+        revoked_at: null,
+        expires_at: { gte: new Date() },
+      },
+      data: {
+        revoked_at: new Date(),
+      },
+    });
+
+    if (updateResult.count === 0) {
+      throw new Error('Refresh token không hợp lệ hoặc đã hết hạn');
+    }
+
     const user = await prisma.users.findUnique({ where: { id: payload.userId } });
 
-    if (!user || !user.is_active) {
+    if (!user || !user.is_active || user.deleted_at !== null) {
       throw new Error('Tài khoản không hợp lệ hoặc đã bị khóa');
     }
 
+    // Cấp cặp token mới
     const newPayload = { userId: user.id, email: user.email, role: user.role };
     const accessToken = jwt.sign(newPayload, JWT_SECRET, { expiresIn: '8h' });
+    const newRefreshToken = jwt.sign({ userId: user.id, jti: crypto.randomUUID() }, JWT_REFRESH_SECRET, { expiresIn: '7d' });
 
-    return { accessToken };
+    // Lưu session mới
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    await prisma.userSessions.create({
+      data: {
+        user_id: user.id,
+        refresh_token_hash: hashToken(newRefreshToken),
+        expires_at: expiresAt,
+      },
+    });
+
+    return { accessToken, refreshToken: newRefreshToken };
   } catch (error) {
+    console.error('Error during refresh:', error);
     throw new Error('Refresh token không hợp lệ hoặc đã hết hạn');
+  }
+};
+
+/**
+ * Đăng xuất và vô hiệu hóa phiên làm việc (Idempotent)
+ */
+export const revokeSession = async (refreshToken) => {
+  try {
+    if (!refreshToken) return true;
+    const hash = hashToken(refreshToken);
+    await prisma.userSessions.updateMany({
+      where: {
+        refresh_token_hash: hash,
+        revoked_at: null,
+      },
+      data: {
+        revoked_at: new Date(),
+      },
+    });
+    return true;
+  } catch (error) {
+    return true; // Trả về 200 OK im lặng
   }
 };
 
@@ -66,8 +146,8 @@ export const refresh = async (refreshToken) => {
  * Lấy thông tin user hiện tại
  */
 export const getMe = async (userId) => {
-  const user = await prisma.users.findUnique({
-    where: { id: userId },
+  const user = await prisma.users.findFirst({
+    where: { id: userId, deleted_at: null },
     select: {
       id: true,
       email: true,
@@ -87,7 +167,7 @@ export const getMe = async (userId) => {
  * Đổi mật khẩu
  */
 export const changePassword = async (userId, oldPassword, newPassword) => {
-  const user = await prisma.users.findUnique({ where: { id: userId } });
+  const user = await prisma.users.findFirst({ where: { id: userId, deleted_at: null } });
   if (!user) throw new Error('Không tìm thấy người dùng');
 
   const isMatch = await bcrypt.compare(oldPassword, user.password_hash);
@@ -109,12 +189,13 @@ export const changePassword = async (userId, oldPassword, newPassword) => {
 export const getUsers = async ({ page = 1, limit = 20, search }) => {
   const where = search
     ? {
+        deleted_at: null,
         OR: [
           { email: { contains: search } },
           { full_name: { contains: search } },
         ],
       }
-    : {};
+    : { deleted_at: null };
 
   const [items, total] = await Promise.all([
     prisma.users.findMany({
@@ -143,7 +224,7 @@ export const getUsers = async ({ page = 1, limit = 20, search }) => {
  * ADMIN: Tạo user mới
  */
 export const createUser = async (data) => {
-  const existing = await prisma.users.findUnique({ where: { email: data.email } });
+  const existing = await prisma.users.findFirst({ where: { email: data.email, deleted_at: null } });
   if (existing) {
     throw new Error(`Email '${data.email}' đã tồn tại`);
   }
@@ -178,7 +259,7 @@ export const createUser = async (data) => {
  * ADMIN: Cập nhật user
  */
 export const updateUser = async (id, data) => {
-  const user = await prisma.users.findUnique({ where: { id } });
+  const user = await prisma.users.findFirst({ where: { id, deleted_at: null } });
   if (!user) throw new Error('Không tìm thấy người dùng');
 
   // Không cho phép đổi email qua đây để tránh conflict
@@ -204,7 +285,7 @@ export const updateUser = async (id, data) => {
  * ADMIN: Toggle trạng thái active
  */
 export const toggleActive = async (id) => {
-  const user = await prisma.users.findUnique({ where: { id } });
+  const user = await prisma.users.findFirst({ where: { id, deleted_at: null } });
   if (!user) throw new Error('Không tìm thấy người dùng');
 
   const updatedUser = await prisma.users.update({

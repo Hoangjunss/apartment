@@ -25,7 +25,9 @@ export const login = async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp email và password' });
     }
-    const data = await service.login(email, password);
+    const ipAddress = req.ip;
+    const userAgent = req.headers['user-agent'];
+    const data = await service.login(email, password, ipAddress, userAgent);
     res.json({ success: true, data });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });
@@ -46,9 +48,13 @@ export const refresh = async (req, res) => {
 };
 
 export const logout = async (req, res) => {
-  // Jwt logout thường được xử lý ở frontend bằng cách xóa token.
-  // Nếu có blacklist thì xử lý ở đây.
-  res.json({ success: true, message: 'Đăng xuất thành công' });
+  try {
+    const { refreshToken } = req.body;
+    await service.revokeSession(refreshToken);
+    res.json({ success: true, message: 'Đăng xuất thành công' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
 
 export const getMe = async (req, res) => {

@@ -1,7 +1,6 @@
 import jwt from 'jsonwebtoken';
 
-// Nên lấy từ biến môi trường, dùng fallback cho development
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 /**
  * Middleware xác thực JWT token

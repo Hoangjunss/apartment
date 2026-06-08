@@ -13,8 +13,8 @@ export async function login(email, password) {
 /**
  * Đăng xuất
  */
-export async function logout() {
-  const res = await api.post('/auth/logout');
+export async function logout(refreshToken) {
+  const res = await api.post('/auth/logout', { refreshToken });
   return res.data;
 }
 
