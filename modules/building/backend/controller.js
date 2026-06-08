@@ -33,7 +33,7 @@ export const getBuildingById = async (req, res) => {
 
 export const createBuilding = async (req, res) => {
   try {
-    const data = await service.createBuilding(req.body);
+    const data = await service.createBuilding(req.body, req.user.userId);
     res.status(201).json({ success: true, data });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });
@@ -42,7 +42,7 @@ export const createBuilding = async (req, res) => {
 
 export const updateBuilding = async (req, res) => {
   try {
-    const data = await service.updateBuilding(+req.params.id, req.body);
+    const data = await service.updateBuilding(+req.params.id, req.body, req.user.userId);
     res.json({ success: true, data });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });

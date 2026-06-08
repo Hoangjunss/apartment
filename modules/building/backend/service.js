@@ -1,4 +1,4 @@
-import { prisma } from '@my/prisma';
+import { prisma, notDeleted } from '@my/prisma';
 import { createLog } from '@my/audit-log-backend';
 import { applyBuildingScope, getAssignedBuildingIds } from '@my/policy-backend';
 
@@ -7,14 +7,15 @@ import { applyBuildingScope, getAssignedBuildingIds } from '@my/policy-backend';
 // ==========================================
 
 export const getBuildings = async ({ page = 1, limit = 20, search } = {}, currentUser) => {
-  let where = search
-    ? {
-        OR: [
-          { name: { contains: search } },
-          { code: { contains: search } },
-        ],
-      }
-    : {};
+  let where = {
+    ...notDeleted
+  };
+  if (search) {
+    where.OR = [
+      { name: { contains: search } },
+      { code: { contains: search } },
+    ];
+  }
 
   where = await applyBuildingScope(currentUser, where, 'Building');
 
@@ -32,32 +33,41 @@ export const getBuildings = async ({ page = 1, limit = 20, search } = {}, curren
 };
 
 export const getBuildingById = async (id) => {
-  return prisma.buildings.findUnique({
-    where: { id },
+  return prisma.buildings.findFirst({
+    where: { id, ...notDeleted },
     include: {
       floors: {
+        where: { ...notDeleted },
         orderBy: { floor_number: 'asc' },
       },
     },
   });
 };
 
-export const createBuilding = async (data) => {
-  const existing = await prisma.buildings.findUnique({ where: { code: data.code } });
+export const createBuilding = async (data, userId) => {
+  const existing = await prisma.buildings.findFirst({ where: { code: data.code, ...notDeleted } });
   if (existing) throw new Error(`Mã tòa nhà '${data.code}' đã tồn tại`);
 
-  return prisma.buildings.create({ data });
+  return prisma.buildings.create({
+    data: {
+      ...data,
+      created_by: userId
+    }
+  });
 };
 
-export const updateBuilding = async (id, data) => {
+export const updateBuilding = async (id, data, userId) => {
   if (data.code) {
-    const existing = await prisma.buildings.findUnique({ where: { code: data.code } });
+    const existing = await prisma.buildings.findFirst({ where: { code: data.code, ...notDeleted } });
     if (existing && existing.id !== id) throw new Error(`Mã tòa nhà '${data.code}' đã tồn tại`);
   }
 
   return prisma.buildings.update({
     where: { id },
-    data,
+    data: {
+      ...data,
+      updated_by: userId
+    },
   });
 };
 
@@ -67,10 +77,11 @@ export const updateBuilding = async (id, data) => {
 
 export const getFloorsByBuildingId = async (buildingId) => {
   return prisma.floors.findMany({
-    where: { building_id: buildingId },
+    where: { building_id: buildingId, ...notDeleted },
     orderBy: { floor_number: 'asc' },
     include: {
       apartments: {
+        where: { ...notDeleted },
         orderBy: { apartment_code: 'asc' },
       },
     },
@@ -108,14 +119,16 @@ export const bulkCreateFloors = async (buildingId, fromFloor, toFloor) => {
 // ==========================================
 
 export const getApartments = async ({ page = 1, limit = 20, status, building_id, floor_id, room_type } = {}, currentUser) => {
-  let where = {};
+  let where = {
+    ...notDeleted
+  };
   
   if (status) where.status = status;
   if (room_type) where.room_type = room_type;
   if (floor_id) {
     where.floor_id = floor_id;
   } else if (building_id) {
-    where.floor = { building_id: building_id };
+    where.floor = { building_id: building_id, ...notDeleted };
   }
 
   where = await applyBuildingScope(currentUser, where, 'Apartment');
@@ -139,14 +152,15 @@ export const getApartments = async ({ page = 1, limit = 20, status, building_id,
 };
 
 export const getApartmentById = async (id) => {
-  return prisma.apartments.findUnique({
-    where: { id },
+  return prisma.apartments.findFirst({
+    where: { id, ...notDeleted },
     include: {
       furniture: true,
       floor: {
         include: { building: true }
       },
       contracts: {
+        where: { ...notDeleted },
         include: {
           tenant: true
         }
@@ -158,7 +172,7 @@ export const getApartmentById = async (id) => {
 
 export const createApartment = async (data, userId) => {
   const { building_id, floor_id, ...rest } = data;
-  const existing = await prisma.apartments.findUnique({ where: { apartment_code: rest.apartment_code } });
+  const existing = await prisma.apartments.findFirst({ where: { apartment_code: rest.apartment_code, ...notDeleted } });
   if (existing) throw new Error(`Mã căn hộ '${rest.apartment_code}' đã tồn tại`);
 
   const newApartment = await prisma.apartments.create({
@@ -170,7 +184,8 @@ export const createApartment = async (data, userId) => {
       base_price: Number(rest.base_price),
       deposit_amount: Number(rest.deposit_amount),
       description: rest.description || null,
-      floor: { connect: { id: Number(floor_id) } }
+      floor: { connect: { id: Number(floor_id) } },
+      created_by: userId
     }
   });
 
@@ -196,13 +211,15 @@ export const updateApartment = async (id, data, userId) => {
   const { status, building_id, floor_id, ...updateData } = data;
 
   if (updateData.apartment_code) {
-    const existing = await prisma.apartments.findUnique({ where: { apartment_code: updateData.apartment_code } });
+    const existing = await prisma.apartments.findFirst({ where: { apartment_code: updateData.apartment_code, ...notDeleted } });
     if (existing && existing.id !== id) throw new Error(`Mã căn hộ '${updateData.apartment_code}' đã tồn tại`);
   }
 
-  const oldApartment = await prisma.apartments.findUnique({ where: { id } });
+  const oldApartment = await prisma.apartments.findFirst({ where: { id, ...notDeleted } });
 
-  const payload = {};
+  const payload = {
+    updated_by: userId
+  };
   if (updateData.apartment_code !== undefined) payload.apartment_code = updateData.apartment_code;
   if (updateData.room_type !== undefined) payload.room_type = updateData.room_type;
   if (updateData.area_sqm !== undefined) payload.area_sqm = Number(updateData.area_sqm);
@@ -388,14 +405,17 @@ export const generateApartmentToken = async (apartmentId) => {
 };
 
 export const getApartmentPreview = async (id) => {
-  const apartment = await prisma.apartments.findUnique({
-    where: { id },
+  const apartment = await prisma.apartments.findFirst({
+    where: { id, ...notDeleted },
     include: {
       floor: {
         include: { building: true }
       },
       contracts: {
-        where: { status: { in: ['ACTIVE', 'EXPIRING_SOON'] } },
+        where: { 
+          status: { in: ['ACTIVE', 'EXPIRING_SOON'] },
+          ...notDeleted
+        },
         include: {
           tenant: true
         }
