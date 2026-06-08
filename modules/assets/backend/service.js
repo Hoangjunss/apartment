@@ -1,4 +1,4 @@
-import { prisma } from '@my/prisma';
+import { prisma, notDeleted } from '@my/prisma';
 import { applyBuildingScope } from '@my/policy-backend';
 
 // Helper tính khấu hao động (Straight-Line)
@@ -42,7 +42,7 @@ export const calculateAssetDepreciation = (asset) => {
 };
 
 export const getAssets = async ({ page = 1, limit = 20, search, building_id, category, status } = {}, currentUser) => {
-  let where = {};
+  let where = { ...notDeleted };
 
   if (building_id) {
     where.building_id = Number(building_id);
@@ -88,8 +88,8 @@ export const getAssets = async ({ page = 1, limit = 20, search, building_id, cat
 };
 
 export const getAssetById = async (id) => {
-  const asset = await prisma.assets.findUnique({
-    where: { id: Number(id) },
+  const asset = await prisma.assets.findFirst({
+    where: { id: Number(id), ...notDeleted },
     include: {
       building: { select: { id: true, name: true, code: true } }
     }
@@ -105,7 +105,7 @@ export const getAssetById = async (id) => {
 };
 
 export const getAssetByCode = async (code, currentUser) => {
-  let where = { asset_code: code };
+  let where = { asset_code: code, ...notDeleted };
   where = await applyBuildingScope(currentUser, where, 'Asset');
 
   const asset = await prisma.assets.findFirst({
@@ -124,9 +124,9 @@ export const getAssetByCode = async (code, currentUser) => {
   };
 };
 
-export const createAsset = async (data) => {
-  const existing = await prisma.assets.findUnique({
-    where: { asset_code: data.asset_code }
+export const createAsset = async (data, userId) => {
+  const existing = await prisma.assets.findFirst({
+    where: { asset_code: data.asset_code, ...notDeleted }
   });
   if (existing) {
     throw new Error(`Mã tài sản '${data.asset_code}' đã tồn tại`);
@@ -144,15 +144,16 @@ export const createAsset = async (data) => {
       useful_life_years: Number(data.useful_life_years),
       purchase_date: new Date(data.purchase_date),
       depreciation_method: data.depreciation_method || 'STRAIGHT_LINE',
-      description: data.description || null
+      description: data.description || null,
+      created_by: userId
     }
   });
 };
 
-export const updateAsset = async (id, data) => {
+export const updateAsset = async (id, data, userId) => {
   if (data.asset_code) {
-    const existing = await prisma.assets.findUnique({
-      where: { asset_code: data.asset_code }
+    const existing = await prisma.assets.findFirst({
+      where: { asset_code: data.asset_code, ...notDeleted }
     });
     if (existing && existing.id !== Number(id)) {
       throw new Error(`Mã tài sản '${data.asset_code}' đã tồn tại`);
@@ -172,14 +173,20 @@ export const updateAsset = async (id, data) => {
       useful_life_years: data.useful_life_years !== undefined ? Number(data.useful_life_years) : undefined,
       purchase_date: data.purchase_date ? new Date(data.purchase_date) : undefined,
       depreciation_method: data.depreciation_method,
-      description: data.description !== undefined ? data.description : undefined
+      description: data.description !== undefined ? data.description : undefined,
+      updated_by: userId
     }
   });
 };
 
-export const deleteAsset = async (id) => {
-  return prisma.assets.delete({
-    where: { id: Number(id) }
+export const deleteAsset = async (id, userId) => {
+  const asset = await prisma.assets.findFirst({
+    where: { id: Number(id), ...notDeleted }
+  });
+  if (!asset) throw new Error('Không tìm thấy tài sản');
+  return prisma.assets.update({
+    where: { id: Number(id) },
+    data: { deleted_at: new Date(), deleted_by: userId }
   });
 };
 
