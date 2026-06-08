@@ -1,4 +1,4 @@
-import { prisma, Prisma } from '@my/prisma';
+import { prisma, Prisma, notDeleted } from '@my/prisma';
 import eventHub from '@my/events';
 import { WATER_PRICE_PER_PERSON } from './constants.js';
 import { calculateWaterCost } from './utils.js';
@@ -130,7 +130,9 @@ export const recordUtilityReading = async (data, userId) => {
 // ==========================================
 
 export const getInvoices = async ({ page = 1, limit = 20, status, contract_id, billing_month, apartment_id, building_id }, currentUser) => {
-  let where = {};
+  let where = {
+    ...notDeleted
+  };
   if (status) where.status = status;
   if (contract_id) where.contract_id = contract_id;
   if (billing_month) where.billing_month = billing_month;
@@ -140,8 +142,10 @@ export const getInvoices = async ({ page = 1, limit = 20, status, contract_id, b
       ...where.apartment,
       floor: {
         ...where.apartment?.floor,
-        building_id: Number(building_id)
-      }
+        building_id: Number(building_id),
+        ...notDeleted
+      },
+      ...notDeleted
     };
   }
 
@@ -170,8 +174,8 @@ export const getInvoices = async ({ page = 1, limit = 20, status, contract_id, b
 };
 
 export const getInvoiceById = async (id) => {
-  return prisma.invoices.findUnique({
-    where: { id },
+  return prisma.invoices.findFirst({
+    where: { id, ...notDeleted },
     include: {
       contract: {
         include: {
@@ -241,12 +245,11 @@ export const generateInvoice = async (data, userId) => {
 
   return prisma.$transaction(async (tx) => {
     // Check unique contract_id + billing_month
-    const existing = await tx.invoices.findUnique({
+    const existing = await tx.invoices.findFirst({
       where: {
-        contract_id_billing_month: {
-          contract_id,
-          billing_month
-        }
+        contract_id,
+        billing_month,
+        ...notDeleted
       }
     });
 
@@ -255,8 +258,8 @@ export const generateInvoice = async (data, userId) => {
     }
 
     // Fetch contract
-    const contract = await tx.contracts.findUnique({
-      where: { id: contract_id },
+    const contract = await tx.contracts.findFirst({
+      where: { id: contract_id, ...notDeleted },
       include: {
         apartment: true,
         service_subscriptions: {
@@ -314,7 +317,8 @@ export const generateInvoice = async (data, userId) => {
       where: {
         contract_id,
         status: { in: ['UNPAID', 'PARTIALLY_PAID', 'OVERDUE'] },
-        billing_month: { lt: billing_month }
+        billing_month: { lt: billing_month },
+        ...notDeleted
       },
       include: {
         payments: true
@@ -367,7 +371,7 @@ export const generateInvoice = async (data, userId) => {
     const invoice_code = `HD-${cleanCode}-${monthCode}`;
 
     // Check unique invoice_code
-    const checkCode = await tx.invoices.findUnique({ where: { invoice_code } });
+    const checkCode = await tx.invoices.findFirst({ where: { invoice_code, ...notDeleted } });
     if (checkCode) {
       throw new Error(`Mã hóa đơn ${invoice_code} đã tồn tại`);
     }
@@ -439,20 +443,20 @@ export const generateInvoice = async (data, userId) => {
   return newInvoice;
 };
 
-export const updateInvoiceStatus = async (id, status) => {
+export const updateInvoiceStatus = async (id, status, userId) => {
   const validStatuses = ['UNPAID', 'PARTIALLY_PAID', 'PAID', 'OVERDUE'];
   if (!validStatuses.includes(status)) {
     throw new Error('Trạng thái hóa đơn không hợp lệ');
   }
 
-  const invoice = await prisma.invoices.findUnique({ where: { id } });
+  const invoice = await prisma.invoices.findFirst({ where: { id, ...notDeleted } });
   if (!invoice) {
     throw new Error('Không tìm thấy hóa đơn');
   }
 
   return prisma.invoices.update({
     where: { id },
-    data: { status }
+    data: { status, updated_by: userId }
   });
 };
 
@@ -473,9 +477,9 @@ export const recordPayment = async (data, userId) => {
 
   const { paymentRecord, creditSurplus } = await prisma.$transaction(async (tx) => {
     // 1. Fetch invoice and related payments
-    const invoice = await tx.invoices.findUnique({
-      where: { id: invoice_id },
-      include: { payments: true }
+    const invoice = await tx.invoices.findFirst({
+      where: { id: invoice_id, ...notDeleted },
+      include: { payments: { where: { ...notDeleted } } }
     });
 
     if (!invoice) {
@@ -511,7 +515,8 @@ export const recordPayment = async (data, userId) => {
         payment_date: new Date(payment_date),
         reference_number,
         note: note || (creditSurplus > 0 ? `Thanh toán hóa đơn. Thừa ${creditSurplus.toLocaleString('vi-VN')} đ chuyển vào ví credit.` : undefined),
-        recorded_by: userId
+        recorded_by: userId,
+        created_by: userId
       }
     });
 
