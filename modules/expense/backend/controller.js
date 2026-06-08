@@ -78,7 +78,7 @@ export const updateExpense = async (req, res) => {
       building_id: +building_id,
       amount: +amount,
       expense_date: new Date(expense_date)
-    });
+    }, req.user.userId);
 
     res.json({ success: true, data, message: 'Cập nhật chi phí tòa nhà thành công' });
   } catch (err) {
@@ -93,7 +93,7 @@ export const updateExpenseStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp trạng thái' });
     }
 
-    const data = await service.updateExpenseStatus(+req.params.id, status);
+    const data = await service.updateExpenseStatus(+req.params.id, status, req.user.userId);
     res.json({ success: true, data, message: 'Cập nhật trạng thái thanh toán thành công' });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });
@@ -102,7 +102,7 @@ export const updateExpenseStatus = async (req, res) => {
 
 export const deleteExpense = async (req, res) => {
   try {
-    const data = await service.deleteExpense(+req.params.id);
+    const data = await service.deleteExpense(+req.params.id, req.user.userId);
     res.json({ success: true, data, message: 'Xóa chi phí tòa nhà thành công' });
   } catch (err) {
     res.status(getErrorStatus(err.message)).json({ success: false, message: err.message });

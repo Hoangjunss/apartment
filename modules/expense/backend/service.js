@@ -1,7 +1,7 @@
-import { prisma } from '@my/prisma';
+import { prisma, notDeleted } from '@my/prisma';
 
 export const getExpenses = async ({ page = 1, limit = 20, building_id, category, status, start_date, end_date }) => {
-  const where = { deleted_at: null };
+  const where = { ...notDeleted };
   if (building_id) where.building_id = building_id;
   if (category) where.category = category;
   if (status) where.status = status;
@@ -55,7 +55,7 @@ export const getExpenses = async ({ page = 1, limit = 20, building_id, category,
 };
 
 export const getExpensesSummary = async ({ building_id, year, month }) => {
-  const where = { deleted_at: null, status: 'PAID' };
+  const where = { ...notDeleted, status: 'PAID' };
   if (building_id) where.building_id = building_id;
 
   if (year !== undefined) {
@@ -109,15 +109,15 @@ export const createExpense = async (data, userId) => {
   });
 };
 
-export const updateExpense = async (id, data) => {
+export const updateExpense = async (id, data, userId) => {
   const { building_id, category, title, amount, expense_date, description } = data;
 
   if (Number(amount) <= 0) {
     throw new Error('Số tiền chi phí phải lớn hơn 0');
   }
 
-  const expense = await prisma.buildingExpenses.findUnique({
-    where: { id, deleted_at: null }
+  const expense = await prisma.buildingExpenses.findFirst({
+    where: { id, ...notDeleted }
   });
 
   if (!expense) {
@@ -132,7 +132,8 @@ export const updateExpense = async (id, data) => {
       title,
       amount: Number(amount),
       expense_date,
-      description
+      description,
+      updated_by: userId
     },
     include: {
       building: { select: { id: true, name: true, code: true } },
@@ -141,14 +142,14 @@ export const updateExpense = async (id, data) => {
   });
 };
 
-export const updateExpenseStatus = async (id, status) => {
+export const updateExpenseStatus = async (id, status, userId) => {
   const validStatuses = ['PENDING', 'PAID'];
   if (!validStatuses.includes(status)) {
     throw new Error('Trạng thái chi phí không hợp lệ');
   }
 
-  const expense = await prisma.buildingExpenses.findUnique({
-    where: { id, deleted_at: null }
+  const expense = await prisma.buildingExpenses.findFirst({
+    where: { id, ...notDeleted }
   });
 
   if (!expense) {
@@ -157,13 +158,13 @@ export const updateExpenseStatus = async (id, status) => {
 
   return prisma.buildingExpenses.update({
     where: { id },
-    data: { status }
+    data: { status, updated_by: userId }
   });
 };
 
-export const deleteExpense = async (id) => {
-  const expense = await prisma.buildingExpenses.findUnique({
-    where: { id, deleted_at: null }
+export const deleteExpense = async (id, userId) => {
+  const expense = await prisma.buildingExpenses.findFirst({
+    where: { id, ...notDeleted }
   });
 
   if (!expense) {
@@ -173,6 +174,6 @@ export const deleteExpense = async (id) => {
   // Soft delete
   return prisma.buildingExpenses.update({
     where: { id },
-    data: { deleted_at: new Date() }
+    data: { deleted_at: new Date(), deleted_by: userId }
   });
 };
