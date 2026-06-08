@@ -1,4 +1,4 @@
-import { prisma } from '@my/prisma';
+import { prisma, notDeleted } from '@my/prisma';
 import { createLog } from '@my/audit-log-backend';
 import { applyBuildingScope } from '@my/policy-backend';
 
@@ -9,6 +9,7 @@ import { applyBuildingScope } from '@my/policy-backend';
 export const getTenants = async ({ page = 1, limit = 20, search, status } = {}, currentUser) => {
   let where = {
     AND: [
+      notDeleted,
       search
         ? {
             OR: [
@@ -20,7 +21,7 @@ export const getTenants = async ({ page = 1, limit = 20, search, status } = {}, 
         : {},
       status === 'ACTIVE'
         ? {
-            contracts: { some: { status: 'ACTIVE' } },
+            contracts: { some: { status: 'ACTIVE', ...notDeleted } },
           }
         : {},
       status === 'EXPIRED'
@@ -46,6 +47,7 @@ export const getTenants = async ({ page = 1, limit = 20, search, status } = {}, 
       orderBy: { created_at: 'desc' },
       include: {
         contracts: {
+          where: { ...notDeleted },
           orderBy: { start_date: 'desc' },
           take: 1, // Lấy hợp đồng mới nhất
           include: {
@@ -73,10 +75,11 @@ export const getTenants = async ({ page = 1, limit = 20, search, status } = {}, 
 };
 
 export const getTenantById = async (id) => {
-  return prisma.tenants.findUnique({
-    where: { id },
+  return prisma.tenants.findFirst({
+    where: { id, ...notDeleted },
     include: {
       contracts: {
+        where: { ...notDeleted },
         include: { apartment: true },
         orderBy: { start_date: 'desc' },
       },
@@ -119,8 +122,8 @@ export const getTenantHistory = async (id) => {
 };
 
 export const createTenant = async (data, userId) => {
-  const existing = await prisma.tenants.findUnique({
-    where: { national_id: data.national_id },
+  const existing = await prisma.tenants.findFirst({
+    where: { national_id: data.national_id, ...notDeleted },
   });
   if (existing) {
     throw new Error(`CCCD '${data.national_id}' đã tồn tại trong hệ thống (ID: ${existing.id})`);
@@ -130,7 +133,12 @@ export const createTenant = async (data, userId) => {
   if (data.national_id_issued_date) data.national_id_issued_date = new Date(data.national_id_issued_date);
   if (data.date_of_birth) data.date_of_birth = new Date(data.date_of_birth);
 
-  const newTenant = await prisma.tenants.create({ data });
+  const newTenant = await prisma.tenants.create({
+    data: {
+      ...data,
+      created_by: userId
+    }
+  });
 
   if (userId) {
     await createLog({
@@ -151,8 +159,8 @@ export const createTenant = async (data, userId) => {
 
 export const updateTenant = async (id, data, userId) => {
   if (data.national_id) {
-    const existing = await prisma.tenants.findUnique({
-      where: { national_id: data.national_id },
+    const existing = await prisma.tenants.findFirst({
+      where: { national_id: data.national_id, ...notDeleted },
     });
     if (existing && existing.id !== id) {
       throw new Error(`CCCD '${data.national_id}' đã tồn tại trong hệ thống (ID: ${existing.id})`);
@@ -162,11 +170,14 @@ export const updateTenant = async (id, data, userId) => {
   if (data.national_id_issued_date) data.national_id_issued_date = new Date(data.national_id_issued_date);
   if (data.date_of_birth) data.date_of_birth = new Date(data.date_of_birth);
 
-  const oldTenant = await prisma.tenants.findUnique({ where: { id } });
+  const oldTenant = await prisma.tenants.findFirst({ where: { id, ...notDeleted } });
 
   const updated = await prisma.tenants.update({
     where: { id },
-    data,
+    data: {
+      ...data,
+      updated_by: userId
+    },
   });
 
   if (userId && oldTenant) {
@@ -273,10 +284,11 @@ export const getAllRegistrations = async ({ page = 1, limit = 20, month, year },
 };
 
 export const getTenantPreview = async (id) => {
-  const tenant = await prisma.tenants.findUnique({
-    where: { id },
+  const tenant = await prisma.tenants.findFirst({
+    where: { id, ...notDeleted },
     include: {
       contracts: {
+        where: { ...notDeleted },
         orderBy: { start_date: 'desc' },
         take: 1,
         include: {
