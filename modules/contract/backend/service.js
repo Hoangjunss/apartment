@@ -1,4 +1,4 @@
-import { prisma } from '@my/prisma';
+import { prisma, notDeleted } from '@my/prisma';
 import eventHub from '@my/events';
 import { validateTransition } from '@my/workflow-backend';
 import { applyBuildingScope, getAssignedBuildingIds } from '@my/policy-backend';
@@ -8,7 +8,7 @@ import { applyBuildingScope, getAssignedBuildingIds } from '@my/policy-backend';
 const generateContractCode = async () => {
   const year = new Date().getFullYear();
   const lastContract = await prisma.contracts.findFirst({
-    where: { contract_code: { startsWith: `HD${year}-` } },
+    where: { contract_code: { startsWith: `HD${year}-` }, ...notDeleted },
     orderBy: { id: 'desc' },
   });
   
@@ -20,7 +20,9 @@ const generateContractCode = async () => {
 };
 
 export const getContracts = async ({ page = 1, limit = 20, status, apartment_id, tenant_id, building_id, month }, currentUser) => {
-  let where = {};
+  let where = {
+    ...notDeleted
+  };
   if (status) where.status = status;
   if (apartment_id) where.apartment_id = apartment_id;
   if (tenant_id) where.tenant_id = tenant_id;
@@ -28,8 +30,10 @@ export const getContracts = async ({ page = 1, limit = 20, status, apartment_id,
   if (building_id) {
     where.apartment = {
       floor: {
-        building_id: building_id
-      }
+        building_id: building_id,
+        ...notDeleted
+      },
+      ...notDeleted
     };
   }
 
@@ -65,8 +69,8 @@ export const getContracts = async ({ page = 1, limit = 20, status, apartment_id,
 };
 
 export const getContractById = async (id) => {
-  return prisma.contracts.findUnique({
-    where: { id },
+  return prisma.contracts.findFirst({
+    where: { id, ...notDeleted },
     include: {
       tenant: true,
       apartment: {
@@ -90,8 +94,8 @@ export const createContract = async (data, userId, currentUser) => {
   }
 
   // 1. Kiểm tra trạng thái căn hộ
-  const apartment = await prisma.apartments.findUnique({
-    where: { id: data.apartment_id },
+  const apartment = await prisma.apartments.findFirst({
+    where: { id: data.apartment_id, ...notDeleted },
     include: { floor: true }
   });
   if (!apartment) throw new Error('Không tìm thấy căn hộ');
@@ -110,7 +114,7 @@ export const createContract = async (data, userId, currentUser) => {
 
   // 2. Kiểm tra không có hợp đồng ACTIVE trùng căn hộ
   const activeContract = await prisma.contracts.findFirst({
-    where: { apartment_id: data.apartment_id, status: 'ACTIVE' },
+    where: { apartment_id: data.apartment_id, status: 'ACTIVE', ...notDeleted },
   });
   if (activeContract) {
     throw new Error('Căn hộ này đang có hợp đồng hiệu lực khác');
@@ -188,11 +192,14 @@ export const updateContract = async (id, data, actor) => {
     updateData.soNguoiO = Number(updateData.occupants_count);
   }
 
-  const oldContract = await prisma.contracts.findUnique({ where: { id } });
+  const oldContract = await prisma.contracts.findFirst({ where: { id, ...notDeleted } });
 
   const updated = await prisma.contracts.update({
     where: { id },
-    data: updateData,
+    data: {
+      ...updateData,
+      updated_by: actor?.userId
+    },
   });
 
   if (actor && oldContract) {
@@ -218,7 +225,7 @@ export const updateContract = async (id, data, actor) => {
 };
 
 export const terminateContract = async (id, termination_reason, userId, userRole) => {
-  const contract = await prisma.contracts.findUnique({ where: { id } });
+  const contract = await prisma.contracts.findFirst({ where: { id, ...notDeleted } });
   if (!contract) throw new Error('Không tìm thấy hợp đồng');
   
   // Xác thực transition trạng thái qua Workflow Engine
@@ -227,7 +234,7 @@ export const terminateContract = async (id, termination_reason, userId, userRole
   const [terminatedContract] = await prisma.$transaction([
     prisma.contracts.update({
       where: { id },
-      data: { status: 'TERMINATED', termination_reason },
+      data: { status: 'TERMINATED', termination_reason, updated_by: userId },
     }),
     prisma.apartments.update({
       where: { id: contract.apartment_id },
@@ -257,7 +264,7 @@ export const terminateContract = async (id, termination_reason, userId, userRole
 };
 
 export const renewContract = async (id, data, userId, userRole) => {
-  const contract = await prisma.contracts.findUnique({ where: { id } });
+  const contract = await prisma.contracts.findFirst({ where: { id, ...notDeleted } });
   if (!contract) throw new Error('Không tìm thấy hợp đồng');
 
   // Xác thực transition trạng thái qua Workflow Engine
@@ -285,6 +292,7 @@ export const renewContract = async (id, data, userId, userRole) => {
         end_date: newEndDate,
         monthly_rent: data.new_monthly_rent ?? contract.monthly_rent,
         status: 'ACTIVE', // Reset về ACTIVE nếu đang là EXPIRING_SOON
+        updated_by: userId
       },
     }),
   ]);
@@ -322,7 +330,7 @@ export const getRenewals = async (contractId) => {
 };
 
 export const getExpiringSoon = async (currentUser) => {
-  let where = { status: 'EXPIRING_SOON' };
+  let where = { status: 'EXPIRING_SOON', ...notDeleted };
   where = await applyBuildingScope(currentUser, where, 'Contract');
 
   const contracts = await prisma.contracts.findMany({
