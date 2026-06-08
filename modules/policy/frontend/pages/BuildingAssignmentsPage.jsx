@@ -35,6 +35,16 @@ export default function BuildingAssignmentsPage() {
   const [revokeNotes, setRevokeNotes] = useState('');
   const [isRevoking, setIsRevoking] = useState(false);
 
+  // Expanded State for Revoked Assignments History
+  const [expandedUsers, setExpandedUsers] = useState({});
+
+  const toggleExpandUser = (userId) => {
+    setExpandedUsers(prev => ({
+      ...prev,
+      [userId]: !prev[userId]
+    }));
+  };
+
   // Fetch buildings using existing hook
   const { data: buildingsData } = useBuildings({ limit: 100 });
   const buildings = buildingsData?.items ?? [];
@@ -361,8 +371,8 @@ Ghi chú: ${a.notes || 'Không có ghi chú'}`}
                         {revokedAssigns.length === 0 ? (
                           <span className="text-xs text-gray-400 dark:text-gray-500">—</span>
                         ) : (
-                          <div className="flex flex-wrap gap-2">
-                            {revokedAssigns.map((a) => (
+                          <div className="flex flex-wrap gap-2 items-center">
+                            {(expandedUsers[user.id] ? revokedAssigns : revokedAssigns.slice(0, 2)).map((a) => (
                               <span
                                 key={a.id}
                                 className="inline-flex items-center gap-1.5 bg-red-50 text-red-700 border border-red-150 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30 px-2 py-0.5 rounded-lg text-xs font-medium cursor-help"
@@ -382,6 +392,14 @@ Ghi chú lịch sử: ${a.notes || 'Không có ghi chú'}`}
                                 )}
                               </span>
                             ))}
+                            {revokedAssigns.length > 2 && (
+                              <button
+                                onClick={() => toggleExpandUser(user.id)}
+                                className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold ml-0.5 hover:underline transition-colors focus:outline-none"
+                              >
+                                {expandedUsers[user.id] ? 'Thu gọn' : `+${revokedAssigns.length - 2} xem thêm`}
+                              </button>
+                            )}
                           </div>
                         )}
                       </td>

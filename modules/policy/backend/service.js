@@ -6,7 +6,8 @@ export const getAssignedBuildingIds = async (userId) => {
     where: {
       user_id: Number(userId),
       revoked_at: null,
-      user: { is_active: true }
+      user: { is_active: true, deleted_at: null },
+      building: { deleted_at: null }
     },
     select: { building_id: true }
   });
@@ -119,6 +120,10 @@ export const applyBuildingScope = async (currentUser, prismaWhere = {}, resource
 // Lấy danh sách toàn bộ assignments (dành cho Admin quản lý)
 export const getAllAssignments = async () => {
   return prisma.buildingAssignments.findMany({
+    where: {
+      building: { deleted_at: null },
+      user: { deleted_at: null }
+    },
     include: {
       user: { select: { id: true, full_name: true, role: true, email: true } },
       building: { select: { id: true, name: true, code: true } },
