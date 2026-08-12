@@ -26,6 +26,9 @@ import rulesRouter from '@my/rules-backend';
 import policyRouter from '@my/policy-backend';
 import '@my/contract-backend/cron.js';
 import '@my/notifications-backend/cron.js';
+import { initWeeklyReportScheduler } from '@my/scheduler';
+
+initWeeklyReportScheduler();
 
 const app = express();
 const httpServer = createServer(app);

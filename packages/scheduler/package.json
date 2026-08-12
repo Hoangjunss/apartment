@@ -1,5 +1,5 @@
 {
-  "name": "@my/report-backend",
+  "name": "@my/scheduler",
   "version": "1.0.0",
   "type": "module",
   "main": "index.js",
@@ -8,9 +8,8 @@
   },
   "dependencies": {
     "@my/prisma": "workspace:*",
-    "@my/auth-backend": "workspace:*",
     "@my/email": "workspace:*",
-    "express": "^4.19.2",
-    "xlsx": "^0.18.5"
+    "@my/report-backend": "workspace:*",
+    "node-cron": "^3.0.3"
   }
 }

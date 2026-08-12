@@ -28,3 +28,20 @@ export async function downloadExportFile(endpoint, params = {}) {
   });
   return res.data;
 }
+
+export async function getWeeklyReport() {
+  const res = await api.get('/report/weekly');
+  return res.data.data;
+}
+
+export async function triggerWeeklyReport(userIds = null) {
+  const res = await api.post('/report/weekly/trigger', { userIds });
+  return res.data;
+}
+
+export async function getWeeklyReportCandidates() {
+  const res = await api.get('/report/weekly/candidates');
+  return res.data.data;
+}
+
+

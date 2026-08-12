@@ -9,6 +9,11 @@ router.get('/revenue', authenticate, requireRole(['ADMIN', 'MANAGER']), ctrl.get
 router.get('/occupancy', authenticate, requireRole(['ADMIN', 'MANAGER']), ctrl.getOccupancyReport);
 router.get('/maintenance', authenticate, requireRole(['ADMIN', 'MANAGER']), ctrl.getMainMaintenanceReport || ctrl.getMaintenanceReport);
 router.get('/contracts', authenticate, requireRole(['ADMIN', 'MANAGER']), ctrl.getContractsReport);
+router.get('/weekly', authenticate, requireRole(['ADMIN', 'MANAGER']), ctrl.getWeeklyReport);
+router.get('/weekly/candidates', authenticate, requireRole(['ADMIN', 'MANAGER']), ctrl.getWeeklyReportCandidates);
+router.post('/weekly/trigger', authenticate, requireRole(['ADMIN', 'MANAGER']), ctrl.triggerWeeklyReport);
+
+
 
 // EXPORTS (RBAC SUPPORT)
 router.get('/export/tenants', authenticate, requireRole(['ADMIN', 'MANAGER', 'RECEPTIONIST']), ctrl.exportTenants);

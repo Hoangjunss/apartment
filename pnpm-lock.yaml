@@ -65,6 +65,9 @@ importers:
       '@my/rules-backend':
         specifier: workspace:*
         version: link:../../modules/rules/backend
+      '@my/scheduler':
+        specifier: workspace:*
+        version: link:../../packages/scheduler
       '@my/search-backend':
         specifier: workspace:*
         version: link:../../modules/search/backend
@@ -598,6 +601,9 @@ importers:
       '@my/auth-backend':
         specifier: workspace:*
         version: link:../../auth/backend
+      '@my/email':
+        specifier: workspace:*
+        version: link:../../../packages/email
       '@my/prisma':
         specifier: workspace:*
         version: link:../../../packages/prisma
@@ -740,6 +746,12 @@ importers:
         specifier: ^4.19.2
         version: 4.22.2
 
+  packages/email:
+    dependencies:
+      nodemailer:
+        specifier: ^6.9.13
+        version: 6.10.1
+
   packages/events: {}
 
   packages/prisma:
@@ -754,6 +766,21 @@ importers:
       prisma:
         specifier: ^5.14.0
         version: 5.22.0
+
+  packages/scheduler:
+    dependencies:
+      '@my/email':
+        specifier: workspace:*
+        version: link:../email
+      '@my/prisma':
+        specifier: workspace:*
+        version: link:../prisma
+      '@my/report-backend':
+        specifier: workspace:*
+        version: link:../../modules/report/backend
+      node-cron:
+        specifier: ^3.0.3
+        version: 3.0.3
 
 packages:
 
@@ -1906,6 +1933,10 @@ packages:
 
   node-releases@2.0.44:
     resolution: {integrity: sha512-5WUyunoPMsvvEhS8AxHtRzP+oA8UCkJ7YRxatWKjngndhDGLiqEVAQKWjFAiAiuL8zMRGzGSJxFnLetoa43qGQ==}
+
+  nodemailer@6.10.1:
+    resolution: {integrity: sha512-Z+iLaBGVaSjbIzQ4pX6XV41HrooLsQ10ZWPUehGmuantvzWoDVBnmsdUcOIDM1t+yPor5pDhVlDESgOMEGxhHA==}
+    engines: {node: '>=6.0.0'}
 
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
@@ -3449,6 +3480,8 @@ snapshots:
       uuid: 8.3.2
 
   node-releases@2.0.44: {}
+
+  nodemailer@6.10.1: {}
 
   normalize-path@3.0.0: {}
 

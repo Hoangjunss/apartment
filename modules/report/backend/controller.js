@@ -1,5 +1,6 @@
 import * as service from './service.js';
 import * as exportService from './export.service.js';
+import { prisma } from '@my/prisma';
 
 export const getRevenueReport = async (req, res) => {
   try {
@@ -94,3 +95,40 @@ export const exportRevenue = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
+export const getWeeklyReport = async (req, res) => {
+  try {
+    let buildingIds = null;
+    if (req.user && req.user.role === 'MANAGER') {
+      const assignments = await prisma.buildingAssignments.findMany({
+        where: { user_id: req.user.id, revoked_at: null },
+        select: { building_id: true }
+      });
+      buildingIds = assignments.map(a => a.building_id);
+    }
+    const data = await service.getWeeklyReportData(buildingIds);
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const triggerWeeklyReport = async (req, res) => {
+  try {
+    const { userIds } = req.body;
+    const results = await service.runWeeklyReport(userIds);
+    res.json({ success: true, message: 'Đã kích hoạt gửi báo cáo tuần qua email.', results });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+export const getWeeklyReportCandidates = async (req, res) => {
+  try {
+    const data = await service.getWeeklyReportCandidates();
+    res.json({ success: true, data });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+

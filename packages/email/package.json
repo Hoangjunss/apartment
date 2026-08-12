@@ -1,0 +1,12 @@
+{
+  "name": "@my/email",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "dependencies": {
+    "nodemailer": "^6.9.13"
+  }
+}

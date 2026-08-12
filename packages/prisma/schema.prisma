@@ -24,6 +24,7 @@ model Users {
   phone         String?   @db.VarChar(20)
   role          UserRole
   is_active     Boolean   @default(true)
+  receive_weekly_report Boolean @default(false)
   last_login_at DateTime?
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
@@ -945,5 +946,16 @@ model UserSessions {
   @@index([user_id])
   @@index([refresh_token_hash])
   @@index([expires_at])
+}
+
+model EmailLogs {
+  id            Int      @id @default(autoincrement())
+  recipient     String   @db.Text
+  subject       String   @db.VarChar(200)
+  sent_at       DateTime @default(now())
+  status        String   @db.VarChar(50) // SUCCESS, FAILED
+  retry_count   Int      @default(0)
+  error_message String?  @db.Text
+  created_at    DateTime @default(now())
 }
 

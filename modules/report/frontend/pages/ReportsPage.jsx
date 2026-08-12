@@ -12,7 +12,11 @@ import {
   TrendingUp,
   Activity,
   RotateCcw,
-  Printer
+  Printer,
+  Mail,
+  Loader2,
+  Search,
+  X
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -37,7 +41,7 @@ import {
   useMaintenanceReport,
   useContractsReport
 } from '../hooks/useReport.js';
-import { downloadExportFile } from '../services/report.api.js';
+import { downloadExportFile, triggerWeeklyReport, getWeeklyReportCandidates } from '../services/report.api.js';
 
 const formatCurrency = (v) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(v || 0));
@@ -49,6 +53,12 @@ export default function ReportsPage() {
   const [fromMonth, setFromMonth] = useState('');
   const [toMonth, setToMonth] = useState('');
   const [activeTab, setActiveTab] = useState('revenue');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [candidates, setCandidates] = useState([]);
+  const [isLoadingCandidates, setIsLoadingCandidates] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Filters for queries
   const filters = {
@@ -106,6 +116,54 @@ export default function ReportsPage() {
     window.print();
   };
 
+  const handleOpenSendModal = async () => {
+    setShowSendModal(true);
+    setIsLoadingCandidates(true);
+    try {
+      const data = await getWeeklyReportCandidates();
+      setCandidates(data || []);
+      setSelectedUserIds((data || []).map(u => u.id));
+    } catch (err) {
+      console.error(err);
+      toast.error('Không thể tải danh sách người nhận báo cáo.');
+    } finally {
+      setIsLoadingCandidates(false);
+    }
+  };
+
+  const handleSendWeeklyReportEmail = async () => {
+    if (selectedUserIds.length === 0) {
+      toast.error('Vui lòng chọn ít nhất một người nhận.');
+      return;
+    }
+    try {
+      setIsSendingEmail(true);
+      toast.loading('Đang gửi email báo cáo tuần...', { id: 'email-toast' });
+      const res = await triggerWeeklyReport(selectedUserIds);
+      
+      if (res?.success) {
+        toast.success(res.message || 'Gửi email báo cáo tuần thành công!', { id: 'email-toast' });
+        setShowSendModal(false);
+      } else {
+        toast.error(res?.message || 'Gửi email báo cáo tuần thất bại.', { id: 'email-toast' });
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || err.message || 'Có lỗi xảy ra khi gửi email.', { id: 'email-toast' });
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  const filteredCandidates = candidates.filter(user => {
+    const q = searchQuery.toLowerCase();
+    return (
+      user.full_name?.toLowerCase().includes(q) ||
+      user.email?.toLowerCase().includes(q) ||
+      user.role?.toLowerCase().includes(q)
+    );
+  });
+
   // Aggregate stats for top cards
   const totalCollectedRevenue = revenueData.reduce((sum, item) => sum + item.actual_collected, 0);
   const occupancyRate = occupancyData?.occupancyRate ?? 0;
@@ -120,14 +178,24 @@ export default function ReportsPage() {
           title="Báo cáo thống kê"
           subtitle="Theo dõi doanh thu, tỷ lệ lấp đầy, tình trạng kỹ thuật và hợp đồng căn hộ"
           action={
-            <button
-              onClick={handlePrint}
-              className="btn-secondary flex items-center gap-1.5"
-              id="print-report-btn"
-            >
-              <Printer size={16} />
-              In báo cáo (PDF)
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleOpenSendModal}
+                className="btn-primary flex items-center gap-1.5"
+                id="send-weekly-report-btn"
+              >
+                <Mail size={16} />
+                Gửi báo cáo tuần
+              </button>
+              <button
+                onClick={handlePrint}
+                className="btn-secondary flex items-center gap-1.5"
+                id="print-report-btn"
+              >
+                <Printer size={16} />
+                In báo cáo (PDF)
+              </button>
+            </div>
           }
         />
       </div>
@@ -639,6 +707,169 @@ export default function ReportsPage() {
           </div>
         )}
       </div>
+
+      {/* Modal Chọn người nhận báo cáo */}
+      {showSendModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[85vh]">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+              <div>
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                  <Mail className="text-indigo-600" size={18} /> Gửi báo cáo vận hành tuần qua Email
+                </h3>
+                <p className="text-[11px] text-slate-400">Chọn những quản lý hoặc quản trị viên bạn muốn gửi báo cáo tuần này</p>
+              </div>
+              <button 
+                onClick={() => setShowSendModal(false)}
+                className="text-slate-400 hover:text-slate-600 transition p-1 hover:bg-slate-100 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Search and Selection Helpers */}
+            <div className="p-4 border-b border-slate-50 flex flex-col sm:flex-row gap-3 items-center justify-between bg-white">
+              <div className="relative w-full sm:w-72">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                  <Search size={14} />
+                </span>
+                <input
+                  type="text"
+                  placeholder="Tìm theo tên, email, vai trò..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="input pl-9 text-xs h-9 w-full"
+                />
+              </div>
+              
+              <div className="flex items-center gap-2 self-end sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setSelectedUserIds(filteredCandidates.map(c => c.id))}
+                  className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition bg-indigo-50 hover:bg-indigo-100/50 px-2.5 py-1.5 rounded-lg"
+                >
+                  Chọn tất cả
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedUserIds([])}
+                  className="text-xs font-semibold text-slate-600 hover:text-slate-800 transition bg-slate-50 hover:bg-slate-100 px-2.5 py-1.5 rounded-lg"
+                >
+                  Bỏ chọn tất cả
+                </button>
+              </div>
+            </div>
+
+            {/* Candidates list content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {isLoadingCandidates ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-3 text-slate-400">
+                  <Loader2 className="animate-spin text-indigo-600" size={24} />
+                  <span className="text-xs">Đang tải danh sách người nhận...</span>
+                </div>
+              ) : filteredCandidates.length === 0 ? (
+                <div className="text-center py-20 text-slate-400 text-xs italic">
+                  Không tìm thấy người nhận nào phù hợp.
+                </div>
+              ) : (
+                <div className="border border-slate-100 rounded-xl overflow-hidden shadow-sm">
+                  <div className="divide-y divide-slate-100 max-h-[350px] overflow-y-auto">
+                    {filteredCandidates.map((user) => {
+                      const isChecked = selectedUserIds.includes(user.id);
+                      return (
+                        <div 
+                          key={user.id} 
+                          onClick={() => {
+                            setSelectedUserIds(prev => 
+                              isChecked ? prev.filter(id => id !== user.id) : [...prev, user.id]
+                            );
+                          }}
+                          className={`flex items-start gap-3 p-3.5 hover:bg-slate-50/50 transition cursor-pointer ${
+                            isChecked ? 'bg-indigo-50/10' : ''
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            readOnly
+                            className="checkbox mt-1 pointer-events-none"
+                          />
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-bold text-slate-800">{user.full_name}</span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                user.role === 'ADMIN' 
+                                  ? 'bg-indigo-100 text-indigo-800' 
+                                  : 'bg-violet-100 text-violet-800'
+                              }`}>
+                                {user.role}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-400 truncate mt-0.5">{user.email}</div>
+                            
+                            {/* Assigned Buildings list */}
+                            <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] font-semibold text-slate-400">Tòa nhà:</span>
+                              {user.role === 'ADMIN' ? (
+                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                  Toàn hệ thống
+                                </span>
+                              ) : user.buildings && user.buildings.length > 0 ? (
+                                user.buildings.map(b => (
+                                  <span key={b.id} className="text-[10px] font-bold text-indigo-600 bg-indigo-50/70 px-1.5 py-0.5 rounded">
+                                    {b.name}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded italic">
+                                  Chưa phân công
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
+              <span className="text-xs font-semibold text-slate-500">
+                Đã chọn: <strong className="text-slate-800 font-mono">{selectedUserIds.length}</strong> / {filteredCandidates.length} người
+              </span>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowSendModal(false)}
+                  className="btn-secondary text-xs h-9 px-4"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSendWeeklyReportEmail}
+                  disabled={isSendingEmail || selectedUserIds.length === 0}
+                  className="btn-primary text-xs h-9 px-5 flex items-center gap-1.5 shadow-sm"
+                >
+                  {isSendingEmail ? (
+                    <Loader2 className="animate-spin" size={14} />
+                  ) : (
+                    <Mail size={14} />
+                  )}
+                  Xác nhận gửi
+                </button>
+              </div>
+            </div>
+            
+          </div>
+        </div>
+      )}
     </div>
   );
 }

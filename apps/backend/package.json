@@ -18,6 +18,7 @@
     "@my/attachments-backend": "workspace:*",
     "@my/search-backend": "workspace:*",
     "@my/report-backend": "workspace:*",
+    "@my/scheduler": "workspace:*",
     "@my/expense-backend": "workspace:*",
     "@my/calendar-backend": "workspace:*",
     "@my/workflow-backend": "workspace:*",

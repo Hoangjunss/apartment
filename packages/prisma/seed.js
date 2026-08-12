@@ -19,6 +19,8 @@ async function main() {
   console.log('Seed starting with MASSIVE dataset (5x expansion)...');
 
   // 1. Clean up existing data in correct FK order
+  await prisma.userSessions.deleteMany({});
+  await prisma.temporaryRegistrations.deleteMany({});
   await prisma.serviceRequestMaterials.deleteMany({});
   await prisma.stockTransactions.deleteMany({});
   await prisma.inventoryItems.deleteMany({});
@@ -64,6 +66,7 @@ async function main() {
       full_name: 'Nguyễn Văn Admin',
       role: 'ADMIN',
       phone: '0901234567',
+      receive_weekly_report: true,
     },
   });
 
@@ -74,6 +77,7 @@ async function main() {
       full_name: 'Trần Thị Manager',
       role: 'MANAGER',
       phone: '0907654321',
+      receive_weekly_report: true,
     },
   });
 
@@ -104,6 +108,7 @@ async function main() {
       { name: 'Giặt ủi đồ', type: 'LAUNDRY', unit_price: 50000, unit: 'kg' },
       { name: 'Internet cáp quang', type: 'INTERNET', unit_price: 250000, unit: 'tháng' },
       { name: 'Truyền hình cáp HD', type: 'CABLE_TV', unit_price: 120000, unit: 'tháng' },
+      { name: 'Trông giữ thú cưng', type: 'OTHER', unit_price: 150000, unit: 'con/tháng' },
     ],
   });
 
@@ -170,7 +175,7 @@ async function main() {
   for (let f = 0; f < 4; f++) {
     const floor = floorsA[f];
     for (let r = 1; r <= 3; r++) {
-      const type = roomTypes[(f + r) % 3]; // STUDIO, ONE_BR, TWO_BR
+      const type = roomTypes[(f + r) % roomTypes.length]; // STUDIO, ONE_BR, TWO_BR, THREE_BR
       const code = `A0${f + 1}0${r}`;
       const apt = await prisma.apartments.create({
         data: {
@@ -193,7 +198,7 @@ async function main() {
   for (let f = 0; f < 4; f++) {
     const floor = floorsB[f];
     for (let r = 1; r <= 3; r++) {
-      const type = roomTypes[(f + r + 1) % 3];
+      const type = roomTypes[(f + r + 1) % roomTypes.length];
       const code = `B0${f + 1}0${r}`;
       const apt = await prisma.apartments.create({
         data: {
@@ -225,7 +230,7 @@ async function main() {
         national_id_issued_date: new Date('2018-06-15'),
         national_id_issued_place: 'Cục Cảnh sát ĐKQL cư trú và DLQG về dân cư',
         date_of_birth: new Date(1988 + (i * 2), (i * 3) % 12, (i * 5) % 28 + 1),
-        gender: isMale ? 'MALE' : 'FEMALE',
+        gender: i % 5 === 0 ? 'OTHER' : (isMale ? 'MALE' : 'FEMALE'),
         phone: `09${30000000 + i * 45917}`,
         email: `tenant${i + 1}@gmail.com`,
         permanent_address: `${i * 12 + 10} Đường Điện Biên Phủ, Quận Bình Thạnh, TP.HCM`,
@@ -256,10 +261,33 @@ async function main() {
     // Default 1-year contract length
     let endDate = new Date(startDate.getFullYear() + 1, startDate.getMonth(), startDate.getDate());
     
+    let status = 'ACTIVE';
+    let terminationReason = null;
+    
     // Make 3 contracts expire in June 2026
-    if (i === 0) endDate = new Date('2026-06-15');
-    if (i === 4) endDate = new Date('2026-06-22');
-    if (i === 8) endDate = new Date('2026-06-29');
+    if (i === 0) {
+      endDate = new Date('2026-06-15');
+      status = 'EXPIRING_SOON';
+    }
+    if (i === 4) {
+      endDate = new Date('2026-06-22');
+      status = 'EXPIRING_SOON';
+    }
+    if (i === 8) {
+      endDate = new Date('2026-06-29');
+      status = 'EXPIRING_SOON';
+    }
+    
+    // Make one contract expired and one terminated in the past (to test full enum scope)
+    if (i === 12) {
+      endDate = new Date('2026-05-15');
+      status = 'TERMINATED';
+      terminationReason = 'Khách thuê chuyển công tác trước thời hạn';
+    }
+    if (i === 13) {
+      endDate = new Date('2026-05-20');
+      status = 'EXPIRED';
+    }
 
     const monthlyRent = Number(apt.base_price);
     const occupants = (i % 3) + 1; // 1 to 3 occupants
@@ -274,7 +302,8 @@ async function main() {
         monthly_rent: monthlyRent,
         deposit_amount: monthlyRent, // deposit <= rent
         payment_due_day: 5,
-        status: 'ACTIVE',
+        status: status,
+        termination_reason: terminationReason,
         created_by: manager.id,
         occupants_count: occupants,
         soNguoiO: occupants,
@@ -286,26 +315,26 @@ async function main() {
       }
     });
 
-    // Update apartment to occupied
+    // Update apartment status: AVAILABLE if expired/terminated, OCCUPIED otherwise
     await prisma.apartments.update({
       where: { id: apt.id },
-      data: { status: 'OCCUPIED' }
+      data: { status: (status === 'EXPIRED' || status === 'TERMINATED') ? 'AVAILABLE' : 'OCCUPIED' }
     });
 
-    // Add Furniture logs for this apartment
+    // Add Furniture logs for this apartment with diverse condition enums (NEW, GOOD, WORN)
     await prisma.apartmentFurniture.createMany({
       data: [
-        { apartment_id: apt.id, item_name: 'Giường gỗ sồi', quantity: 1, condition: 'NEW' },
-        { apartment_id: apt.id, item_name: 'Tủ quần áo 3 cánh', quantity: 1, condition: 'GOOD' },
-        { apartment_id: apt.id, item_name: 'Điều hòa Daikin', quantity: 1, condition: 'NEW' },
-        { apartment_id: apt.id, item_name: 'Bình nóng lạnh', quantity: 1, condition: 'GOOD' }
+        { apartment_id: apt.id, item_name: 'Giường gỗ sồi', quantity: 1, condition: i % 3 === 0 ? 'WORN' : (i % 2 === 0 ? 'NEW' : 'GOOD') },
+        { apartment_id: apt.id, item_name: 'Tủ quần áo 3 cánh', quantity: 1, condition: i % 3 === 1 ? 'WORN' : (i % 2 === 1 ? 'NEW' : 'GOOD') },
+        { apartment_id: apt.id, item_name: 'Điều hòa Daikin', quantity: 1, condition: i % 3 === 2 ? 'WORN' : (i % 2 === 0 ? 'NEW' : 'GOOD') },
+        { apartment_id: apt.id, item_name: 'Bình nóng lạnh', quantity: 1, condition: i % 3 === 0 ? 'WORN' : (i % 2 === 1 ? 'NEW' : 'GOOD') }
       ]
     });
 
-    // Add subscriptions
+    // Add subscriptions with some CANCELLED status (SubscriptionStatus: ACTIVE, CANCELLED)
     if (internetService) {
       await prisma.serviceSubscriptions.create({
-        data: { contract_id: contract.id, service_id: internetService.id, status: 'ACTIVE', quantity: 1 }
+        data: { contract_id: contract.id, service_id: internetService.id, status: i % 7 === 0 ? 'CANCELLED' : 'ACTIVE', quantity: 1 }
       });
     }
     if (i % 2 === 0 && cleanService) {
@@ -332,14 +361,78 @@ async function main() {
     data: { status: 'RESERVED' }
   });
 
+  // 7.5 Create ContractCredits and CreditTransactions
+  console.log('Seeding Contract Credits & Credit Transactions...');
+  for (let i = 0; i < 5; i++) {
+    const contract = contracts[i];
+    await prisma.contractCredits.create({
+      data: {
+        contract_id: contract.id,
+        balance: 500000.00,
+      }
+    });
+
+    await prisma.creditTransactions.create({
+      data: {
+        contract_id: contract.id,
+        type: 'CREDIT_IN',
+        amount: 500000.00,
+        description: 'Khách hàng nộp thừa tiền phòng, chuyển vào số dư tích lũy',
+        recorded_by: admin.id,
+        created_at: new Date('2026-05-10T10:00:00Z')
+      }
+    });
+  }
+
+  // Credit Transactions for CREDIT_APPLY and CREDIT_REFUND
+  if (contracts[0]) {
+    await prisma.creditTransactions.create({
+      data: {
+        contract_id: contracts[0].id,
+        type: 'CREDIT_APPLY',
+        amount: 200000.00,
+        description: 'Khấu trừ 200,000đ từ số dư tích lũy vào hóa đơn tháng 5',
+        recorded_by: admin.id,
+        created_at: new Date('2026-05-01T11:00:00Z')
+      }
+    });
+  }
+  if (contracts[1]) {
+    await prisma.creditTransactions.create({
+      data: {
+        contract_id: contracts[1].id,
+        type: 'CREDIT_REFUND',
+        amount: 100000.00,
+        description: 'Hoàn trả 100,000đ tiền mặt từ số dư tích lũy cho khách',
+        recorded_by: admin.id,
+        created_at: new Date('2026-05-15T14:00:00Z')
+      }
+    });
+  }
+
+  // 7.6 Create ContractRenewals
+  console.log('Seeding Contract Renewals...');
+  if (contracts[2]) {
+    await prisma.contractRenewals.create({
+      data: {
+        contract_id: contracts[2].id,
+        old_end_date: new Date('2026-03-01'),
+        new_end_date: new Date('2027-03-01'),
+        new_monthly_rent: Number(contracts[2].monthly_rent) * 1.05,
+        notes: 'Gia hạn hợp đồng thêm 1 năm, tăng giá thuê 5% theo thỏa thuận.',
+        renewed_by: manager.id,
+      }
+    });
+  }
+
   console.log(` Rented out 16 apartments. 1 Maintenance, 1 Reserved, 6 Available.`);
 
   // 8. Generate Utility Readings, Invoices, and Payments Month-by-Month
-  // For each contract, generate records starting from the first billing month up to May 2026.
-  // Months: Jan 2026 ('2026-01'), Feb 2026 ('2026-02'), Mar 2026 ('2026-03'), Apr 2026 ('2026-04'), May 2026 ('2026-05')
+  // For each contract, generate records starting from the first billing month up to June 2026.
+  // Months: Jan 2026 ('2026-01') to June 2026 ('2026-06')
   console.log('Generating historical financials & chốt số records...');
   
-  const allBillingMonths = ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05'];
+  const allBillingMonths = ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06'];
   let totalInvoicesCreated = 0;
 
   for (const contract of contracts) {
@@ -351,12 +444,15 @@ async function main() {
     // Initial values
     let prevElec = Number(contract.initial_electricity);
 
-    // Filter months that are on or after the contract start date
+    // Filter months that are within the contract active period
     const billingMonths = allBillingMonths.filter(m => {
       const [yStr, mStr] = m.split('-');
-      const mDate = new Date(Number(yStr), Number(mStr) - 1, 1);
-      // Include month if contract starts on or before the first of this month
-      return start <= new Date(Number(yStr), Number(mStr) - 1, 31);
+      const monthStart = new Date(Number(yStr), Number(mStr) - 1, 1);
+      const monthEnd = new Date(Number(yStr), Number(mStr) - 1, 31);
+      
+      const contractEnd = new Date(contract.end_date);
+      
+      return start <= monthEnd && contractEnd >= monthStart;
     });
 
     for (let monthIndex = 0; monthIndex < billingMonths.length; monthIndex++) {
@@ -372,6 +468,10 @@ async function main() {
       // Flat water calculation (100.000đ per person per month)
       const waterAmount = occupants * 100000;
 
+      // Ensure utility reading recording date does not exceed current local time (June 9, 2026)
+      const plannedRecordedAt = new Date(year, month - 1, 28, 17, 30, 0);
+      const recordedAt = plannedRecordedAt > new Date('2026-06-09') ? new Date('2026-06-01T17:30:00Z') : plannedRecordedAt;
+
       // 8.1 Write Utility Reading record
       await prisma.utilityReadings.create({
         data: {
@@ -385,7 +485,7 @@ async function main() {
           water_unit_price: 100000, // flat unit price
           soNguoiO: occupants,
           recorded_by: admin.id,
-          recorded_at: new Date(year, month - 1, 28, 17, 30, 0)
+          recorded_at: recordedAt
         }
       });
 
@@ -403,12 +503,16 @@ async function main() {
       const totalAmount = monthlyRent + electricityAmount + waterAmount + serviceAmount + otherAmount;
 
       // Invoice status distribution
-      // May 2026: More Unpaid/Partially Paid invoices for test data display
-      // Other months: Mostly paid
+      // June 2026 is the current month. The due date is June 5th, 2026.
+      // Since today is June 9th, unpaid/partially paid invoices are OVERDUE.
       let status = 'PAID';
       const rand = Math.random();
 
-      if (billingMonth === '2026-05') {
+      if (billingMonth === '2026-06') {
+        if (rand < 0.25) status = 'OVERDUE';
+        else if (rand < 0.5) status = 'UNPAID';
+        else if (rand < 0.7) status = 'PARTIALLY_PAID';
+      } else if (billingMonth === '2026-05') {
         if (rand < 0.35) status = 'UNPAID';
         else if (rand < 0.6) status = 'PARTIALLY_PAID';
       } else {
@@ -444,7 +548,7 @@ async function main() {
           data: {
             invoice_id: invoice.id,
             amount: totalAmount,
-            payment_method: 'BANK_TRANSFER',
+            payment_method: monthIndex % 3 === 0 ? 'CASH' : 'BANK_TRANSFER',
             payment_date: new Date(year, month - 1, 4),
             reference_number: `BANKTX${year}${String(month).padStart(2, '0')}04${String(contract.id).padStart(4, '0')}`,
             note: `Thanh toán toàn bộ hóa đơn tháng ${month}/${year}`,
@@ -458,7 +562,7 @@ async function main() {
           data: {
             invoice_id: invoice.id,
             amount: paidAmount,
-            payment_method: 'BANK_TRANSFER',
+            payment_method: monthIndex % 3 === 0 ? 'CASH' : 'BANK_TRANSFER',
             payment_date: new Date(year, month - 1, 5),
             reference_number: `BANKTX${year}${String(month).padStart(2, '0')}05${String(contract.id).padStart(4, '0')}`,
             note: `Thanh toán trước một phần tiền phòng kỳ tháng ${month}/${year}`,
@@ -497,6 +601,8 @@ async function main() {
     { warehouse_id: w1.id, item_name: 'Bóng đèn Điện Quang 18W', category: 'CONSUMABLE', current_stock: 20, min_stock_level: 5, unit: 'cái', unit_cost: 35000 },
     { warehouse_id: w1.id, item_name: 'Dây cáp điện Cadivi', category: 'CONSUMABLE', current_stock: 50, min_stock_level: 10, unit: 'mét', unit_cost: 12000 },
     { warehouse_id: w1.id, item_name: 'Van nước Inox', category: 'SPARE_PART', current_stock: 8, min_stock_level: 3, unit: 'cái', unit_cost: 85000 },
+    { warehouse_id: w1.id, item_name: 'Bộ tuốc nơ vít đa năng', category: 'TOOL', current_stock: 3, min_stock_level: 1, unit: 'bộ', unit_cost: 180000 },
+    { warehouse_id: w1.id, item_name: 'Máy khoan cầm tay Bosch', category: 'EQUIPMENT', current_stock: 2, min_stock_level: 1, unit: 'cái', unit_cost: 1200000 },
     { warehouse_id: w2.id, item_name: 'Nước lau sàn Sunlight', category: 'CONSUMABLE', current_stock: 10, min_stock_level: 2, unit: 'chai', unit_cost: 45000 }
   ];
 
@@ -520,6 +626,20 @@ async function main() {
     });
   }
 
+  // Stock Transaction with ADJUSTMENT ref type
+  await prisma.stockTransactions.create({
+    data: {
+      inventory_item_id: items[0].id,
+      type: 'STOCK_OUT',
+      quantity: 1,
+      unit_cost: items[0].unit_cost,
+      item_name_snapshot: items[0].item_name,
+      ref_type: 'ADJUSTMENT',
+      note: 'Kiểm kho phát hiện hao hụt 1 bóng đèn',
+      recorded_by: admin.id
+    }
+  });
+
   const elevatorAsset = await prisma.assets.create({
     data: {
       building_id: b1.id,
@@ -542,7 +662,7 @@ async function main() {
       asset_code: 'AST-0002',
       name: 'Máy phát điện Mitsubishi',
       category: 'MACHINERY',
-      status: 'ACTIVE',
+      status: 'UNDER_REPAIR',
       purchase_cost: 450000000,
       salvage_value: 30000000,
       useful_life_years: 10,
@@ -552,7 +672,87 @@ async function main() {
     }
   });
 
-  // 10. ServiceRequests mẫu
+  const oldPumpAsset = await prisma.assets.create({
+    data: {
+      building_id: b1.id,
+      asset_code: 'AST-0003',
+      name: 'Máy bơm nước cũ Pentax',
+      category: 'MACHINERY',
+      status: 'DECOMMISSIONED',
+      purchase_cost: 12000000,
+      salvage_value: 500000,
+      useful_life_years: 5,
+      purchase_date: new Date('2020-02-10'),
+      depreciation_method: 'STRAIGHT_LINE',
+      description: 'Máy bơm nước sảnh phụ đã hỏng hóc nặng và thanh lý'
+    }
+  });
+
+  const serverAsset = await prisma.assets.create({
+    data: {
+      building_id: b1.id,
+      asset_code: 'AST-0004',
+      name: 'Hệ thống Camera & Server trung tâm',
+      category: 'ELECTRONICS',
+      status: 'ACTIVE',
+      purchase_cost: 120000000,
+      salvage_value: 10000000,
+      useful_life_years: 5,
+      purchase_date: new Date('2025-01-10'),
+      depreciation_method: 'STRAIGHT_LINE',
+      description: 'Hệ thống đầu ghi và camera giám sát hành lang toàn tòa nhà'
+    }
+  });
+
+  const deskAsset = await prisma.assets.create({
+    data: {
+      building_id: b1.id,
+      asset_code: 'AST-0005',
+      name: 'Bàn lễ tân sảnh chính',
+      category: 'FURNITURE',
+      status: 'ACTIVE',
+      purchase_cost: 25000000,
+      salvage_value: 2000000,
+      useful_life_years: 8,
+      purchase_date: new Date('2026-01-05'),
+      depreciation_method: 'STRAIGHT_LINE',
+      description: 'Bàn quầy gỗ công nghiệp An Cường sảnh chính'
+    }
+  });
+
+  const cartAsset = await prisma.assets.create({
+    data: {
+      building_id: b1.id,
+      asset_code: 'AST-0006',
+      name: 'Xe điện tuần tra nội khu',
+      category: 'VEHICLE',
+      status: 'ACTIVE',
+      purchase_cost: 80000000,
+      salvage_value: 5000000,
+      useful_life_years: 7,
+      purchase_date: new Date('2025-06-15'),
+      depreciation_method: 'STRAIGHT_LINE',
+      description: 'Xe điện 4 chỗ dùng cho bảo vệ tuần tra khuôn viên Sunrise Block A'
+    }
+  });
+
+  const fireAsset = await prisma.assets.create({
+    data: {
+      building_id: b1.id,
+      asset_code: 'AST-0007',
+      name: 'Hệ thống bình chữa cháy cầm tay',
+      category: 'OTHER',
+      status: 'ACTIVE',
+      purchase_cost: 15000000,
+      salvage_value: 0,
+      useful_life_years: 3,
+      purchase_date: new Date('2026-03-01'),
+      depreciation_method: 'STRAIGHT_LINE',
+      description: 'Trang bị 30 bình chữa cháy khí CO2 đặt tại các hành lang'
+    }
+  });
+
+  // 10. ServiceRequests mẫu với độ đa dạng cao của các Enums
   const serviceReqData = [
     {
       title: 'Điều hòa phòng A101 không mát',
@@ -562,6 +762,7 @@ async function main() {
       requester_phone: '0922334455',
       assigned_to: tech.id,
       status: 'IN_PROGRESS',
+      priority: 'HIGH',
       source: 'INTERNAL',
       type: 'MAINTENANCE',
       scheduled_start_date: new Date('2026-06-04')
@@ -573,7 +774,8 @@ async function main() {
       requester_name: 'Trần Thị Manager',
       requester_phone: '0907654321',
       assigned_to: tech.id,
-      status: 'PENDING',
+      status: 'ASSIGNED',
+      priority: 'URGENT',
       source: 'INTERNAL',
       type: 'MAINTENANCE',
       scheduled_start_date: new Date('2026-06-05')
@@ -586,7 +788,8 @@ async function main() {
       requester_phone: '0922334455',
       assigned_to: null,
       status: 'PENDING',
-      source: 'INTERNAL',
+      priority: 'LOW',
+      source: 'PUBLIC_FORM',
       type: 'MAINTENANCE',
       scheduled_start_date: new Date('2026-06-06')
     },
@@ -598,21 +801,49 @@ async function main() {
       requester_phone: '0901234567',
       assigned_to: tech.id,
       status: 'RESOLVED',
+      priority: 'NORMAL',
       source: 'INTERNAL',
       type: 'MAINTENANCE',
       scheduled_start_date: new Date('2026-06-02')
     },
     {
-      title: 'Thay bình nóng lạnh phòng B102',
-      description: 'Bình nóng lạnh không đun được nước, có thể hỏng điện trở',
-      apartment_id: apartments[12].id,
+      title: 'Hàng xóm làm ồn đêm khuya',
+      description: 'Căn hộ tầng trên thường xuyên kéo ghế và làm ồn sau 11h đêm',
+      apartment_id: apartments[2].id,
+      requester_name: 'Trần Thị Manager',
+      requester_phone: '0907654321',
+      assigned_to: manager.id,
+      status: 'POSTPONED',
+      priority: 'NORMAL',
+      source: 'INTERNAL',
+      type: 'COMPLAINT',
+      scheduled_start_date: new Date('2026-06-03')
+    },
+    {
+      title: 'Hỗ trợ lắp đặt kệ sách treo tường',
+      description: 'Khách yêu cầu hỗ trợ khoan tường lắp kệ sách mới mua',
+      apartment_id: apartments[1].id,
       requester_name: 'Phạm Thị Lễ Tân',
       requester_phone: '0922334455',
       assigned_to: tech.id,
-      status: 'PENDING',
-      source: 'INTERNAL',
-      type: 'MAINTENANCE',
+      status: 'CANCELLED',
+      priority: 'LOW',
+      source: 'PUBLIC_FORM',
+      type: 'OTHER',
       scheduled_start_date: new Date('2026-06-07')
+    },
+    {
+      title: 'Dọn dẹp hành lang Block B',
+      description: 'Yêu cầu dọn dẹp rác sinh hoạt rơi vãi hành lang',
+      apartment_id: apartments[12].id,
+      requester_name: 'Phạm Thị Lễ Tân',
+      requester_phone: '0922334455',
+      assigned_to: null,
+      status: 'PENDING',
+      priority: 'LOW',
+      source: 'INTERNAL',
+      type: 'CLEANING',
+      scheduled_start_date: new Date('2026-06-08')
     },
     {
       title: 'Bảo trì định kỳ Thang máy Otis',
@@ -622,6 +853,7 @@ async function main() {
       requester_phone: '0901234567',
       assigned_to: tech.id,
       status: 'RESOLVED',
+      priority: 'NORMAL',
       source: 'INTERNAL',
       type: 'MAINTENANCE',
       asset_id: elevatorAsset.id,
@@ -678,7 +910,7 @@ async function main() {
   const exp1 = await prisma.buildingExpenses.create({
     data: {
       building_id: b1.id,
-      category: 'OPERATIONS',
+      category: 'UTILITY_ELECTRICITY',
       title: 'Electricity Bill - May 2026',
       amount: 4250000,
       expense_date: new Date('2026-05-05'),
@@ -704,7 +936,7 @@ async function main() {
   const exp3 = await prisma.buildingExpenses.create({
     data: {
       building_id: b1.id,
-      category: 'MAINTENANCE',
+      category: 'ASSET_MAINTENANCE',
       title: 'Elevator Maintenance Schindler',
       amount: 5000000,
       expense_date: new Date('2026-05-12'),
@@ -743,12 +975,25 @@ async function main() {
   const exp6 = await prisma.buildingExpenses.create({
     data: {
       building_id: b1.id,
-      category: 'OPERATIONS',
-      title: 'Internet Service Viettel - May 2026',
-      amount: 850000,
+      category: 'MAINTENANCE',
+      title: 'Sửa mái tôn chống dột Block A',
+      amount: 4500000,
       expense_date: new Date('2026-05-20'),
       status: 'PAID',
-      description: 'Tiền cước cáp quang Viettel tốc độ cao cho ban quản lý Block A tháng 5/2026',
+      description: 'Chi phí chống dột mái tôn sảnh trước mùa mưa',
+      created_by: admin.id
+    }
+  });
+
+  const exp7 = await prisma.buildingExpenses.create({
+    data: {
+      building_id: b1.id,
+      category: 'INVENTORY_PURCHASE',
+      title: 'Purchase Spare Parts & Consumables',
+      amount: 1500000,
+      expense_date: new Date('2026-05-22'),
+      status: 'PAID',
+      description: 'Mua bổ sung bóng đèn, dây cáp điện dự phòng cho kho kỹ thuật',
       created_by: admin.id
     }
   });
@@ -790,6 +1035,32 @@ async function main() {
         entity_type: 'BuildingExpense',
         entity_id: exp4.id,
         uploaded_by: admin.id,
+      }
+    ]
+  });
+
+  // 10.5 Seed TemporaryRegistrations
+  console.log('Seeding Temporary Registrations...');
+  await prisma.temporaryRegistrations.createMany({
+    data: [
+      {
+        tenant_id: tenants[0].id,
+        apartment_id: apartments[0].id,
+        type: 'TEMPORARY_RESIDENCE',
+        start_date: new Date('2026-01-05'),
+        end_date: new Date('2027-01-05'),
+        reason: 'Đăng ký tạm trú dài hạn theo hợp đồng thuê nhà',
+        submitted_by: receptionist.id
+      },
+      {
+        tenant_id: tenants[1].id,
+        apartment_id: apartments[1].id,
+        type: 'TEMPORARY_ABSENCE',
+        start_date: new Date('2026-06-05'),
+        end_date: new Date('2026-06-20'),
+        destination: '123 Đường Trần Hưng Đạo, Quy Nhơn, Bình Định',
+        reason: 'Về quê nghỉ hè và thăm gia đình',
+        submitted_by: receptionist.id
       }
     ]
   });
